@@ -81,25 +81,10 @@ A standalone utility for:
 ```
 /
 ├── backend/          # Backend API service
-│   ├── src/          # Source code
-│   ├── package.json  # Package dependencies
-│   └── tsconfig.json # TypeScript configuration
 ├── scraper/          # Data scraping service
-│   ├── src/          # Source code
-│   ├── package.json  # Package dependencies
-│   └── tsconfig.json # TypeScript configuration
 ├── database/         # Database schemas and migrations
-│   ├── src/          # Source code
-│   ├── package.json  # Package dependencies
-│   └── tsconfig.json # TypeScript configuration
 ├── shared/           # Shared utilities and types
-│   ├── src/          # Source code
-│   ├── package.json  # Package dependencies
-│   └── tsconfig.json # TypeScript configuration
 ├── scripts/          # Utility scripts including key management
-│   ├── src/          # Source code
-│   ├── package.json  # Package dependencies
-│   └── tsconfig.json # TypeScript configuration
 ├── examples/         # HTML samples for testing
 ├── docs/             # Project documentation
 ├── package.json      # Root package with shared dependencies
@@ -110,6 +95,7 @@ A standalone utility for:
 ├── .gitignore        # Git ignore rules
 ├── docker-compose.dev.yml  # Development Docker Compose
 ├── docker-compose.prod.yml # Production Docker Compose
+├── docker-compose.test.yml # Test Docker Compose
 ├── .env.dev.example  # Development environment template
 └── .env.prod.example # Production environment template
 ```

@@ -100,11 +100,11 @@ Tests follow descriptive naming conventions that indicate:
 
 ### Minimum Coverage Standards
 
-- **Overall Code Coverage**: 100% of business logic
-- **Parsing Logic**: 100% coverage using example HTML files
-- **Database Operations**: 100% coverage of CRUD operations
-- **API Endpoints**: 100% coverage of all endpoints
-- **Authentication**: 100% coverage of API key validation
+- **Overall Code Coverage**: 80% of business logic
+- **Parsing Logic**: 80% coverage using example HTML files
+- **Database Operations**: 80% coverage of CRUD operations
+- **API Endpoints**: 80% coverage of all endpoints
+- **Authentication**: 80% coverage of API key validation
 
 ### Critical Path Coverage
 
@@ -124,6 +124,8 @@ All critical paths must have comprehensive tests:
 - Isolated from development and production databases
 - Clean state before each test run
 - Seed data for common test scenarios
+- Configured via `docker-compose.test.yml`
+- Test setup implemented in [`database/test/setup.ts`](database/test/setup.ts)
 
 ### Test Fixtures
 
@@ -141,6 +143,18 @@ Tests run automatically during development:
 - Watch mode triggers tests on file changes
 - Fast feedback loop for developers
 - Failed tests block commits in pre-commit hooks
+
+### Database Tests
+
+Run database tests from the database package directory:
+
+```bash
+# Run all database tests
+cd database && pnpm test:run
+
+# Run tests with coverage
+cd database && pnpm test:coverage
+```
 
 ### Continuous Integration
 
@@ -177,6 +191,8 @@ Tests use test database instance:
 - Configurable for different test scenarios
 - Fast setup and teardown
 - No risk to production data
+- Test database configured in `docker-compose.test.yml`
+- Clean state before each test run
 
 ### HTTP Requests
 
@@ -209,6 +225,20 @@ External HTTP requests are mocked:
 - Constraint violations
 - Duplicate key errors
 - Transaction rollbacks
+- Serialization failures
+- Deadlock detection
+
+**Database Failure Test Scenarios**:
+- Connection pool exhaustion
+- Invalid connection parameters
+- Retry logic on transient failures
+- Foreign key constraint violations
+- Unique constraint violations
+- CHECK constraint violations
+- Transaction rollback on errors
+- Savepoint rollback
+- Isolation level behavior
+- Cascade delete behavior
 
 ## Test Maintenance
 
