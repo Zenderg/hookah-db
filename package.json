@@ -1,0 +1,54 @@
+{
+  "name": "hookah-db",
+  "version": "1.0.0",
+  "description": "Monorepository for hookah tobacco database API - scrapes htreviews.org and provides API access",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm run --filter \"./packages/**\" dev",
+    "dev:backend": "pnpm --filter backend dev",
+    "dev:scraper": "pnpm --filter scraper dev",
+    "dev:db": "docker-compose -f docker-compose.dev.yml up -d database",
+    "dev:all": "docker-compose -f docker-compose.dev.yml up",
+    "build": "pnpm run --filter \"./packages/**\" build",
+    "test": "vitest",
+    "test:coverage": "vitest --coverage",
+    "lint": "eslint . --ext .ts,.js",
+    "lint:fix": "eslint . --ext .ts,.js --fix",
+    "format": "prettier --write \"**/*.{ts,js,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,js,json,md}\"",
+    "clean": "pnpm run --filter \"./packages/**\" clean && rm -rf node_modules",
+    "type-check": "tsc --noEmit",
+    "start:prod": "docker-compose -f docker-compose.prod.yml up",
+    "docker:up:prod": "docker-compose -f docker-compose.prod.yml up -d",
+    "docker:down:prod": "docker-compose -f docker-compose.prod.yml down",
+    "docker:logs:prod": "docker-compose -f docker-compose.prod.yml logs -f"
+  },
+  "keywords": [
+    "hookah",
+    "tobacco",
+    "database",
+    "api",
+    "scraper",
+    "monorepo"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "@vitest/coverage-v8": "^1.0.0",
+    "eslint": "^8.55.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.29.0",
+    "prettier": "^3.1.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.0"
+}

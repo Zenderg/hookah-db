@@ -1,0 +1,18 @@
+# pnpm workspace configuration
+# This file defines which packages are part of the monorepo
+
+packages:
+  # Backend API service
+  - 'backend'
+  
+  # Data scraping service
+  - 'scraper'
+  
+  # Database schemas and migrations
+  - 'database'
+  
+  # Shared utilities and types
+  - 'shared'
+  
+  # Utility scripts including key management
+  - 'scripts'

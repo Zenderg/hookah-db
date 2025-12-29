@@ -4,6 +4,41 @@
 
 The project is organized as a monorepository using pnpm workspaces. This approach allows multiple subprojects to coexist in a single repository while sharing dependencies and configuration.
 
+### Workspace Configuration
+
+The workspace is configured in `pnpm-workspace.yaml` with 5 packages:
+- `backend/` - Backend API service
+- `scraper/` - Data scraping service
+- `database/` - Database schemas and migrations
+- `shared/` - Shared utilities and types
+- `scripts/` - Utility scripts including key management
+
+### TypeScript Configuration Strategy
+
+TypeScript is configured at two levels:
+
+**Root Configuration (`tsconfig.json`):**
+- Contains shared compiler options for all packages
+- Excludes output-related settings (each package manages its own output)
+- Provides common path mappings and type checking rules
+
+**Package-Level Configuration:**
+- Each package has its own `tsconfig.json` extending the root configuration
+- Packages define their own output directory and build settings
+- Allows for different build targets per package
+
+### Code Quality Tools
+
+**ESLint Configuration (`.eslintrc.cjs`):**
+- Configured as CommonJS module for ES module compatibility
+- Shared across all workspace packages
+- Enforces consistent code style and best practices
+
+**Prettier Configuration (`.prettierrc`):**
+- Shared formatting rules across the entire project
+- Applied to all TypeScript and configuration files
+- Ensures consistent code formatting
+
 ## Project Components
 
 ### Backend Service
@@ -46,12 +81,37 @@ A standalone utility for:
 ```
 /
 ├── backend/          # Backend API service
+│   ├── src/          # Source code
+│   ├── package.json  # Package dependencies
+│   └── tsconfig.json # TypeScript configuration
 ├── scraper/          # Data scraping service
+│   ├── src/          # Source code
+│   ├── package.json  # Package dependencies
+│   └── tsconfig.json # TypeScript configuration
 ├── database/         # Database schemas and migrations
+│   ├── src/          # Source code
+│   ├── package.json  # Package dependencies
+│   └── tsconfig.json # TypeScript configuration
 ├── shared/           # Shared utilities and types
-├── examples/         # HTML samples for testing
+│   ├── src/          # Source code
+│   ├── package.json  # Package dependencies
+│   └── tsconfig.json # TypeScript configuration
 ├── scripts/          # Utility scripts including key management
-└── docs/             # Project documentation
+│   ├── src/          # Source code
+│   ├── package.json  # Package dependencies
+│   └── tsconfig.json # TypeScript configuration
+├── examples/         # HTML samples for testing
+├── docs/             # Project documentation
+├── package.json      # Root package with shared dependencies
+├── pnpm-workspace.yaml # Workspace configuration
+├── tsconfig.json     # Root TypeScript configuration
+├── .eslintrc.cjs     # ESLint configuration (CommonJS)
+├── .prettierrc       # Prettier configuration
+├── .gitignore        # Git ignore rules
+├── docker-compose.dev.yml  # Development Docker Compose
+├── docker-compose.prod.yml # Production Docker Compose
+├── .env.dev.example  # Development environment template
+└── .env.prod.example # Production environment template
 ```
 
 ## Deployment Architecture
@@ -65,6 +125,11 @@ Production deployment uses docker-compose to orchestrate:
 - **Database Container**: Persistent data storage
 - **Network Configuration**: Inter-service communication
 
+**Configuration:**
+- Docker Compose file: `docker-compose.prod.yml`
+- Environment variables: `.env.prod.example` (template)
+- No version attribute (Docker Compose v2+)
+
 ### Development Environment
 
 Local development uses a separate docker-compose configuration:
@@ -74,6 +139,11 @@ Local development uses a separate docker-compose configuration:
 - **Volume Mounts**: Live code synchronization
 - **Debug Configuration**: Enhanced logging and debugging tools
 
+**Configuration:**
+- Docker Compose file: `docker-compose.dev.yml`
+- Environment variables: `.env.dev.example` (template)
+- No version attribute (Docker Compose v2+)
+
 ## Configuration Management
 
 Environment variables are defined centrally and shared across all services:
@@ -82,6 +152,22 @@ Environment variables are defined centrally and shared across all services:
 - **External Service URLs**: Target URLs for scraping
 - **API Settings**: Port numbers, timeouts, and limits
 - **Security Settings**: Encryption keys and secrets
+
+### Environment Templates
+
+Two environment variable templates are provided:
+
+**Development (`.env.dev.example`):**
+- Local database connection
+- Debug logging enabled
+- Relaxed security settings
+- Hot-reload configuration
+
+**Production (`.env.prod.example`):**
+- Production database connection
+- Production logging levels
+- Strict security settings
+- Optimized performance settings
 
 ## Cross-Cutting Concerns
 
