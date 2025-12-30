@@ -2,7 +2,7 @@
 
 ## Testing Philosophy
 
-The project follows a comprehensive testing approach that prioritizes reliability and maintainability. Tests serve as living documentation and ensure that scraping logic remains accurate as the source website structure evolves.
+The project follows a comprehensive testing approach that prioritizes reliability and maintainability. Tests serve as living documentation and ensure that scraping logic remains accurate as the source website structure evolves. Given that the source website uses dynamic loading (infinite scroll/lazy loading), testing must verify the iterative data retrieval mechanisms.
 
 ## The Examples Directory
 
@@ -17,15 +17,18 @@ The `examples/` directory contains HTML files saved from htreviews.org. These fi
 
 ### Example File Types
 
-- **Brand List Page**: HTML showing the list of all tobacco brands
-- **Brand Detail Page**: HTML for a specific brand with product links
+- **Brand List Page (Initial Load)**: HTML showing the first batch of brands from the listing page
+- **Brand List Page (Subsequent Loads)**: HTML showing additional brands loaded via pagination or infinite scroll (if available)
+- **Brand Detail Page (Initial Load)**: HTML for a specific brand with initial product links
+- **Brand Detail Page (Subsequent Loads)**: HTML showing additional products loaded via pagination or infinite scroll (if available)
 - **Product Detail Page**: HTML for a specific tobacco product
 
 ### Maintaining Examples
 
 - Update examples when the source website structure changes significantly
-- Add new examples when new page types are introduced
+- Add new examples when new page types or loading patterns are introduced
 - Remove outdated examples when corresponding pages are removed from the source
+- For dynamic loading scenarios, maintain multiple examples showing different states of loading
 
 ## Test Categories
 
@@ -38,44 +41,53 @@ Test individual functions and components in isolation.
 - Data transformation and normalization logic
 - Utility functions for string manipulation, URL handling
 - API key generation and validation logic
+- Iteration state management functions
+- Completion detection logic for dynamic loading
 
 **Characteristics**:
 - Fast execution
 - No external dependencies
 - Mock all external interactions
 - Test edge cases and error conditions
+- Test iteration logic with various states
 
 ### Integration Tests
 
 Test interactions between multiple components.
 
 **Scope**:
-- Scraper reading HTML from files and extracting data
-- Database operations for storing and retrieving entities
+- Scraper reading HTML from files and extracting data across multiple iterations
+- Database operations for storing and retrieving entities in batches
 - API key validation against the database
 - End-to-end data flow from HTML parsing to database storage
+- Checkpoint creation and recovery mechanisms
+- Duplicate detection across iterations
 
 **Characteristics**:
 - Use real database instances (test-specific)
 - Use example HTML files as input
 - Test component interactions
 - Verify data persistence
+- Test iterative loading scenarios with multiple example files
 
 ### End-to-End Tests
 
 Test complete workflows from start to finish.
 
 **Scope**:
-- Full scraping workflow using example HTML files
+- Full scraping workflow using example HTML files with multiple iterations
 - API request handling with authentication
 - Complete data retrieval from database to API response
 - API key management workflow
+- Resumable scraping with checkpoint recovery
+- Incremental update scenarios
 
 **Characteristics**:
 - Test complete user scenarios
 - Use all real components (except external HTTP calls)
 - Verify system behavior as a whole
 - Slower execution but high confidence
+- Test large data volume handling
 
 ## Test Organization
 
@@ -105,16 +117,113 @@ Tests follow descriptive naming conventions that indicate:
 - **Database Operations**: 80% coverage of CRUD operations
 - **API Endpoints**: 80% coverage of all endpoints
 - **Authentication**: 80% coverage of API key validation
+- **Iteration Logic**: 80% coverage of dynamic loading mechanisms
+- **Completion Detection**: 80% coverage of end-of-list detection
 
 ### Critical Path Coverage
 
 All critical paths must have comprehensive tests:
 
-- Brand discovery and extraction
-- Product discovery and extraction
-- Data persistence to database
+- Brand discovery and extraction across multiple iterations
+- Product discovery and extraction across multiple iterations
+- Data persistence to database in batches
 - API request authentication
 - API response formatting
+- Checkpoint creation and recovery
+- Duplicate detection across iterations
+- Completion detection for both brand and product lists
+
+## Dynamic Loading Test Scenarios
+
+### Brand Discovery Tests
+
+**Single Page Brand Discovery**:
+- Verify extraction of all brands from a single page load
+- Test parsing of brand links and metadata
+- Validate brand data structure
+
+**Multi-Page Brand Discovery**:
+- Verify iterative discovery across multiple page loads
+- Test duplicate detection across iterations
+- Validate completion detection when all brands are discovered
+- Test handling of empty or malformed intermediate pages
+
+**Brand Discovery with Failures**:
+- Test retry logic when a page load fails
+- Verify continuation after failed iteration
+- Test timeout handling during brand discovery
+- Validate state persistence after interruption
+
+### Product Discovery Tests
+
+**Single Page Product Discovery**:
+- Verify extraction of all products from a brand page initial load
+- Test parsing of product links and metadata
+- Validate product-brand association
+
+**Multi-Page Product Discovery**:
+- Verify iterative discovery across multiple product page loads
+- Test handling of brands with large product counts (100+)
+- Validate completion detection when all products are discovered
+- Test duplicate detection across product iterations
+
+**Product Discovery with Failures**:
+- Test retry logic when a product page load fails
+- Verify continuation after failed iteration
+- Test timeout handling during product discovery
+- Validate state persistence after interruption
+
+### Iteration State Management Tests
+
+**State Tracking**:
+- Verify proper tracking of discovered items across iterations
+- Test state persistence and recovery
+- Validate state consistency after interruptions
+
+**Duplicate Detection**:
+- Test identification of duplicate brands across iterations
+- Test identification of duplicate products across iterations
+- Verify deduplication logic with various data scenarios
+
+**Completion Detection**:
+- Test detection of end-of-list for brand discovery
+- Test detection of end-of-list for product discovery
+- Verify handling of ambiguous completion signals
+- Test timeout-based completion as fallback
+
+### Resumable Scraping Tests
+
+**Checkpoint Creation**:
+- Verify checkpoint creation after each iteration
+- Test checkpoint data completeness
+- Validate checkpoint storage in database
+
+**Checkpoint Recovery**:
+- Test resumption from last checkpoint after interruption
+- Verify correct continuation of iteration sequence
+- Test handling of corrupted or missing checkpoints
+
+**Incremental Updates**:
+- Test identification of already-processed items
+- Verify update logic for changed items
+- Test full refresh vs incremental update scenarios
+
+### Large Data Volume Tests
+
+**Brand Volume Testing**:
+- Test handling of 100+ brands
+- Verify performance with large brand sets
+- Test memory management during brand discovery
+
+**Product Volume Testing**:
+- Test handling of brands with 100+ products
+- Verify performance with large product sets
+- Test batch database operations for efficiency
+
+**Combined Volume Testing**:
+- Test handling of thousands of products across all brands
+- Verify system stability during long-running operations
+- Test resource management and cleanup
 
 ## Test Data Management
 
@@ -125,7 +234,7 @@ All critical paths must have comprehensive tests:
 - Clean state before each test run
 - Seed data for common test scenarios
 - Configured via `docker-compose.test.yml`
-- Test setup implemented in [`database/test/setup.ts`](database/test/setup.ts)
+- Test setup implemented in [`database/test/setup.ts`](database/test/setup.ts:1)
 
 ### Test Fixtures
 
@@ -133,6 +242,13 @@ All critical paths must have comprehensive tests:
 - Consistent across test suites
 - Easy to modify when requirements change
 - Documented for maintainability
+
+### Dynamic Loading Test Fixtures
+
+- Multiple example HTML files representing different iteration states
+- Mock responses for pagination or infinite scroll endpoints
+- Test data for various completion scenarios
+- Error scenario fixtures for iteration failures
 
 ## Running Tests
 
@@ -156,6 +272,21 @@ cd database && pnpm test:run
 cd database && pnpm test:coverage
 ```
 
+### Scraper Tests
+
+Run scraper tests to verify dynamic loading logic:
+
+```bash
+# Run all scraper tests
+cd scraper && pnpm test:run
+
+# Run tests with coverage
+cd scraper && pnpm test:coverage
+
+# Run specific dynamic loading tests
+cd scraper && pnpm test:run --grep "dynamic loading"
+```
+
 ### Continuous Integration
 
 All tests run in CI pipeline:
@@ -163,6 +294,7 @@ All tests run in CI pipeline:
 - Full test suite on every pull request
 - Coverage reports generated and checked
 - Tests must pass before merging
+- Dynamic loading scenarios included in CI
 
 ### Manual Testing
 
@@ -171,6 +303,7 @@ Ad-hoc testing scenarios:
 - Manual API testing with generated keys
 - Verification against live website
 - Performance testing under load
+- Testing with actual dynamic loading behavior
 
 ## Testing External Dependencies
 
@@ -182,6 +315,7 @@ Tests use example HTML files instead of live website:
 - Provides consistent test input
 - Allows testing of historical page structures
 - Prevents rate limiting from source website
+- For dynamic loading, multiple example files simulate iterative loads
 
 ### Database
 
@@ -202,6 +336,7 @@ External HTTP requests are mocked:
 - Can simulate various response scenarios
 - Faster test execution
 - No network flakiness
+- Can mock iterative loading responses with different states
 
 ## Error Scenario Testing
 
@@ -211,6 +346,8 @@ External HTTP requests are mocked:
 - DNS resolution failures
 - HTTP error responses
 - Malformed responses
+- Rate limiting responses
+- Intermittent network failures during iterations
 
 ### Parsing Failures
 
@@ -218,6 +355,7 @@ External HTTP requests are mocked:
 - Malformed HTML structure
 - Empty or null values
 - Unexpected data formats
+- Inconsistent data across iterations
 
 ### Database Failures
 
@@ -227,6 +365,7 @@ External HTTP requests are mocked:
 - Transaction rollbacks
 - Serialization failures
 - Deadlock detection
+- Batch operation failures
 
 **Database Failure Test Scenarios**:
 - Connection pool exhaustion
@@ -240,6 +379,16 @@ External HTTP requests are mocked:
 - Isolation level behavior
 - Cascade delete behavior
 
+### Iteration Failures
+
+- Timeout during iteration
+- Incomplete iteration due to error
+- Duplicate items in iteration
+- Infinite iteration loops
+- State corruption during iteration
+- Checkpoint creation failures
+- Recovery from corrupted state
+
 ## Test Maintenance
 
 ### Updating Tests
@@ -250,6 +399,8 @@ Tests must be updated when:
 - Data model changes
 - API contracts change
 - Source website structure changes
+- Dynamic loading behavior changes
+- Iteration patterns change
 
 ### Refactoring Tests
 
@@ -259,25 +410,13 @@ Regular test maintenance includes:
 - Consolidating duplicate tests
 - Improving test clarity
 - Optimizing test performance
+- Updating example HTML files for new page structures
 
-## Quality Gates
+### Dynamic Loading Test Maintenance
 
-### Pre-Commit
+Special considerations for dynamic loading tests:
 
-- Fast unit tests run automatically
-- Linting and formatting checks
-- Type checking (if applicable)
-
-### Pre-Merge
-
-- Full test suite must pass
-- Coverage thresholds must be met
-- No flaky tests allowed
-- Code review approval required
-
-### Pre-Release
-
-- All tests passing
-- Integration tests with staging environment
-- Performance benchmarks met
-- Security review completed
+- Update example HTML files when loading patterns change
+- Add new test scenarios for new iteration mechanisms
+- Update completion detection tests when end-of-list signals change
+- Maintain test coverage for various data volume scenarios

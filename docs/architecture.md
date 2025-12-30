@@ -54,10 +54,26 @@ The backend service is the core component responsible for:
 
 The scraper service is responsible for:
 
-- **HTTP Client**: Fetches HTML pages from htreviews.org
-- **HTML Parser**: Extracts structured data from HTML documents
+- **HTTP Client**: Fetches HTML pages from htreviews.org with support for iterative requests
+- **HTML Parser**: Extracts structured data from HTML documents across multiple iterations
 - **Data Normalization**: Transforms raw scraped data into consistent formats
 - **Error Handling**: Manages network failures and parsing errors
+- **Iteration Management**: Handles dynamic loading patterns (infinite scroll, lazy loading, pagination)
+- **State Tracking**: Maintains state across iterations for brand and product discovery
+- **Completion Detection**: Identifies when all data has been loaded from dynamic lists
+- **Checkpoint Management**: Saves progress for resumable scraping operations
+- **Duplicate Detection**: Prevents duplicate processing across iterations
+- **Batch Processing**: Optimizes database operations for large data volumes
+
+**Scraper Architecture Considerations:**
+
+The scraper is designed to handle dynamic loading on the source website:
+
+- **Iterative Discovery**: Brand and product lists are discovered through multiple requests, not a single page load
+- **Stateful Processing**: Maintains tracking of discovered items to avoid duplicates
+- **Resumable Operations**: Saves checkpoints to resume from interruption points
+- **Volume Awareness**: Optimized for processing ~100 brands and thousands of products
+- **Error Isolation**: Failures in one iteration do not prevent processing of others
 
 ### Database
 
@@ -66,7 +82,7 @@ The database stores:
 - **Brands**: Tobacco brand information including names, descriptions, and images
 - **Products**: Individual tobacco products linked to brands
 - **API Keys**: Client authentication credentials
-- **Metadata**: Tracking information for scraped data
+- **Metadata**: Tracking information for scraped operations, including iteration progress
 
 ### API Key Management
 
@@ -81,11 +97,11 @@ A standalone utility for:
 ```
 /
 ├── backend/          # Backend API service
-├── scraper/          # Data scraping service
+├── scraper/          # Data scraping service with iterative loading support
 ├── database/         # Database schemas and migrations
 ├── shared/           # Shared utilities and types
 ├── scripts/          # Utility scripts including key management
-├── examples/         # HTML samples for testing
+├── examples/         # HTML samples for testing (includes multiple loading states)
 ├── docs/             # Project documentation
 ├── package.json      # Root package with shared dependencies
 ├── pnpm-workspace.yaml # Workspace configuration
@@ -107,7 +123,7 @@ A standalone utility for:
 Production deployment uses docker-compose to orchestrate:
 
 - **Backend Container**: Runs the API service in production mode
-- **Scraper Container**: Executes scheduled scraping tasks
+- **Scraper Container**: Executes scheduled scraping tasks with iterative loading support
 - **Database Container**: Persistent data storage
 - **Network Configuration**: Inter-service communication
 
@@ -138,6 +154,7 @@ Environment variables are defined centrally and shared across all services:
 - **External Service URLs**: Target URLs for scraping
 - **API Settings**: Port numbers, timeouts, and limits
 - **Security Settings**: Encryption keys and secrets
+- **Scraper Settings**: Iteration timeouts, retry limits, batch sizes
 
 ### Environment Templates
 
@@ -164,6 +181,8 @@ All services implement structured logging for:
 - Request tracking and debugging
 - Error monitoring and alerting
 - Performance metrics collection
+- Iteration progress tracking (scraper)
+- Checkpoint status logging (scraper)
 
 ### Error Handling
 
@@ -172,6 +191,8 @@ Consistent error handling across services:
 - Standardized error response formats
 - Graceful degradation on failures
 - Retry logic for transient errors
+- Iteration-level error isolation (scraper)
+- Checkpoint recovery mechanisms (scraper)
 
 ### Testing
 
@@ -180,3 +201,78 @@ Comprehensive test coverage across all components:
 - Unit tests for individual functions
 - Integration tests for service interactions
 - End-to-end tests for complete workflows
+- Dynamic loading scenario tests (scraper)
+- Large data volume tests (scraper)
+- Checkpoint and recovery tests (scraper)
+
+## Scraper Architecture Details
+
+### Iterative Loading Pattern
+
+The scraper implements an iterative loading pattern to handle dynamic content:
+
+```
+Initial Request → Extract Items → Detect More Content?
+                                              ↓
+                                         Yes → Next Iteration
+                                              ↓
+                                      Extract More Items → Detect More Content?
+                                              ↓
+                                         No → Complete
+```
+
+### State Management
+
+The scraper maintains state across iterations:
+
+- **Discovered Items**: Tracks all brands and products discovered so far
+- **Iteration Count**: Monitors number of iterations performed
+- **Last Checkpoint**: Saves progress for recovery
+- **Completion Status**: Tracks whether discovery is complete
+
+### Completion Detection
+
+Multiple strategies for detecting completion:
+
+- **Explicit Signals**: End-of-list indicators from the source
+- **Empty Results**: No new items returned in iteration
+- **Pagination Exhaustion**: No more pages available
+- **Timeout Fallback**: Maximum iterations or time limit reached
+
+### Resumable Scraping
+
+The scraper supports resumable operations:
+
+- **Checkpoint Creation**: Saves state after each iteration
+- **Checkpoint Recovery**: Resumes from last saved state
+- **Incremental Updates**: Skips already-processed items
+- **Full Refresh**: Discards existing data and starts fresh
+
+### Data Volume Considerations
+
+The scraper is designed for significant data volumes:
+
+- **Brands**: ~100 brands requiring multiple iterations
+- **Products**: Up to 100+ products per brand
+- **Total Products**: Several thousand products across all brands
+- **Requests**: Potentially hundreds of HTTP requests per full scrape
+- **Duration**: Long-running operations requiring progress tracking
+
+### Error Isolation
+
+Failures are isolated to prevent cascading issues:
+
+- **Iteration Failures**: Continue with next iteration
+- **Brand Failures**: Continue with next brand
+- **Product Failures**: Continue with next product
+- **Partial Success**: Save whatever data was successfully collected
+
+### Performance Optimization
+
+The scraper implements several optimizations:
+
+- **Batch Operations**: Group database writes for efficiency
+- **Concurrent Processing**: Process multiple brands in parallel (with limits)
+- **Memory Management**: Clear processed data from memory
+- **Rate Limiting**: Respect source server limits
+- **Caching**: Avoid redundant requests

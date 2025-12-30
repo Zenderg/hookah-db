@@ -201,14 +201,20 @@
 - Implement retry logic with exponential backoff
 - Add rate limiting to respect source server limits
 - Implement user agent management
+- Support iterative requests for dynamic loading scenarios
+- Implement request state tracking across iterations
 
 ### 3.2 HTML Parser
 
-- Implement brand list page parser
-- Implement brand detail page parser
+- Implement brand list page parser (initial load)
+- Implement brand list page parser (subsequent loads)
+- Implement brand detail page parser (initial load)
+- Implement brand detail page parser (subsequent loads)
 - Implement product detail page parser
 - Create data extraction utilities
 - Implement error handling for malformed HTML
+- Implement detection of pagination/infinite scroll mechanisms
+- Implement completion detection logic for dynamic lists
 
 ### 3.3 Data Normalization
 
@@ -217,22 +223,86 @@
 - Implement URL normalization
 - Set up data validation rules
 - Create error logging for invalid data
+- Implement duplicate detection across iterations
 
 ### 3.4 Scraping Orchestration
 
-- Implement brand discovery workflow
+- Implement iterative brand discovery workflow
+  - Detect loading mechanism (pagination, infinite scroll, lazy loading)
+  - Fetch initial brand list
+  - Iterate through subsequent pages/loads
+  - Track discovered brands to avoid duplicates
+  - Detect completion when all brands are discovered
 - Implement brand data extraction workflow
+  - Parse brand information from page
+  - Detect product loading mechanism
+  - Iterate through product pages/loads
+  - Track discovered products to avoid duplicates
+  - Detect completion when all products are discovered
 - Implement product data extraction workflow
+  - Fetch and parse individual product pages
+  - Associate products with parent brands
 - Create scraping job queue management
+  - Queue discovered brands for processing
+  - Queue discovered products for processing
+  - Manage concurrent processing limits
 - Implement progress tracking and logging
+  - Track iteration progress for brand discovery
+  - Track iteration progress for product discovery
+  - Log checkpoints for resumability
+  - Monitor overall scraping progress
 
 ### 3.5 Error Handling and Recovery
 
 - Implement network error handling
+  - Retry logic for failed requests
+  - Timeout handling for individual iterations
+  - Continue with next iteration on non-critical failures
 - Create parsing error logging
+  - Log malformed pages
+  - Continue processing remaining items in iteration
 - Set up duplicate detection logic
+  - Detect duplicate brands across iterations
+  - Detect duplicate products across iterations
 - Implement partial recovery mechanisms
+  - Save checkpoints after each iteration
+  - Resume from last checkpoint on interruption
+  - Skip already-processed items on retry
 - Create scraping failure notifications
+  - Alert on critical failures
+  - Log iteration-specific errors
+  - Provide recovery recommendations
+
+### 3.6 Data Volume Handling
+
+- Implement batch database operations
+  - Batch insert brands for efficiency
+  - Batch insert products for efficiency
+  - Optimize for thousands of products
+- Implement memory management
+  - Process data in chunks to avoid memory issues
+  - Clear processed data from memory
+  - Handle large datasets efficiently
+- Implement resumable scraping
+  - Checkpoint after each brand discovery iteration
+  - Checkpoint after each product discovery iteration
+  - Support incremental updates
+  - Support full refresh scenarios
+
+### 3.7 Completion Detection
+
+- Implement brand list completion detection
+  - Detect end of pagination
+  - Detect no more infinite scroll results
+  - Implement timeout-based completion as fallback
+- Implement product list completion detection
+  - Detect end of pagination
+  - Detect no more infinite scroll results
+  - Implement timeout-based completion as fallback
+- Implement validation of completion
+  - Verify no duplicate items in final dataset
+  - Verify expected data volume ranges
+  - Log completion metrics
 
 ## Phase 4: Backend API Service
 
@@ -314,19 +384,28 @@
 
 ### 6.2 Example HTML Files
 
-- Download and save brand list page HTML
-- Download and save brand detail page HTML
+- Download and save brand list page HTML (initial load)
+- Download and save brand list page HTML (subsequent loads, if available)
+- Download and save brand detail page HTML (initial load)
+- Download and save brand detail page HTML (subsequent loads, if available)
 - Download and save product detail page HTML
 - Organize example files in examples directory
-- Document example file structure
+- Document example file structure and loading patterns
 
 ### 6.3 Scraper Tests
 
 - Write unit tests for HTML parsing functions
 - Write unit tests for data normalization
+- Write unit tests for iteration state management
+- Write unit tests for completion detection logic
 - Write integration tests for scraping workflows
 - Write tests using example HTML files
+- Write tests for iterative brand discovery
+- Write tests for iterative product discovery
 - Create error scenario tests
+- Create tests for checkpoint and recovery
+- Create tests for duplicate detection
+- Create tests for large data volume handling
 
 ### 6.4 Backend Tests
 
@@ -342,6 +421,7 @@
 - Write tests for transaction management
 - Write tests for constraint enforcement
 - Write tests for indexing performance
+- Write tests for batch operations
 - Create migration tests
 
 ### 6.6 API Key Management Tests
@@ -352,15 +432,28 @@
 - Write security tests for key storage
 - Create audit logging tests
 
+### 6.7 Dynamic Loading Tests
+
+- Write tests for brand discovery across multiple iterations
+- Write tests for product discovery across multiple iterations
+- Write tests for completion detection
+- Write tests for duplicate detection across iterations
+- Write tests for checkpoint creation and recovery
+- Write tests for handling large data volumes (100+ brands, 1000+ products)
+- Write tests for timeout and retry during iterations
+- Write tests for state management across iterations
+
 ## Phase 7: Final Verification
 
 ### 7.1 End-to-End Testing
 
-- Execute full scraping workflow
+- Execute full scraping workflow with dynamic loading
 - Test all API endpoints with authentication
-- Verify data consistency
+- Verify data consistency across iterations
 - Test error scenarios
-- Validate performance requirements
+- Validate performance requirements with large data volumes
+- Test resumable scraping with checkpoints
+- Test incremental update scenarios
 
 ### 7.2 Security Review
 
@@ -369,3 +462,11 @@
 - Review database access controls
 - Test for common vulnerabilities
 - Review logging for sensitive data
+
+### 7.3 Performance Testing
+
+- Test scraping performance with ~100 brands
+- Test scraping performance with brands containing 100+ products
+- Test overall performance with thousands of products
+- Verify memory usage during long-running operations
+- Test database performance with batch operations
