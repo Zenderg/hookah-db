@@ -36,15 +36,16 @@ The `examples/` directory contains HTML files saved from htreviews.org. These fi
 
 Test individual functions and components in isolation.
 
-**Scope**:
+**Scope:**
 - HTML parsing functions for extracting specific data points
 - Data transformation and normalization logic
 - Utility functions for string manipulation, URL handling
 - API key generation and validation logic
 - Iteration state management functions
 - Completion detection logic for dynamic loading
+- HTTP client functionality (retry logic, rate limiting, user agent rotation)
 
-**Characteristics**:
+**Characteristics:**
 - Fast execution
 - No external dependencies
 - Mock all external interactions
@@ -55,15 +56,16 @@ Test individual functions and components in isolation.
 
 Test interactions between multiple components.
 
-**Scope**:
+**Scope:**
 - Scraper reading HTML from files and extracting data across multiple iterations
 - Database operations for storing and retrieving entities in batches
 - API key validation against the database
 - End-to-end data flow from HTML parsing to database storage
 - Checkpoint creation and recovery mechanisms
 - Duplicate detection across iterations
+- HTTP client integration with scraper workflows
 
-**Characteristics**:
+**Characteristics:**
 - Use real database instances (test-specific)
 - Use example HTML files as input
 - Test component interactions
@@ -74,7 +76,7 @@ Test interactions between multiple components.
 
 Test complete workflows from start to finish.
 
-**Scope**:
+**Scope:**
 - Full scraping workflow using example HTML files with multiple iterations
 - API request handling with authentication
 - Complete data retrieval from database to API response
@@ -82,7 +84,7 @@ Test complete workflows from start to finish.
 - Resumable scraping with checkpoint recovery
 - Incremental update scenarios
 
-**Characteristics**:
+**Characteristics:**
 - Test complete user scenarios
 - Use all real components (except external HTTP calls)
 - Verify system behavior as a whole
@@ -119,6 +121,7 @@ Tests follow descriptive naming conventions that indicate:
 - **Authentication**: 80% coverage of API key validation
 - **Iteration Logic**: 80% coverage of dynamic loading mechanisms
 - **Completion Detection**: 80% coverage of end-of-list detection
+- **HTTP Client**: 80% coverage of HTTP client functionality
 
 ### Critical Path Coverage
 
@@ -132,23 +135,161 @@ All critical paths must have comprehensive tests:
 - Checkpoint creation and recovery
 - Duplicate detection across iterations
 - Completion detection for both brand and product lists
+- HTTP client retry logic and rate limiting
+- HTTP client user agent rotation
+- HTTP client iterative request support
+
+## HTTP Client Testing
+
+### HTTP Client Test Coverage
+
+The HTTP client ([`scraper/src/http-client.ts`](scraper/src/http-client.ts:1)) has comprehensive test coverage with 54 tests achieving 97.24% code coverage.
+
+**Test File**: [`scraper/test/http-client.test.ts`](scraper/test/http-client.test.ts:1)
+
+### HTTP Client Test Categories
+
+#### Configuration Tests
+
+- Test default configuration values
+- Test custom configuration overrides
+- Test environment variable configuration
+- Test user agent list initialization
+- Test rate limiter initialization
+
+#### Request Tests
+
+- Test successful HTTP GET requests
+- Test request with custom timeout
+- Test request with custom headers
+- Test request with query parameters
+- Test request with pagination parameters
+- Test request with continuation token
+
+#### Retry Logic Tests
+
+- Test retry on timeout errors
+- Test retry on network errors (ECONNREFUSED, ENOTFOUND, ECONNRESET, ETIMEDOUT)
+- Test retry on 5xx errors
+- Test retry on 429 (Too Many Requests)
+- Test no retry on 4xx errors (except 429)
+- Test exponential backoff calculation
+- Test jitter calculation
+- Test maximum retry attempts
+- Test maximum retry delay cap
+- Test retry delay with different retry counts
+
+#### Rate Limiting Tests
+
+- Test token bucket initialization
+- Test token consumption
+- Test token refill over time
+- Test burst capacity
+- Test rate limit enforcement
+- Test waiting for rate limit
+- Test token count monitoring
+
+#### User Agent Tests
+
+- Test user agent rotation
+- Test custom user agent per request
+- Test user agent list update
+- Test default user agent fallback
+- Test environment variable user agent configuration
+
+#### Iterative Request Tests
+
+- Test iterative request with state tracking
+- Test iteration state updates
+- Test continuation token handling
+- Test page-based pagination
+- Test iteration number increment
+- Test iteration state retrieval
+
+#### State Management Tests
+
+- Test iteration state tracking
+- Test iteration state reset
+- Test iteration state update
+- Test discovered items tracking
+- Test discovered items count
+- Test discovered items clear
+
+#### Request History Tests
+
+- Test request history recording
+- Test request history retrieval
+- Test request history clearing
+- Test history size limit (1000 entries)
+- Test history entry fields (URL, timestamp, status, duration, retry count)
+
+#### Checkpoint Tests
+
+- Test checkpoint creation
+- Test checkpoint restoration
+- Test checkpoint data completeness
+- Test iteration state in checkpoint
+- Test discovered items in checkpoint
+
+#### Error Handling Tests
+
+- Test timeout error handling
+- Test network error handling
+- Test HTTP error handling
+- Test error propagation
+- Test error message formatting
+
+### HTTP Client Testing Approach
+
+**Mocked HTTP Requests:**
+- Use Vitest's mocking capabilities to mock fetch API
+- Simulate various HTTP responses (success, errors, timeouts)
+- Test retry logic without actual network calls
+- Test rate limiting behavior with controlled timing
+
+**Timing Tests:**
+- Test retry delay calculations
+- Test exponential backoff behavior
+- Test jitter randomness
+- Test rate limiting timing
+- Use fake timers for deterministic timing tests
+
+**State Tests:**
+- Test iteration state persistence
+- Test discovered items tracking
+- Test request history management
+- Test checkpoint creation and restoration
+
+**Edge Cases:**
+- Test maximum retry attempts
+- Test maximum delay caps
+- Test empty user agent lists
+- Test invalid URLs
+- Test concurrent requests
+
+### HTTP Client Test Results
+
+- **Total Tests**: 54
+- **Pass Rate**: 100%
+- **Code Coverage**: 97.24%
+- **Test File**: [`scraper/test/http-client.test.ts`](scraper/test/http-client.test.ts:1)
 
 ## Dynamic Loading Test Scenarios
 
 ### Brand Discovery Tests
 
-**Single Page Brand Discovery**:
+**Single Page Brand Discovery:**
 - Verify extraction of all brands from a single page load
 - Test parsing of brand links and metadata
 - Validate brand data structure
 
-**Multi-Page Brand Discovery**:
+**Multi-Page Brand Discovery:**
 - Verify iterative discovery across multiple page loads
 - Test duplicate detection across iterations
 - Validate completion detection when all brands are discovered
 - Test handling of empty or malformed intermediate pages
 
-**Brand Discovery with Failures**:
+**Brand Discovery with Failures:**
 - Test retry logic when a page load fails
 - Verify continuation after failed iteration
 - Test timeout handling during brand discovery
@@ -156,18 +297,18 @@ All critical paths must have comprehensive tests:
 
 ### Product Discovery Tests
 
-**Single Page Product Discovery**:
+**Single Page Product Discovery:**
 - Verify extraction of all products from a brand page initial load
 - Test parsing of product links and metadata
 - Validate product-brand association
 
-**Multi-Page Product Discovery**:
+**Multi-Page Product Discovery:**
 - Verify iterative discovery across multiple product page loads
 - Test handling of brands with large product counts (100+)
 - Validate completion detection when all products are discovered
 - Test duplicate detection across product iterations
 
-**Product Discovery with Failures**:
+**Product Discovery with Failures:**
 - Test retry logic when a product page load fails
 - Verify continuation after failed iteration
 - Test timeout handling during product discovery
@@ -175,17 +316,17 @@ All critical paths must have comprehensive tests:
 
 ### Iteration State Management Tests
 
-**State Tracking**:
+**State Tracking:**
 - Verify proper tracking of discovered items across iterations
 - Test state persistence and recovery
 - Validate state consistency after interruptions
 
-**Duplicate Detection**:
+**Duplicate Detection:**
 - Test identification of duplicate brands across iterations
 - Test identification of duplicate products across iterations
 - Verify deduplication logic with various data scenarios
 
-**Completion Detection**:
+**Completion Detection:**
 - Test detection of end-of-list for brand discovery
 - Test detection of end-of-list for product discovery
 - Verify handling of ambiguous completion signals
@@ -193,34 +334,34 @@ All critical paths must have comprehensive tests:
 
 ### Resumable Scraping Tests
 
-**Checkpoint Creation**:
+**Checkpoint Creation:**
 - Verify checkpoint creation after each iteration
 - Test checkpoint data completeness
 - Validate checkpoint storage in database
 
-**Checkpoint Recovery**:
+**Checkpoint Recovery:**
 - Test resumption from last checkpoint after interruption
 - Verify correct continuation of iteration sequence
 - Test handling of corrupted or missing checkpoints
 
-**Incremental Updates**:
+**Incremental Updates:**
 - Test identification of already-processed items
 - Verify update logic for changed items
 - Test full refresh vs incremental update scenarios
 
 ### Large Data Volume Tests
 
-**Brand Volume Testing**:
+**Brand Volume Testing:**
 - Test handling of 100+ brands
 - Verify performance with large brand sets
 - Test memory management during brand discovery
 
-**Product Volume Testing**:
+**Product Volume Testing:**
 - Test handling of brands with 100+ products
 - Verify performance with large product sets
 - Test batch database operations for efficiency
 
-**Combined Volume Testing**:
+**Combined Volume Testing:**
 - Test handling of thousands of products across all brands
 - Verify system stability during long-running operations
 - Test resource management and cleanup
@@ -282,6 +423,9 @@ cd scraper && pnpm test:run
 
 # Run tests with coverage
 cd scraper && pnpm test:coverage
+
+# Run specific HTTP client tests
+cd scraper && pnpm test:run --grep "HTTP Client"
 
 # Run specific dynamic loading tests
 cd scraper && pnpm test:run --grep "dynamic loading"
@@ -367,7 +511,7 @@ External HTTP requests are mocked:
 - Deadlock detection
 - Batch operation failures
 
-**Database Failure Test Scenarios**:
+**Database Failure Test Scenarios:**
 - Connection pool exhaustion
 - Invalid connection parameters
 - Retry logic on transient failures
@@ -389,6 +533,17 @@ External HTTP requests are mocked:
 - Checkpoint creation failures
 - Recovery from corrupted state
 
+### HTTP Client Failures
+
+- Request timeout
+- Network connectivity issues
+- Rate limit exceeded
+- Server errors (5xx)
+- Client errors (4xx)
+- Retry exhaustion
+- Invalid user agents
+- Malformed URLs
+
 ## Test Maintenance
 
 ### Updating Tests
@@ -401,6 +556,7 @@ Tests must be updated when:
 - Source website structure changes
 - Dynamic loading behavior changes
 - Iteration patterns change
+- HTTP client behavior changes
 
 ### Refactoring Tests
 
@@ -420,3 +576,13 @@ Special considerations for dynamic loading tests:
 - Add new test scenarios for new iteration mechanisms
 - Update completion detection tests when end-of-list signals change
 - Maintain test coverage for various data volume scenarios
+
+### HTTP Client Test Maintenance
+
+Special considerations for HTTP client tests:
+
+- Update retry logic tests when retry behavior changes
+- Update rate limiting tests when rate limit algorithm changes
+- Update user agent tests when user agent list changes
+- Maintain test coverage for all HTTP client features
+- Update error scenario tests as new error cases are identified

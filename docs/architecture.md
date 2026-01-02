@@ -65,6 +65,68 @@ The scraper service is responsible for:
 - **Duplicate Detection**: Prevents duplicate processing across iterations
 - **Batch Processing**: Optimizes database operations for large data volumes
 
+#### HTTP Client Component
+
+The HTTP client ([`scraper/src/http-client.ts`](scraper/src/http-client.ts:1)) provides robust web scraping capabilities with the following features:
+
+**Core Responsibilities:**
+- HTTP GET requests with automatic retry logic and rate limiting
+- User agent rotation to avoid detection
+- Iterative request support for dynamic loading scenarios
+- Request timeout configuration with per-request overrides
+- Request history tracking for debugging and monitoring
+- Discovered items tracking for duplicate detection
+- Checkpoint creation and restoration for resumable operations
+
+**Retry Logic:**
+- Exponential backoff with jitter (base delay configurable, default: 1000ms)
+- Maximum retry attempts (default: 3)
+- Maximum retry delay cap (default: 30000ms)
+- Transient error detection (timeouts, network errors, 5xx errors, 429 rate limit)
+- Smart retry decision based on error type
+
+**Rate Limiting:**
+- Token bucket algorithm for precise rate control
+- Configurable requests per second (default: 2 RPS)
+- Configurable burst capacity (default: 5 requests)
+- Automatic token refill based on elapsed time
+- Respect for server rate limit headers (X-RateLimit-Remaining, X-RateLimit-Reset)
+
+**User Agent Management:**
+- Rotating user agents from configurable list
+- Default browser user agents (Chrome, Firefox, Safari on Windows, macOS, Linux)
+- Per-request custom user agent support
+- Environment variable configuration for custom user agent lists
+
+**Iterative Request Support:**
+- State tracking across iterations (iteration number, total items, last timestamp)
+- Continuation token support for cursor-based pagination
+- Page-based pagination support
+- Automatic iteration state updates
+- Checkpoint creation for resumable scraping
+
+**Request State Tracking:**
+- Request history (URL, timestamp, status, duration, retry count)
+- Discovered items set for duplicate detection
+- Iteration state management
+- Rate limiter token count monitoring
+
+**Environment Variables:**
+- `SCRAPER_REQUEST_TIMEOUT`: Request timeout in milliseconds (default: 30000)
+- `SCRAPER_MAX_RETRIES`: Maximum retry attempts (default: 3)
+- `SCRAPER_RETRY_DELAY_BASE`: Base delay for exponential backoff in ms (default: 1000)
+- `SCRAPER_RETRY_DELAY_MAX`: Maximum retry delay in ms (default: 30000)
+- `SCRAPER_RATE_LIMIT_RPS`: Requests per second (default: 2)
+- `SCRAPER_RATE_LIMIT_BURST`: Burst capacity (default: 5)
+- `SCRAPER_USER_AGENTS`: Comma-separated list of user agents for rotation
+
+**Integration with Scraper Architecture:**
+- Used by HTML parser to fetch web pages
+- Provides rate limiting for all scraper HTTP requests
+- Enables iterative loading patterns for dynamic content
+- Supports checkpoint creation for resumable scraping operations
+- Integrates with duplicate detection to avoid processing same items
+
 **Scraper Architecture Considerations:**
 
 The scraper is designed to handle dynamic loading on the source website:
@@ -154,7 +216,7 @@ Environment variables are defined centrally and shared across all services:
 - **External Service URLs**: Target URLs for scraping
 - **API Settings**: Port numbers, timeouts, and limits
 - **Security Settings**: Encryption keys and secrets
-- **Scraper Settings**: Iteration timeouts, retry limits, batch sizes
+- **Scraper Settings**: Iteration timeouts, retry limits, batch sizes, rate limiting
 
 ### Environment Templates
 
@@ -183,6 +245,7 @@ All services implement structured logging for:
 - Performance metrics collection
 - Iteration progress tracking (scraper)
 - Checkpoint status logging (scraper)
+- HTTP request history (scraper HTTP client)
 
 ### Error Handling
 
@@ -193,6 +256,7 @@ Consistent error handling across services:
 - Retry logic for transient errors
 - Iteration-level error isolation (scraper)
 - Checkpoint recovery mechanisms (scraper)
+- HTTP client retry with exponential backoff (scraper)
 
 ### Testing
 
@@ -204,6 +268,7 @@ Comprehensive test coverage across all components:
 - Dynamic loading scenario tests (scraper)
 - Large data volume tests (scraper)
 - Checkpoint and recovery tests (scraper)
+- HTTP client tests (scraper)
 
 ## Scraper Architecture Details
 
@@ -214,11 +279,11 @@ The scraper implements an iterative loading pattern to handle dynamic content:
 ```
 Initial Request → Extract Items → Detect More Content?
                                               ↓
-                                         Yes → Next Iteration
-                                              ↓
-                                      Extract More Items → Detect More Content?
-                                              ↓
-                                         No → Complete
+                                          Yes → Next Iteration
+                                               ↓
+                                       Extract More Items → Detect More Content?
+                                               ↓
+                                          No → Complete
 ```
 
 ### State Management
@@ -274,5 +339,29 @@ The scraper implements several optimizations:
 - **Batch Operations**: Group database writes for efficiency
 - **Concurrent Processing**: Process multiple brands in parallel (with limits)
 - **Memory Management**: Clear processed data from memory
-- **Rate Limiting**: Respect source server limits
+- **Rate Limiting**: Respect source server limits (token bucket algorithm)
 - **Caching**: Avoid redundant requests
+- **Retry Logic**: Exponential backoff with jitter for transient failures
+- **User Agent Rotation**: Distribute requests across different user agents
+
+### HTTP Client Integration
+
+The HTTP client ([`scraper/src/http-client.ts`](scraper/src/http-client.ts:1)) is integrated into the scraper architecture as follows:
+
+- **Singleton Pattern**: Single instance used across all scraping operations
+- **Rate Limiting**: Enforces rate limits before each HTTP request
+- **Retry Logic**: Automatically retries failed requests with exponential backoff
+- **State Tracking**: Maintains request history and discovered items
+- **Checkpoint Support**: Creates checkpoints for resumable scraping
+- **Iterative Requests**: Supports pagination and continuation tokens
+- **User Agent Rotation**: Rotates through configured user agents
+
+**Key Methods:**
+- [`fetch()`](scraper/src/http-client.ts:255): Core HTTP GET request with retry and rate limiting
+- [`fetchIterative()`](scraper/src/http-client.ts:329): Iterative request support for dynamic loading
+- [`waitForRateLimit()`](scraper/src/http-client.ts:503): Rate limiting enforcement
+- [`getUserAgent()`](scraper/src/http-client.ts:534): User agent rotation
+- [`createCheckpoint()`](scraper/src/http-client.ts:654): Checkpoint creation for resumability
+- [`restoreCheckpoint()`](scraper/src/http-client.ts:669): Checkpoint restoration
+- [`getIterationState()`](scraper/src/http-client.ts:562): Iteration state tracking
+- [`getRequestHistory()`](scraper/src/http-client.ts:612): Request history retrieval
