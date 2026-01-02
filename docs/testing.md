@@ -274,6 +274,235 @@ The HTTP client ([`scraper/src/http-client.ts`](scraper/src/http-client.ts:1)) h
 - **Code Coverage**: 97.24%
 - **Test File**: [`scraper/test/http-client.test.ts`](scraper/test/http-client.test.ts:1)
 
+## HTML Parser Testing
+
+### HTML Parser Test Coverage
+
+The HTML parser ([`scraper/src/html-parser.ts`](scraper/src/html-parser.ts:1)) has comprehensive test coverage with 92 tests achieving 91.99% code coverage.
+
+**Test File**: [`scraper/test/html-parser.test.ts`](scraper/test/html-parser.test.ts:1)
+
+### HTML Parser Test Categories
+
+#### Utility Functions Tests
+
+**cleanText() Tests:**
+- Test removing extra whitespace
+- Test trimming leading/trailing spaces
+- Test normalizing line breaks
+- Test handling empty strings
+- Test handling strings with only whitespace
+- Test preserving single spaces between words
+
+**normalizeUrl() Tests:**
+- Test converting relative URLs to absolute URLs
+- Test handling already absolute URLs
+- Test handling URLs with query parameters
+- Test handling URLs with fragments
+- Test handling empty URLs
+- Test handling malformed URLs
+
+**extractSlug() Tests:**
+- Test extracting slug from brand URLs
+- Test extracting slug from product URLs
+- Test handling URLs without slugs
+- Test handling URLs with multiple path segments
+- Test handling empty URLs
+- Test handling malformed URLs
+
+#### ParseError Class Tests
+
+**Error Creation Tests:**
+- Test creating ParseError with message
+- Test creating ParseError with selector
+- Test creating ParseError with HTML preview
+- Test creating ParseError with all fields
+
+**Error Properties Tests:**
+- Test accessing error message
+- Test accessing error selector
+- Test accessing error HTML preview
+- Test error instanceof ParseError
+
+**Error Formatting Tests:**
+- Test error message formatting
+- Test error string representation
+- Test error JSON serialization
+
+#### Brand List Parser Tests
+
+**Basic Parsing Tests:**
+- Test extracting brands from listing page
+- Test extracting brand names
+- Test extracting brand URLs
+- Test extracting brand slugs
+- Test handling multiple brands
+
+**HTMX Pagination Tests:**
+- Test extracting pagination metadata
+- Test detecting data-target attribute
+- Test detecting data-offset attribute
+- Test detecting data-count attribute
+- Test detecting data-total-count attribute
+- Test handling missing pagination attributes
+
+**Edge Cases Tests:**
+- Test handling empty brand list
+- Test handling missing brand elements
+- Test handling malformed HTML
+- Test handling duplicate brands
+- Test handling brands with missing URLs
+
+**Example HTML File Tests:**
+- Test parsing actual brand list HTML file
+- Verify extracted brands match expected data
+- Test pagination metadata extraction from example file
+
+#### Brand Detail Parser Tests
+
+**Basic Parsing Tests:**
+- Test extracting brand name
+- Test extracting brand description
+- Test extracting brand image URL
+- Test constructing source URL from slug
+- Test handling missing optional fields
+
+**Edge Cases Tests:**
+- Test handling missing description
+- Test handling missing image URL
+- Test handling multiple name spans (prefers English)
+- Test handling empty brand detail page
+- Test handling malformed HTML
+
+**Example HTML File Tests:**
+- Test parsing actual brand detail HTML file
+- Verify extracted brand data matches expected values
+- Test handling of real-world HTML structure
+
+#### Product List Parser Tests
+
+**Basic Parsing Tests:**
+- Test extracting products from brand page
+- Test extracting product names
+- Test extracting product URLs
+- Test extracting product slugs
+- Test handling multiple products
+
+**HTMX Pagination Tests:**
+- Test extracting pagination metadata
+- Test detecting completion based on offset + count >= totalCount
+- Test handling incomplete pagination data
+- Test handling missing pagination attributes
+
+**Edge Cases Tests:**
+- Test handling empty product list
+- Test handling missing product elements
+- Test handling malformed HTML
+- Test handling duplicate products
+- Test handling products with missing URLs
+
+**Example HTML File Tests:**
+- Test parsing actual product list HTML file
+- Verify extracted products match expected data
+- Test pagination metadata extraction from example file
+
+#### Product Detail Parser Tests
+
+**Basic Parsing Tests:**
+- Test extracting product name
+- Test extracting product description
+- Test extracting product image URL
+- Test constructing source URL from slug
+- Test handling missing optional fields
+
+**Edge Cases Tests:**
+- Test handling missing description
+- Test handling missing image URL
+- Test handling empty product detail page
+- Test handling malformed HTML
+- Test handling product with minimal data
+
+**Example HTML File Tests:**
+- Test parsing actual product detail HTML file
+- Verify extracted product data matches expected values
+- Test handling of real-world HTML structure
+
+#### Completion Detection Tests
+
+**Brand Discovery Completion Tests:**
+- Test completion detection when offset + count >= totalCount
+- Test incomplete detection when more items available
+- Test handling missing pagination metadata
+- Test handling zero totalCount
+- Test handling zero count
+
+**Product Discovery Completion Tests:**
+- Test completion detection when offset + count >= totalCount
+- Test incomplete detection when more items available
+- Test handling missing pagination metadata
+- Test handling zero totalCount
+- Test handling zero count
+
+#### Error Scenario Tests
+
+**Malformed HTML Tests:**
+- Test handling of missing required elements
+- Test handling of invalid HTML structure
+- Test graceful degradation on parse errors
+- Test error context in ParseError
+
+**Missing Data Tests:**
+- Test handling of missing optional fields
+- Test handling of null/undefined values
+- Test handling of empty strings
+- Test graceful degradation with incomplete data
+
+**Invalid Data Tests:**
+- Test handling of invalid URLs
+- Test handling of non-numeric pagination data
+- Test handling of unexpected data types
+- Test error propagation for critical failures
+
+### HTML Parser Testing Approach
+
+**Example HTML Files:**
+- Use real HTML files saved from htreviews.org
+- Provides realistic test data
+- Ensures parser works with actual website structure
+- Enables offline testing without network dependencies
+
+**Cheerio Integration:**
+- Test parser with cheerio-loaded HTML
+- Verify CSS selector accuracy
+- Test data extraction from DOM elements
+- Ensure compatibility with cheerio API
+
+**Error Context Testing:**
+- Verify ParseError includes selector for debugging
+- Verify ParseError includes HTML preview
+- Test error message clarity
+- Ensure errors are actionable
+
+**Graceful Degradation Testing:**
+- Test parser continues on individual item failures
+- Verify valid items are extracted even when some fail
+- Test handling of missing optional fields
+- Ensure robustness against malformed HTML
+
+**Type Safety Testing:**
+- Verify all parser functions return correct TypeScript types
+- Test type guards and validation
+- Ensure type definitions match actual data structures
+- Test edge cases with type boundaries
+
+### HTML Parser Test Results
+
+- **Total Tests**: 92
+- **Pass Rate**: 100% (92/92 tests passing)
+- **Code Coverage**: 91.99%
+- **Test File**: [`scraper/test/html-parser.test.ts`](scraper/test/html-parser.test.ts:1)
+- **Regression Tests**: All 334 total tests passed with no failures
+
 ## Dynamic Loading Test Scenarios
 
 ### Brand Discovery Tests
@@ -427,6 +656,9 @@ cd scraper && pnpm test:coverage
 # Run specific HTTP client tests
 cd scraper && pnpm test:run --grep "HTTP Client"
 
+# Run specific HTML parser tests
+cd scraper && pnpm test:run --grep "HTML Parser"
+
 # Run specific dynamic loading tests
 cd scraper && pnpm test:run --grep "dynamic loading"
 ```
@@ -544,6 +776,17 @@ External HTTP requests are mocked:
 - Invalid user agents
 - Malformed URLs
 
+### HTML Parser Failures
+
+- Malformed HTML structure
+- Missing required elements
+- Invalid CSS selectors
+- Unexpected HTML changes
+- Missing optional fields
+- Invalid data types
+- Empty results
+- Parse errors with context
+
 ## Test Maintenance
 
 ### Updating Tests
@@ -557,6 +800,7 @@ Tests must be updated when:
 - Dynamic loading behavior changes
 - Iteration patterns change
 - HTTP client behavior changes
+- HTML parser logic changes
 
 ### Refactoring Tests
 
@@ -586,3 +830,33 @@ Special considerations for HTTP client tests:
 - Update user agent tests when user agent list changes
 - Maintain test coverage for all HTTP client features
 - Update error scenario tests as new error cases are identified
+
+### HTML Parser Test Maintenance
+
+Special considerations for HTML parser tests:
+
+- Update example HTML files when website structure changes
+- Update selector tests when CSS selectors change
+- Update completion detection tests when pagination logic changes
+- Add new test cases for new data types or fields
+- Update error scenario tests as new parsing errors are identified
+- Maintain test coverage for all parser functions
+
+## Documentation Updates
+
+This documentation was updated to include HTML Parser Testing section following the completion of Phase 3.2 HTML Parser implementation.
+
+**Changes Made:**
+- Added comprehensive HTML Parser Testing section
+- Documented all 92 test categories and their purposes
+- Included test results (91.99% coverage, 100% pass rate)
+- Added HTML Parser Testing approach and methodology
+- Updated Test Maintenance section with HTML Parser specific considerations
+
+**Test File Reference:**
+- [`scraper/test/html-parser.test.ts`](scraper/test/html-parser.test.ts:1)
+
+**Implementation Reference:**
+- [`scraper/src/html-parser.ts`](scraper/src/html-parser.ts:1)
+- [`scraper/src/parser-error.ts`](scraper/src/parser-error.ts:1)
+- [`scraper/src/types.ts`](scraper/src/types.ts:1)

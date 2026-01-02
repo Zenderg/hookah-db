@@ -127,6 +127,50 @@ The HTTP client ([`scraper/src/http-client.ts`](scraper/src/http-client.ts:1)) p
 - Supports checkpoint creation for resumable scraping operations
 - Integrates with duplicate detection to avoid processing same items
 
+#### HTML Parser Component
+
+The HTML parser ([`scraper/src/html-parser.ts`](scraper/src/html-parser.ts:1)) provides structured data extraction from HTML documents with the following features:
+
+**Core Responsibilities:**
+- Parse brand list pages and extract brand data with pagination support
+- Parse brand detail pages and extract comprehensive brand information
+- Parse product list pages and extract product data with pagination support
+- Parse product detail pages and extract comprehensive product information
+- Extract HTMX pagination metadata for iterative loading
+- Detect completion of brand and product discovery
+- Handle malformed HTML gracefully with detailed error reporting
+
+**Parser Functions:**
+- [`parseBrandList()`](scraper/src/html-parser.ts:135): Extracts brands from listing pages
+- [`parseBrandDetail()`](scraper/src/html-parser.ts:250): Extracts detailed brand information
+- [`parseProductList()`](scraper/src/html-parser.ts:307): Extracts products from brand pages
+- [`parseProductDetail()`](scraper/src/html-parser.ts:421): Extracts detailed product information
+- [`isBrandDiscoveryComplete()`](scraper/src/html-parser.ts:477): Checks if all brands discovered
+- [`isProductDiscoveryComplete()`](scraper/src/html-parser.ts:511): Checks if all products discovered
+
+**Utility Functions:**
+- [`cleanText()`](scraper/src/html-parser.ts:29): Normalizes text by removing extra whitespace
+- [`normalizeUrl()`](scraper/src/html-parser.ts:43): Converts relative URLs to absolute URLs
+- [`extractSlug()`](scraper/src/html-parser.ts:70): Extracts URL slug for constructing source URLs
+- [`parseHTMXPagination()`](scraper/src/html-parser.ts:88): Extracts HTMX pagination metadata
+
+**Error Handling:**
+- Custom [`ParseError`](scraper/src/parser-error.ts:12) class with element context and HTML preview
+- Graceful handling of missing optional fields (description, image URL)
+- Continues processing valid items even when individual items fail to parse
+- Detailed error messages for debugging with selector and HTML preview
+
+**HTMX Pagination Support:**
+- Extracts pagination metadata from data attributes (data-target, data-offset, data-count, data-total-count)
+- Constructs endpoint URLs for next page requests
+- Determines completion status based on offset + items >= totalCount
+
+**Integration with Scraper Architecture:**
+- Used by scraper orchestration to extract data from fetched HTML
+- Provides pagination metadata for iterative loading
+- Enables completion detection for dynamic content
+- Integrates with HTTP client for fetching HTML content
+
 **Scraper Architecture Considerations:**
 
 The scraper is designed to handle dynamic loading on the source website:
@@ -281,7 +325,7 @@ Initial Request → Extract Items → Detect More Content?
                                               ↓
                                           Yes → Next Iteration
                                                ↓
-                                       Extract More Items → Detect More Content?
+                                        Extract More Items → Detect More Content?
                                                ↓
                                           No → Complete
 ```
@@ -365,3 +409,23 @@ The HTTP client ([`scraper/src/http-client.ts`](scraper/src/http-client.ts:1)) i
 - [`restoreCheckpoint()`](scraper/src/http-client.ts:669): Checkpoint restoration
 - [`getIterationState()`](scraper/src/http-client.ts:562): Iteration state tracking
 - [`getRequestHistory()`](scraper/src/http-client.ts:612): Request history retrieval
+
+### HTML Parser Integration
+
+The HTML parser ([`scraper/src/html-parser.ts`](scraper/src/html-parser.ts:1)) is integrated into the scraper architecture as follows:
+
+- **Data Extraction**: Parses HTML content returned by HTTP client
+- **Pagination Metadata**: Extracts HTMX pagination data for iterative loading
+- **Completion Detection**: Determines when all items have been discovered
+- **Error Handling**: Provides detailed error context for debugging
+- **Graceful Degradation**: Continues processing valid items when some fail
+- **Type Safety**: Uses TypeScript interfaces for all parsed data structures
+
+**Key Methods:**
+- [`parseBrandList()`](scraper/src/html-parser.ts:135): Extracts brands from listing pages
+- [`parseBrandDetail()`](scraper/src/html-parser.ts:250): Extracts detailed brand information
+- [`parseProductList()`](scraper/src/html-parser.ts:307): Extracts products from brand pages
+- [`parseProductDetail()`](scraper/src/html-parser.ts:421): Extracts detailed product information
+- [`isBrandDiscoveryComplete()`](scraper/src/html-parser.ts:477): Checks if all brands discovered
+- [`isProductDiscoveryComplete()`](scraper/src/html-parser.ts:511): Checks if all products discovered
+- [`parseHTMXPagination()`](scraper/src/html-parser.ts:88): Extracts HTMX pagination metadata

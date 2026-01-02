@@ -78,6 +78,115 @@ Tracks information about scraping operations.
 **Relationships**:
 - No parent or child relationships: Metadata records are independent
 
+## Parser Data Types
+
+The HTML parser ([`scraper/src/html-parser.ts`](scraper/src/html-parser.ts:1)) uses TypeScript interfaces defined in [`scraper/src/types.ts`](scraper/src/types.ts:1) to represent parsed data structures. These types ensure type safety and provide clear contracts for parser functions.
+
+### ParsedBrand
+
+Represents a brand extracted from the brand listing page.
+
+**Purpose**: Temporary structure for brand data during parsing before database insertion.
+
+**Fields**:
+- **name**: The brand name as extracted from the HTML
+- **slug**: URL slug for constructing the source URL
+- **sourceUrl**: The complete URL to the brand's detail page
+
+**Usage**:
+- Returned by [`parseBrandList()`](scraper/src/html-parser.ts:135)
+- Used to queue brands for detailed scraping
+- Converted to database Brand entity after full extraction
+
+### ParsedBrandDetail
+
+Represents detailed brand information extracted from a brand detail page.
+
+**Purpose**: Complete brand data including all available fields from the brand page.
+
+**Fields**:
+- **name**: The brand name (prefers English name if multiple names present)
+- **description**: Optional detailed description of the brand
+- **imageUrl**: Optional URL to the brand's logo or representative image
+- **sourceUrl**: The complete URL to the brand's detail page
+
+**Usage**:
+- Returned by [`parseBrandDetail()`](scraper/src/html-parser.ts:250)
+- Contains all fields needed for database insertion
+- Handles missing optional fields gracefully
+
+### ParsedProduct
+
+Represents a product extracted from a brand page product list.
+
+**Purpose**: Temporary structure for product data during parsing before database insertion.
+
+**Fields**:
+- **name**: The product name as extracted from the HTML
+- **slug**: URL slug for constructing the source URL
+- **sourceUrl**: The complete URL to the product's detail page
+
+**Usage**:
+- Returned by [`parseProductList()`](scraper/src/html-parser.ts:307)
+- Used to queue products for detailed scraping
+- Converted to database Product entity after full extraction
+
+### ParsedProductDetail
+
+Represents detailed product information extracted from a product detail page.
+
+**Purpose**: Complete product data including all available fields from the product page.
+
+**Fields**:
+- **name**: The product name
+- **description**: Optional detailed description of the product
+- **imageUrl**: Optional URL to the product's packaging or representative image
+- **sourceUrl**: The complete URL to the product's detail page
+
+**Usage**:
+- Returned by [`parseProductDetail()`](scraper/src/html-parser.ts:421)
+- Contains all fields needed for database insertion
+- Handles missing optional fields gracefully
+
+### HTMXPagination
+
+Represents pagination metadata extracted from HTMX data attributes.
+
+**Purpose**: Provides information about pagination state and completion status.
+
+**Fields**:
+- **target**: The HTMX endpoint URL for fetching next page
+- **offset**: Current offset in the paginated list
+- **count**: Number of items in current page
+- **totalCount**: Total number of items available across all pages
+
+**Usage**:
+- Returned by [`parseHTMXPagination()`](scraper/src/html-parser.ts:88)
+- Used by completion detection functions
+- Enables iterative loading with proper state tracking
+
+**Completion Logic**:
+- Discovery is complete when: `offset + count >= totalCount`
+- Allows for dynamic content loading with clear completion criteria
+
+### ParseError
+
+Custom error class for parsing failures with detailed context.
+
+**Purpose**: Provides actionable error information for debugging parsing issues.
+
+**Fields**:
+- **message**: Human-readable error description
+- **selector**: CSS selector that failed to match (if applicable)
+- **htmlPreview**: HTML snippet around the error location for debugging
+
+**Usage**:
+- Thrown by parser functions when critical parsing failures occur
+- Includes context to identify the exact location of the error
+- Helps developers quickly diagnose and fix parsing issues
+
+**Implementation**: [`scraper/src/parser-error.ts`](scraper/src/parser-error.ts:1)
+
 ## Entity Relationships
 
 ### Brand-Product Hierarchy
@@ -159,3 +268,29 @@ Brand (1) ──────── (*) Product
 - Scraping operations use optimistic locking to prevent conflicts
 - API key validation uses read-committed isolation level
 - Multiple scraping operations should not run simultaneously
+
+## Parser Type Safety
+
+### TypeScript Interfaces
+
+All parser functions use strongly-typed interfaces defined in [`scraper/src/types.ts`](scraper/src/types.ts:1):
+
+- **ParsedBrand**: Brand data from listing pages
+- **ParsedBrandDetail**: Complete brand data from detail pages
+- **ParsedProduct**: Product data from brand pages
+- **ParsedProductDetail**: Complete product data from detail pages
+- **HTMXPagination**: Pagination metadata from HTMX attributes
+
+### Type Guarantees
+
+- All parser functions return consistent types
+- Optional fields are explicitly marked with `| undefined`
+- Required fields are enforced at compile time
+- Type checking prevents common parsing errors
+
+### Error Handling
+
+- [`ParseError`](scraper/src/parser-error.ts:12) class provides detailed error context
+- Errors include selector information for debugging
+- HTML preview helps identify exact failure location
+- Graceful degradation for non-critical parsing failures

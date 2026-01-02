@@ -45,6 +45,7 @@ Update documentation when:
 - Error handling strategies change
 - Rate limiting or retry logic is updated
 - Scraping workflow is restructured
+- HTML parser implementation or modification
 
 ### Testing Changes
 
@@ -313,3 +314,35 @@ Documentation should be continuously improved based on:
 - Common questions and confusion points
 - Changes in best practices or technologies
 - Lessons learned from incidents or issues
+
+## Documentation Updates for Phase 3.2 HTML Parser
+
+This section documents the documentation updates made following the completion of Phase 3.2 HTML Parser implementation.
+
+### Files Updated
+
+The following documentation files were updated to reflect the HTML Parser implementation:
+
+1. **[`docs/implementation-plan.md`](docs/implementation-plan.md:285)** - Phase 3.2 section marked as completed with comprehensive implementation notes
+2. **[`docs/architecture.md`](docs/architecture.md:129)** - Added HTML Parser Component subsection with full feature documentation
+3. **[`docs/testing.md`](docs/testing.md:276)** - Added comprehensive HTML Parser Testing section with all test categories
+4. **[`docs/data-flows.md`](docs/data-flows.md:31)** - Updated to reference parser functions ([`parseBrandDetail()`](scraper/src/html-parser.ts:250), [`parseProductList()`](scraper/src/html-parser.ts:307), [`isProductDiscoveryComplete()`](scraper/src/html-parser.ts:511), [`parseProductDetail()`](scraper/src/html-parser.ts:421))
+5. **[`docs/data-model.md`](docs/data-model.md:80)** - Added Parser Data Types section with all parser type definitions
+
+### Implementation References
+
+The HTML Parser implementation consists of:
+
+- **Main Parser**: [`scraper/src/html-parser.ts`](scraper/src/html-parser.ts:1) - Core parsing functions
+- **Type Definitions**: [`scraper/src/types.ts`](scraper/src/types.ts:1) - TypeScript interfaces
+- **Error Handling**: [`scraper/src/parser-error.ts`](scraper/src/parser-error.ts:1) - Custom error class
+- **Test Suite**: [`scraper/test/html-parser.test.ts`](scraper/test/html-parser.test.ts:1) - 92 comprehensive tests
+
+### Key Features Documented
+
+- Brand and product parsing functions
+- HTMX pagination metadata extraction
+- Completion detection logic
+- Graceful error handling with context
+- Utility functions for text and URL processing
+- Comprehensive test coverage (91.99%, 92 tests)

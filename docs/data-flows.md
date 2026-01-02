@@ -28,8 +28,8 @@ The scraping process begins with discovering available tobacco brands. Since the
 For each brand in the queue:
 
 1. **Fetch Brand Page**: The scraper retrieves the individual brand page
-2. **Parse Brand Information**: Extracts brand name, description, and image URL
-3. **Discover Products with Iterative Loading**: Identifies tobacco product links within the brand page using iterative approach:
+2. **Parse Brand Information**: Extracts brand name, description, and image URL using [`parseBrandDetail()`](scraper/src/html-parser.ts:250)
+3. **Discover Products with Iterative Loading**: Identifies tobacco product links within the brand page using [`parseProductList()`](scraper/src/html-parser.ts:307) and [`isProductDiscoveryComplete()`](scraper/src/html-parser.ts:511):
    - Extract initial product links from loaded content
    - Detect if more products can be loaded (scroll triggers, pagination, API endpoints)
    - Continue fetching additional product pages as available
@@ -49,7 +49,7 @@ For each brand in the queue:
 For each product in the queue:
 
 1. **Fetch Product Page**: The scraper retrieves the individual product page
-2. **Parse Product Information**: Extracts product name, description, and image URL
+2. **Parse Product Information**: Extracts product name, description, and image URL using [`parseProductDetail()`](scraper/src/html-parser.ts:421)
 3. **Associate with Brand**: Links the product to its parent brand
 4. **Store Product Data**: Persists product information to the database
 

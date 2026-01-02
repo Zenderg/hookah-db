@@ -282,17 +282,71 @@
 6. Discovered items tracking for duplicate detection
 7. Comprehensive test suite (54 tests, 97.24% coverage)
 
-### 3.2 HTML Parser
+### 3.2 HTML Parser ✅ **COMPLETED**
 
-- Implement brand list page parser (initial load)
-- Implement brand list page parser (subsequent loads)
-- Implement brand detail page parser (initial load)
-- Implement brand detail page parser (subsequent loads)
-- Implement product detail page parser
-- Create data extraction utilities
-- Implement error handling for malformed HTML
-- Implement detection of pagination/infinite scroll mechanisms
-- Implement completion detection logic for dynamic lists
+- [x] Implement brand list page parser (initial load)
+- [x] Implement brand list page parser (subsequent loads)
+- [x] Implement brand detail page parser (initial load)
+- [x] Implement brand detail page parser (subsequent loads)
+- [x] Implement product detail page parser
+- [x] Create data extraction utilities
+- [x] Implement error handling for malformed HTML
+- [x] Implement detection of pagination/infinite scroll mechanisms
+- [x] Implement completion detection logic for dynamic lists
+
+**Implementation Notes:**
+- Created [`scraper/src/html-parser.ts`](scraper/src/html-parser.ts:1) with comprehensive HTML parsing implementation
+- Created [`scraper/src/types.ts`](scraper/src/types.ts:1) with TypeScript interfaces for parser data structures
+- Created [`scraper/src/parser-error.ts`](scraper/src/parser-error.ts:1) with custom error class for parsing failures
+- Implemented [`parseBrandList()`](scraper/src/html-parser.ts:135): Extracts brands from listing pages with HTMX pagination support
+- Implemented [`parseBrandDetail()`](scraper/src/html-parser.ts:250): Extracts detailed brand information
+- Implemented [`parseProductList()`](scraper/src/html-parser.ts:307): Extracts products from brand pages with pagination
+- Implemented [`parseProductDetail()`](scraper/src/html-parser.ts:421): Extracts detailed product information
+- Implemented [`isBrandDiscoveryComplete()`](scraper/src/html-parser.ts:477): Checks if all brands have been discovered
+- Implemented [`isProductDiscoveryComplete()`](scraper/src/html-parser.ts:511): Checks if all products have been discovered
+- Implemented [`parseHTMXPagination()`](scraper/src/html-parser.ts:88): Extracts HTMX pagination metadata
+- Implemented utility functions: [`cleanText()`](scraper/src/html-parser.ts:29), [`normalizeUrl()`](scraper/src/html-parser.ts:43), [`extractSlug()`](scraper/src/html-parser.ts:70)
+- Comprehensive error handling with [`ParseError`](scraper/src/parser-error.ts:12) class including element context and HTML preview
+- Graceful handling of missing optional fields (description, image URL)
+- Skips invalid items while continuing to parse valid ones
+- HTMX pagination detection using data attributes (data-target, data-offset, data-count, data-total-count)
+- Completion detection based on offset + items >= totalCount
+
+**Key Design Decisions:**
+
+1. **Cheerio for HTML Parsing**: Selected cheerio for its jQuery-like API and server-side compatibility
+2. **Graceful Degradation**: Parser continues processing even when individual items fail to parse
+3. **Optional Fields**: Description and image URL are optional; parser handles missing values gracefully
+4. **HTMX Pagination Support**: Explicitly parses HTMX data attributes for pagination metadata
+5. **Error Context**: ParseError includes selector and HTML preview for debugging
+6. **Slug-Based URLs**: Constructs source URLs from slugs for consistency
+7. **English Name Preference**: For brands with multiple name spans, prefers last (English) name
+
+**Test Coverage:**
+- Created [`scraper/test/html-parser.test.ts`](scraper/test/html-parser.test.ts:1) with 92 comprehensive tests
+- Test coverage: 91.99%
+- Test pass rate: 100% (92/92 tests passing)
+- All regression tests passed (334 total tests, no failures)
+- No breaking changes to existing code
+
+**Test Categories:**
+- Utility functions tests (cleanText, normalizeUrl, extractSlug)
+- ParseError class tests
+- Brand list parser tests (including example HTML file)
+- Brand detail parser tests (including example HTML file)
+- Product list parser tests (including example HTML file)
+- Product detail parser tests (including example HTML file)
+- Completion detection tests (brands and products)
+- Edge cases and error scenarios
+
+**Phase 3.2 Deliverables:**
+1. Complete HTML parser implementation with 9 parsing functions
+2. Custom error class with context for debugging
+3. TypeScript type definitions for parser data structures
+4. Comprehensive test suite (92 tests, 91.99% coverage)
+5. Support for HTMX pagination metadata
+6. Completion detection for dynamic loading
+7. Graceful error handling and recovery
 
 ### 3.3 Data Normalization
 
