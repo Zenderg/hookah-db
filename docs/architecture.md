@@ -23,7 +23,7 @@ TypeScript is configured at two levels:
 - Provides common path mappings and type checking rules
 
 **Package-Level Configuration:**
-- Each package has its own `tsconfig.json` extending the root configuration
+- Each package has its own `tsconfig.json` extending root configuration
 - Packages define their own output directory and build settings
 - Allows for different build targets per package
 
@@ -35,7 +35,7 @@ TypeScript is configured at two levels:
 - Enforces consistent code style and best practices
 
 **Prettier Configuration (`.prettierrc`):**
-- Shared formatting rules across the entire project
+- Shared formatting rules across entire project
 - Applied to all TypeScript and configuration files
 - Ensures consistent code formatting
 
@@ -43,11 +43,11 @@ TypeScript is configured at two levels:
 
 ### Backend Service
 
-The backend service is the core component responsible for:
+The backend service is core component responsible for:
 
 - **HTTP Server**: Exposes REST API endpoints for client access
 - **Authentication Middleware**: Validates API keys on incoming requests
-- **Data Access Layer**: Interacts with the database to retrieve tobacco data
+- **Data Access Layer**: Interacts with database to retrieve tobacco data
 - **Request Processing**: Handles client queries and returns structured responses
 
 ### Scraper Service
@@ -64,10 +64,11 @@ The scraper service is responsible for:
 - **Completion Detection**: Identifies when all data has been loaded from dynamic lists
 - **Checkpoint Management**: Saves progress for resumable scraping operations
 - **Batch Processing**: Optimizes database operations for large data volumes
+- **Orchestration**: Coordinates all scraping workflows with job queue management and progress tracking
 
 #### HTTP Client Component
 
-The HTTP client ([`scraper/src/http-client.ts`](scraper/src/http-client.ts:1)) provides robust web scraping capabilities with the following features:
+The HTTP client ([`scraper/src/http-client.ts`](scraper/src/http-client.ts:1)) provides robust web scraping capabilities with following features:
 
 **Core Responsibilities:**
 - HTTP GET requests with automatic retry logic and rate limiting
@@ -129,7 +130,7 @@ The HTTP client ([`scraper/src/http-client.ts`](scraper/src/http-client.ts:1)) p
 
 #### HTML Parser Component
 
-The HTML parser ([`scraper/src/html-parser.ts`](scraper/src/html-parser.ts:1)) provides structured data extraction from HTML documents with the following features:
+The HTML parser ([`scraper/src/html-parser.ts`](scraper/src/html-parser.ts:1)) provides structured data extraction from HTML documents with following features:
 
 **Core Responsibilities:**
 - Parse brand list pages and extract brand data with pagination support
@@ -265,9 +266,143 @@ The duplicate detection module ([`scraper/src/duplicate-detector.ts`](scraper/sr
 - Integrates with scraper orchestration to skip already-processed items
 - Provides counts and queries for progress tracking and reporting
 
+#### Scraper Orchestration Component
+
+The scraper orchestration module ([`scraper/src/orchestrator.ts`](scraper/src/orchestrator.ts:1)) provides high-level orchestration for scraping workflows, coordinating HTTP client, HTML parser, data normalizer, duplicate detector, and database operations to discover and extract brand and product data.
+
+**Core Responsibilities:**
+- Coordinate iterative brand discovery workflow with pagination support
+- Coordinate brand data extraction with normalization and validation
+- Coordinate iterative product discovery per brand with pagination support
+- Coordinate product data extraction with normalization and validation
+- Manage job queues for brand and product processing with concurrent limits
+- Track progress across all scraping operations
+- Create and manage checkpoints for resumable operations
+- Handle errors with retry logic and recovery mechanisms
+- Manage metadata tracking for scraping operations
+- Provide comprehensive statistics and logging
+
+**Orchestration Methods:**
+- [`initializeOperation()`](scraper/src/orchestrator.ts:209): Initializes scraping operation with metadata tracking (full_refresh or incremental_update)
+- [`discoverBrands()`](scraper/src/orchestrator.ts:231): Discovers all brands from htreviews.org with iterative pagination
+- [`iterativeBrandDiscovery()`](scraper/src/orchestrator.ts:285): Handles iterative brand discovery across multiple pages using HTMX pagination
+- [`extractBrandData()`](scraper/src/orchestrator.ts:377): Extracts and stores brand data with normalization, validation, and duplicate checking
+- [`discoverProducts()`](scraper/src/orchestrator.ts:437): Discovers all products for a specific brand with iterative pagination
+- [`iterativeProductDiscovery()`](scraper/src/orchestrator.ts:492): Handles iterative product discovery across multiple pages using HTMX pagination
+- [`extractProductData()`](scraper/src/orchestrator.ts:573): Extracts and stores product data with normalization, validation, and duplicate checking
+- [`queueBrand()`](scraper/src/orchestrator.ts:640): Queues brand for processing with job tracking
+- [`queueProduct()`](scraper/src/orchestrator.ts:660): Queues product for processing with job tracking
+- [`processBrandQueue()`](scraper/src/orchestrator.ts:678): Processes queued brands with concurrent limits and retry logic
+- [`processProductQueue()`](scraper/src/orchestrator.ts:741): Processes queued products with concurrent limits and retry logic
+- [`getProgress()`](scraper/src/orchestrator.ts:804): Returns current scraping progress statistics
+- [`logProgress()`](scraper/src/orchestrator.ts:821): Logs detailed progress information to console
+- [`saveCheckpoint()`](scraper/src/orchestrator.ts:841): Saves checkpoint for resumability
+- [`completeOperation()`](scraper/src/orchestrator.ts:905): Marks operation as completed successfully
+- [`failOperation()`](scraper/src/orchestrator.ts:924): Marks operation as failed with error details
+- [`reset()`](scraper/src/orchestrator.ts:942): Resets orchestrator state for new operation
+- [`getStatistics()`](scraper/src/orchestrator.ts:962): Returns comprehensive operation statistics
+
+**Workflow Coordination:**
+
+**Brand Discovery Workflow:**
+1. Fetches initial brand list page from base URL
+2. Parses brand list using [`parseBrandList()`](scraper/src/html-parser.ts:135)
+3. Extracts pagination metadata from HTMX data attributes
+4. Iteratively fetches additional pages using [`iterativeBrandDiscovery()`](scraper/src/orchestrator.ts:285)
+5. Detects completion using [`isBrandDiscoveryComplete()`](scraper/src/html-parser.ts:477)
+6. Tracks discovered brands to avoid duplicates
+7. Logs progress and creates checkpoints at intervals
+
+**Brand Data Extraction Workflow:**
+1. Fetches brand detail page using HTTP client
+2. Parses brand information using [`parseBrandDetail()`](scraper/src/html-parser.ts:250)
+3. Normalizes brand data using [`normalizeBrandDetailData()`](scraper/src/data-normalizer.ts:264)
+4. Validates normalized data using [`validateBrandData()`](scraper/src/data-normalizer.ts:316)
+5. Checks for duplicates using [`addBrand()`](scraper/src/duplicate-detector.ts:69)
+6. Stores brand in database using [`upsertBrand()`](database/src/brands.ts:186)
+7. Updates metadata progress and logs errors
+
+**Product Discovery Workflow:**
+1. Fetches brand page to discover products
+2. Parses product list using [`parseProductList()`](scraper/src/html-parser.ts:307)
+3. Extracts pagination metadata from HTMX data attributes
+4. Iteratively fetches additional pages using [`iterativeProductDiscovery()`](scraper/src/orchestrator.ts:492)
+5. Detects completion using [`isProductDiscoveryComplete()`](scraper/src/html-parser.ts:511)
+6. Tracks discovered products to avoid duplicates
+7. Logs progress and creates checkpoints at intervals
+
+**Product Data Extraction Workflow:**
+1. Fetches product detail page using HTTP client
+2. Parses product information using [`parseProductDetail()`](scraper/src/html-parser.ts:421)
+3. Normalizes product data using [`normalizeProductDetailData()`](scraper/src/data-normalizer.ts:289)
+4. Validates normalized data using [`validateProductData()`](scraper/src/data-normalizer.ts:366)
+5. Checks for duplicates using [`addProduct()`](scraper/src/duplicate-detector.ts:101)
+6. Retrieves brand ID from database for association
+7. Stores product in database using [`createProduct()`](database/src/products.ts:19)
+8. Updates metadata progress and logs errors
+
+**Job Queue Management:**
+- Job tracking with status enum (QUEUED, PROCESSING, COMPLETED, FAILED)
+- Separate queues for brands and products
+- Configurable concurrent processing limits (maxConcurrentBrands, maxConcurrentProducts)
+- Automatic retry logic with configurable maximum retries
+- Job status tracking with timestamps (createdAt, completedAt)
+- Error details logging for failed jobs
+- Batch processing with configurable concurrency
+
+**Progress Tracking:**
+- Tracks brands discovered, processed, and failed
+- Tracks products discovered, processed, and failed
+- Calculates overall progress percentage (totalProcessed / totalDiscovered)
+- Provides detailed progress logging with iteration counts
+- Monitors duplicate detector counts
+- Tracks errors encountered during operations
+
+**Checkpoint Management:**
+- Saves checkpoints at configurable intervals (checkpointInterval)
+- Includes iteration counts, discovered items, processed items
+- Tracks error counts and timestamps
+- Enables resumable scraping operations
+- Can be restored after interruption
+
+**Error Handling and Recovery:**
+- Network error handling with retry logic in HTTP client
+- Parsing error handling with detailed logging
+- Validation error handling with data logging using [`logInvalidData()`](scraper/src/data-normalizer.ts:422)
+- Database error handling with graceful degradation
+- Job retry with exponential backoff
+- Maximum retry limit enforcement
+- Error context preservation for debugging
+- Continues processing after individual item failures
+
+**Metadata Management:**
+- Initializes scraping operations with metadata record using [`createScrapingMetadata()`](database/src/metadata.ts:18)
+- Supports full_refresh and incremental_update operation types
+- Updates metadata with brand and product counts using [`updateScrapingMetadata()`](database/src/metadata.ts:166)
+- Increments error count on failures using [`incrementScrapingErrorCount()`](database/src/metadata.ts:289)
+- Marks operations as completed using [`completeScrapingOperation()`](database/src/metadata.ts:253)
+- Marks operations as failed using [`failScrapingOperation()`](database/src/metadata.ts:272)
+- Stores error details for debugging
+- Tracks operation start and completion times
+
+**Environment Variables:**
+- `SCRAPER_BASE_URL`: Base URL for scraping (default: https://htreviews.org)
+- `SCRAPER_MAX_CONCURRENT_BRANDS`: Maximum concurrent brand processing (default: 1)
+- `SCRAPER_MAX_CONCURRENT_PRODUCTS`: Maximum concurrent product processing (default: 1)
+- `SCRAPER_CHECKPOINT_INTERVAL`: Save checkpoint every N iterations (default: 1)
+- `SCRAPER_MAX_RETRIES`: Maximum retry attempts for failed jobs (default: 3)
+
+**Integration with Scraper Architecture:**
+- HTTP Client: Fetches web pages with retry and rate limiting
+- HTML Parser: Extracts structured data from HTML content
+- Data Normalizer: Transforms and validates parsed data
+- Duplicate Detector: Tracks items across iterations
+- Database: Stores brands, products, and metadata
+- Metadata Operations: Tracks scraping progress and errors
+
 **Scraper Architecture Considerations:**
 
-The scraper is designed to handle dynamic loading on the source website:
+The scraper is designed to handle dynamic loading on source website:
 
 - **Iterative Discovery**: Brand and product lists are discovered through multiple requests, not a single page load
 - **Stateful Processing**: Maintains tracking of discovered items to avoid duplicates
@@ -322,7 +457,7 @@ A standalone utility for:
 
 Production deployment uses docker-compose to orchestrate:
 
-- **Backend Container**: Runs the API service in production mode
+- **Backend Container**: Runs API service in production mode
 - **Scraper Container**: Executes scheduled scraping tasks with iterative loading support
 - **Database Container**: Persistent data storage
 - **Network Configuration**: Inter-service communication
@@ -385,6 +520,8 @@ All services implement structured logging for:
 - Checkpoint status logging (scraper)
 - HTTP request history (scraper HTTP client)
 - Invalid data logging (scraper data normalizer)
+- Progress logging (scraper orchestrator)
+- Metadata tracking (scraper orchestrator)
 
 ### Error Handling
 
@@ -397,6 +534,7 @@ Consistent error handling across services:
 - Checkpoint recovery mechanisms (scraper)
 - HTTP client retry with exponential backoff (scraper)
 - Data validation with detailed error logging (scraper)
+- Job retry with maximum limits (scraper orchestrator)
 
 ### Testing
 
@@ -411,6 +549,7 @@ Comprehensive test coverage across all components:
 - HTTP client tests (scraper)
 - Data normalization tests (scraper)
 - Duplicate detection tests (scraper)
+- Orchestration tests (scraper)
 
 ## Scraper Architecture Details
 
@@ -423,7 +562,7 @@ Initial Request → Extract Items → Detect More Content?
                                               ↓
                                           Yes → Next Iteration
                                                ↓
-                                         Extract More Items → Detect More Content?
+                                          Extract More Items → Detect More Content?
                                                ↓
                                           No → Complete
 ```
@@ -441,7 +580,7 @@ The scraper maintains state across iterations:
 
 Multiple strategies for detecting completion:
 
-- **Explicit Signals**: End-of-list indicators from the source
+- **Explicit Signals**: End-of-list indicators from source
 - **Empty Results**: No new items returned in iteration
 - **Pagination Exhaustion**: No more pages available
 - **Timeout Fallback**: Maximum iterations or time limit reached
@@ -487,10 +626,13 @@ The scraper implements several optimizations:
 - **User Agent Rotation**: Distribute requests across different user agents
 - **Duplicate Detection**: Skip already-processed items using O(1) lookups
 - **Data Normalization**: Clean and validate data before storage to prevent errors
+- **Job Queue Management**: Efficient processing with configurable concurrency limits
+- **Progress Tracking**: Monitor and log scraping progress in real-time
+- **Checkpoint Management**: Save state for resumable operations
 
 ### HTTP Client Integration
 
-The HTTP client ([`scraper/src/http-client.ts`](scraper/src/http-client.ts:1)) is integrated into the scraper architecture as follows:
+The HTTP client ([`scraper/src/http-client.ts`](scraper/src/http-client.ts:1)) is integrated into scraper architecture as follows:
 
 - **Singleton Pattern**: Single instance used across all scraping operations
 - **Rate Limiting**: Enforces rate limits before each HTTP request
@@ -512,7 +654,7 @@ The HTTP client ([`scraper/src/http-client.ts`](scraper/src/http-client.ts:1)) i
 
 ### HTML Parser Integration
 
-The HTML parser ([`scraper/src/html-parser.ts`](scraper/src/html-parser.ts:1)) is integrated into the scraper architecture as follows:
+The HTML parser ([`scraper/src/html-parser.ts`](scraper/src/html-parser.ts:1)) is integrated into scraper architecture as follows:
 
 - **Data Extraction**: Parses HTML content returned by HTTP client
 - **Pagination Metadata**: Extracts HTMX pagination data for iterative loading
@@ -532,7 +674,7 @@ The HTML parser ([`scraper/src/html-parser.ts`](scraper/src/html-parser.ts:1)) i
 
 ### Data Normalization Integration
 
-The data normalization module ([`scraper/src/data-normalizer.ts`](scraper/src/data-normalizer.ts:1)) is integrated into the scraper architecture as follows:
+The data normalization module ([`scraper/src/data-normalizer.ts`](scraper/src/data-normalizer.ts:1)) is integrated into scraper architecture as follows:
 
 - **Data Cleaning**: Receives raw parsed data and cleans text fields
 - **URL Normalization**: Converts relative URLs to absolute URLs and removes tracking parameters
@@ -554,7 +696,7 @@ The data normalization module ([`scraper/src/data-normalizer.ts`](scraper/src/da
 
 ### Duplicate Detection Integration
 
-The duplicate detection module ([`scraper/src/duplicate-detector.ts`](scraper/src/duplicate-detector.ts:1)) is integrated into the scraper architecture as follows:
+The duplicate detection module ([`scraper/src/duplicate-detector.ts`](scraper/src/duplicate-detector.ts:1)) is integrated into scraper architecture as follows:
 
 - **Brand Tracking**: Tracks unique brands across iterations using case-insensitive comparison
 - **Product Tracking**: Tracks unique products per brand across iterations
@@ -574,3 +716,33 @@ The duplicate detection module ([`scraper/src/duplicate-detector.ts`](scraper/sr
 - [`clear()`](scraper/src/duplicate-detector.ts:235): Clears all tracked items
 - [`getBrands()`](scraper/src/duplicate-detector.ts:254): Returns all tracked brands
 - [`getProducts()`](scraper/src/duplicate-detector.ts:273): Returns all tracked products
+
+### Scraper Orchestration Integration
+
+The scraper orchestration module ([`scraper/src/orchestrator.ts`](scraper/src/orchestrator.ts:1)) is integrated into scraper architecture as follows:
+
+- **Workflow Coordination**: Coordinates all scraping workflows from discovery to storage
+- **Job Queue Management**: Manages brand and product processing with configurable concurrency
+- **Progress Tracking**: Monitors and logs scraping progress across all operations
+- **Error Handling**: Implements retry logic and recovery mechanisms for failed jobs
+- **Checkpoint Management**: Saves state at configurable intervals for resumable operations
+- **Metadata Tracking**: Integrates with database metadata operations for operation tracking
+- **Component Integration**: Coordinates HTTP client, HTML parser, data normalizer, duplicate detector, and database
+
+**Key Methods:**
+- [`initializeOperation()`](scraper/src/orchestrator.ts:209): Initializes scraping operation with metadata
+- [`discoverBrands()`](scraper/src/orchestrator.ts:231): Discovers brands with iterative pagination
+- [`extractBrandData()`](scraper/src/orchestrator.ts:377): Extracts and stores brand data
+- [`discoverProducts()`](scraper/src/orchestrator.ts:437): Discovers products for brand with iterative pagination
+- [`extractProductData()`](scraper/src/orchestrator.ts:573): Extracts and stores product data
+- [`queueBrand()`](scraper/src/orchestrator.ts:640): Queues brand for processing
+- [`queueProduct()`](scraper/src/orchestrator.ts:660): Queues product for processing
+- [`processBrandQueue()`](scraper/src/orchestrator.ts:678): Processes brand queue with concurrency limits
+- [`processProductQueue()`](scraper/src/orchestrator.ts:741): Processes product queue with concurrency limits
+- [`getProgress()`](scraper/src/orchestrator.ts:804): Returns progress statistics
+- [`logProgress()`](scraper/src/orchestrator.ts:821): Logs detailed progress
+- [`saveCheckpoint()`](scraper/src/orchestrator.ts:841): Saves checkpoint
+- [`completeOperation()`](scraper/src/orchestrator.ts:905): Marks operation completed
+- [`failOperation()`](scraper/src/orchestrator.ts:924): Marks operation failed
+- [`reset()`](scraper/src/orchestrator.ts:942): Resets orchestrator state
+- [`getStatistics()`](scraper/src/orchestrator.ts:962): Returns comprehensive statistics

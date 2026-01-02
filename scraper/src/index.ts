@@ -82,3 +82,14 @@ export {
   getBrands,
   getProducts,
 } from './duplicate-detector.js';
+
+// Export orchestrator
+export {
+  ScraperOrchestrator,
+  JobStatus,
+  type Job,
+  type Progress,
+  type OrchestratorConfig,
+  type BrandDiscoveryResult,
+  type ProductDiscoveryResult,
+} from './orchestrator.js';
