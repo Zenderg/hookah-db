@@ -44,6 +44,8 @@ Test individual functions and components in isolation.
 - Iteration state management functions
 - Completion detection logic for dynamic loading
 - HTTP client functionality (retry logic, rate limiting, user agent rotation)
+- Data validation functions (brand data, product data)
+- Duplicate detection functions (brand tracking, product tracking)
 
 **Characteristics:**
 - Fast execution
@@ -64,6 +66,7 @@ Test interactions between multiple components.
 - Checkpoint creation and recovery mechanisms
 - Duplicate detection across iterations
 - HTTP client integration with scraper workflows
+- Data normalization integration with parser and duplicate detector
 
 **Characteristics:**
 - Use real database instances (test-specific)
@@ -122,6 +125,8 @@ Tests follow descriptive naming conventions that indicate:
 - **Iteration Logic**: 80% coverage of dynamic loading mechanisms
 - **Completion Detection**: 80% coverage of end-of-list detection
 - **HTTP Client**: 80% coverage of HTTP client functionality
+- **Data Normalization**: 80% coverage of normalization and validation functions
+- **Duplicate Detection**: 80% coverage of duplicate detection functions
 
 ### Critical Path Coverage
 
@@ -138,6 +143,8 @@ All critical paths must have comprehensive tests:
 - HTTP client retry logic and rate limiting
 - HTTP client user agent rotation
 - HTTP client iterative request support
+- Data normalization and validation
+- Duplicate detection and tracking
 
 ## HTTP Client Testing
 
@@ -503,6 +510,417 @@ The HTML parser ([`scraper/src/html-parser.ts`](scraper/src/html-parser.ts:1)) h
 - **Test File**: [`scraper/test/html-parser.test.ts`](scraper/test/html-parser.test.ts:1)
 - **Regression Tests**: All 334 total tests passed with no failures
 
+## Data Normalization Testing
+
+### Data Normalizer Test Coverage
+
+The data normalizer ([`scraper/src/data-normalizer.ts`](scraper/src/data-normalizer.ts:1)) has comprehensive test coverage with 110 tests achieving 96.83% code coverage.
+
+**Test File**: [`scraper/test/data-normalizer.test.ts`](scraper/test/data-normalizer.test.ts:1)
+
+### Data Normalizer Test Categories
+
+#### Text Normalization Tests
+
+**cleanText() Tests:**
+- Test removing leading and trailing whitespace
+- Test trimming strings
+- Test normalizing line breaks to single spaces
+- Test removing extra whitespace (multiple spaces become single space)
+- Test handling empty strings
+- Test handling strings with only whitespace
+- Test handling null/undefined values
+- Test preserving single spaces between words
+- Test handling strings with tabs and newlines
+
+#### URL Normalization Tests
+
+**normalizeUrl() Tests:**
+- Test converting relative URLs to absolute URLs
+- Test handling already absolute URLs (http://, https://)
+- Test handling URLs with base URL parameter
+- Test removing tracking parameters (utm_source, utm_medium, utm_campaign, utm_term, utm_content, fbclid, gclid)
+- Test handling URLs with query parameters
+- Test handling URLs with fragments
+- Test handling empty strings
+- Test handling null/undefined values
+- Test handling malformed URLs gracefully (returns null)
+- Test handling URLs without protocol
+- Test handling URLs with invalid characters
+- Test URL length validation (MAX_URL_LENGTH: 2000 characters)
+
+#### Slug Generation Tests
+
+- Test generating slugs from names
+- Test converting to lowercase
+- Test removing special characters (keeps only alphanumeric, spaces, hyphens)
+- Test replacing spaces with hyphens
+- Test removing leading/trailing hyphens
+- Test normalizing multiple consecutive hyphens to single hyphen
+- Test handling empty strings
+- Test handling names with special characters
+- Test handling names with multiple spaces
+- Test handling names with numbers
+
+#### Slug Extraction Tests
+
+- Test extracting slugs from URLs
+- Test extracting from absolute URLs
+- Test extracting from relative URLs
+- Test handling URLs without path segments
+- Test handling URLs with multiple path segments
+- Test handling URLs with query parameters
+- Test handling malformed URLs (returns null)
+- Test extracting last path segment as slug
+
+#### Brand Data Normalization Tests
+
+**normalizeBrandData() Tests:**
+- Test transforming parsed brand data to normalized format
+- Test cleaning brand name with cleanText()
+- Test normalizing brand description
+- Test normalizing brand image URL
+- Test normalizing brand source URL
+- Test generating slug from source URL or name
+- Test adding scrapedAt timestamp (ISO 8601)
+- Test handling missing optional fields (description, imageUrl)
+- Test handling empty description
+- Test handling null imageUrl
+
+#### Product Data Normalization Tests
+
+**normalizeProductData() Tests:**
+- Test transforming parsed product data to normalized format
+- Test cleaning product name with cleanText()
+- Test normalizing product description
+- Test normalizing product image URL
+- Test normalizing product source URL
+- Test cleaning and associating brandSlug
+- Test generating slug from source URL or name
+- Test adding scrapedAt timestamp (ISO 8601)
+- Test handling missing optional fields (description, imageUrl)
+- Test handling empty description
+- Test handling null imageUrl
+
+#### Brand Detail Data Normalization Tests
+
+**normalizeBrandDetailData() Tests:**
+- Test transforming parsed brand detail data to normalized format
+- Test cleaning brand name with cleanText()
+- Test normalizing brand description
+- Test normalizing brand image URL
+- Test normalizing brand source URL
+- Test generating slug from source URL or name
+- Test adding scrapedAt timestamp (ISO 8601)
+- Test handling missing optional fields (description, imageUrl)
+
+#### Product Detail Data Normalization Tests
+
+**normalizeProductDetailData() Tests:**
+- Test transforming parsed product detail data to normalized format
+- Test cleaning product name with cleanText()
+- Test normalizing product description
+- Test normalizing product image URL
+- Test normalizing product source URL
+- Test cleaning and associating brandSlug
+- Test generating slug from source URL or name
+- Test adding scrapedAt timestamp (ISO 8601)
+- Test handling missing optional fields (description, imageUrl)
+
+#### Brand Data Validation Tests
+
+**validateBrandData() Tests:**
+- Test validating required field: slug (non-empty, max 500 chars)
+- Test validating required field: name (non-empty, max 500 chars)
+- Test validating required field: sourceUrl (valid URL format, max 2000 chars)
+- Test validating optional field: description (max 10000 chars if present)
+- Test validating optional field: imageUrl (valid URL format, max 2000 chars if present)
+- Test validating scrapedAt timestamp (valid ISO 8601 format)
+- Test validation with all valid data (isValid: true, errors: [])
+- Test validation with missing required fields (isValid: false, specific errors)
+- Test validation with empty required fields (isValid: false, specific errors)
+- Test validation with exceeding length limits (isValid: false, specific errors)
+- Test validation with invalid URL format (isValid: false, specific errors)
+- Test validation with invalid timestamp format (isValid: false, specific errors)
+
+#### Product Data Validation Tests
+
+**validateProductData() Tests:**
+- Test validating required field: slug (non-empty, max 500 chars)
+- Test validating required field: name (non-empty, max 500 chars)
+- Test validating required field: sourceUrl (valid URL format, max 2000 chars)
+- Test validating required field: brandSlug (non-empty, max 500 chars)
+- Test validating optional field: description (max 10000 chars if present)
+- Test validating optional field: imageUrl (valid URL format, max 2000 chars if present)
+- Test validating scrapedAt timestamp (valid ISO 8601 format)
+- Test validation with all valid data (isValid: true, errors: [])
+- Test validation with missing required fields (isValid: false, specific errors)
+- Test validation with empty required fields (isValid: false, specific errors)
+- Test validation with exceeding length limits (isValid: false, specific errors)
+- Test validation with invalid URL format (isValid: false, specific errors)
+- Test validation with invalid timestamp format (isValid: false, specific errors)
+
+#### Invalid Data Logging Tests
+
+**logInvalidData() Tests:**
+- Test logging invalid data with error messages
+- Test logging multiple validation errors
+- Test logging data preview (truncated to 500 characters)
+- Test handling data that cannot be serialized (fallback message)
+- Test logging format with numbered error list
+- Test handling empty errors array
+
+#### Edge Cases and Integration Tests
+
+**Text Normalization Edge Cases:**
+- Test handling strings with only whitespace
+- Test handling strings with tabs and multiple newlines
+- Test handling Unicode characters
+- Test handling very long strings (exceeding limits)
+- Test handling strings with mixed whitespace types
+
+**URL Normalization Edge Cases:**
+- Test handling URLs with all tracking parameters
+- Test handling URLs with multiple query parameters
+- Test handling URLs with fragments
+- Test handling URLs at maximum length (2000 chars)
+- Test handling URLs without protocol
+- Test handling protocol-only URLs (http://, https://)
+- Test handling relative URLs with multiple path segments
+
+**Slug Generation Edge Cases:**
+- Test handling names with only special characters
+- Test handling names with consecutive special characters
+- Test handling names with leading/trailing spaces
+- Test handling names with numbers
+- Test handling very long names (exceeding 500 chars)
+- Test handling names with hyphens already present
+
+**Integration Tests:**
+- Test end-to-end normalization flow (parse → normalize → validate)
+- Test normalization with duplicate detection integration
+- Test normalization with real-world scraped data
+- Test handling of data from HTML parser output
+
+### Data Normalizer Testing Approach
+
+**Unit Testing:**
+- Test each normalization function in isolation
+- Test with various input types (strings, null, undefined)
+- Test edge cases and boundary conditions
+- Verify output format matches expected interfaces
+
+**Validation Testing:**
+- Test all validation rules independently
+- Test with valid and invalid inputs
+- Verify error messages are specific and actionable
+- Test that validation catches all business rule violations
+
+**Integration Testing:**
+- Test normalization pipeline (parse → normalize → validate → log errors)
+- Test with realistic scraped data from HTML parser
+- Test error handling and logging flow
+- Verify data flows through normalization to storage
+
+**Edge Case Testing:**
+- Test boundary conditions (empty strings, maximum lengths, minimum lengths)
+- Test malformed inputs (invalid URLs, invalid timestamps)
+- Test null/undefined handling throughout pipeline
+- Test with realistic edge cases from actual scraping scenarios
+
+### Data Normalizer Test Results
+
+- **Total Tests**: 110
+- **Pass Rate**: 100% (110/110 tests passing)
+- **Code Coverage**: 96.83%
+- **Test File**: [`scraper/test/data-normalizer.test.ts`](scraper/test/data-normalizer.test.ts:1)
+
+## Duplicate Detection Testing
+
+### Duplicate Detector Test Coverage
+
+The duplicate detector ([`scraper/src/duplicate-detector.ts`](scraper/src/duplicate-detector.ts:1)) has comprehensive test coverage with 105 tests achieving 100% code coverage.
+
+**Test File**: [`scraper/test/duplicate-detector.test.ts`](scraper/test/duplicate-detector.test.ts:1)
+
+### Duplicate Detector Test Categories
+
+#### Detector Creation Tests
+
+**createDuplicateDetector() Tests:**
+- Test creating new detector instance
+- Test initial state (empty brands Set, empty products Map)
+- Test initial totalCount (0)
+- Test multiple detector instances are independent
+- Test detector can be reused after clearing
+
+#### Brand Duplicate Detection Tests
+
+**addBrand() Tests:**
+- Test adding first brand (returns false, adds to Set)
+- Test adding duplicate brand (returns true, doesn't add to Set)
+- Test case-insensitive comparison (Brand, brand, BRAND all detected as same)
+- Test incrementing totalCount on new brand
+- Test totalCount not incremented on duplicate
+- Test multiple brands with same slug (only first added)
+
+**hasBrand() Tests:**
+- Test checking existence of added brand (returns true)
+- Test checking non-existent brand (returns false)
+- Test case-insensitive lookup (Brand, brand, BRAND all match)
+- Test checking with empty detector (returns false)
+- Test checking after clearing detector
+
+#### Product Duplicate Detection Tests
+
+**addProduct() Tests:**
+- Test adding first product for brand (returns false, adds to Set)
+- Test adding duplicate product for brand (returns true, doesn't add to Set)
+- Test case-insensitive comparison (Product, product, PRODUCT all detected as same)
+- Test incrementing totalCount on new product
+- Test totalCount not incremented on duplicate
+- Test creating new product Set for new brand
+- Test reusing existing product Set for brand
+- Test multiple products with same slug (only first added)
+
+**hasProduct() Tests:**
+- Test checking existence of added product (returns true)
+- Test checking non-existent product (returns false)
+- Test case-insensitive lookup (Product, product, PRODUCT all match)
+- Test checking with empty detector (returns false)
+- Test checking with non-existent brand (returns false)
+- Test checking after clearing detector
+
+#### Count and Query Tests
+
+**getBrandCount() Tests:**
+- Test counting brands in empty detector (returns 0)
+- Test counting after adding single brand (returns 1)
+- Test counting after adding multiple brands
+- Test count doesn't include duplicates
+- Test count after clearing detector
+
+**getProductCount() Tests:**
+- Test counting products in empty detector (returns 0)
+- Test counting after adding single product (returns 1)
+- Test counting after adding multiple products for same brand
+- Test counting after adding products for multiple brands
+- Test count doesn't include duplicates
+
+**getProductCountByBrand() Tests:**
+- Test counting products for specific brand (empty brand returns 0)
+- Test counting products for brand with products
+- Test counting after adding product to brand
+- Test counting duplicates (only unique products counted)
+- Test counting for non-existent brand (returns 0)
+
+**getBrands() Tests:**
+- Test retrieving brands from empty detector (returns empty array)
+- Test retrieving all added brands
+- Test brands are returned as array
+- Test order preservation (order of addition)
+- Test after clearing detector
+
+**getProducts() Tests:**
+- Test retrieving products from empty detector (returns empty array)
+- Test retrieving all added products with brand associations
+- Test products are returned as array of objects with slug and brandSlug
+- Test products from multiple brands are included
+- Test order preservation (order of addition)
+
+**totalCount Tests:**
+- Test initial totalCount (0)
+- Test totalCount after adding brand (1)
+- Test totalCount after adding product (2)
+- Test totalCount after adding duplicate brand (still 1)
+- Test totalCount after adding duplicate product (still 2)
+- Test totalCount after clearing (returns to 0)
+
+#### State Management Tests
+
+**clear() Tests:**
+- Test clearing all brands from detector
+- Test clearing all products from detector
+- Test resetting totalCount to 0
+- Test detector can be reused after clearing
+- Test clearing empty detector (no errors)
+
+#### Edge Cases and Performance Tests
+
+**Empty Detector Tests:**
+- Test all operations with empty detector
+- Test hasBrand() returns false for empty detector
+- Test hasProduct() returns false for empty detector
+- Test counts return 0 for empty detector
+- Test retrieval returns empty arrays
+
+**Single Item Tests:**
+- Test adding single brand and checking existence
+- Test adding single product and checking existence
+- Test counts with single item
+- Test retrieval with single item
+
+**Multiple Items Tests:**
+- Test adding multiple brands
+- Test adding multiple products for same brand
+- Test adding products for multiple brands
+- Test counts with multiple items
+- Test retrieval with multiple items
+
+**Case Sensitivity Tests:**
+- Test uppercase brand/product slugs
+- Test lowercase brand/product slugs
+- Test mixed case brand/product slugs
+- Test all variations detected as same brand/product
+- Test normalization to lowercase for comparison
+
+**Brand-Specific Product Tests:**
+- Test products for different brands are tracked separately
+- Test getProducts() returns products with correct brandSlug
+- Test getProductCountByBrand() returns correct count per brand
+- Test duplicate detection is brand-specific (same slug in different brand is not duplicate)
+
+### Duplicate Detector Testing Approach
+
+**Unit Testing:**
+- Test each duplicate detection function in isolation
+- Test with various input types and edge cases
+- Verify O(1) lookup performance
+- Test case-insensitive comparison
+
+**Integration Testing:**
+- Test duplicate detection with normalized data
+- Test duplicate detection with real-world scraped data
+- Test duplicate detection with HTML parser output
+- Test duplicate detector state persistence across operations
+
+**Performance Testing:**
+- Verify O(1) lookup time for brand existence checks
+- Verify O(1) lookup time for product existence checks
+- Test with large numbers of items (100+ brands, 1000+ products)
+- Verify memory efficiency of Set and Map data structures
+
+**State Testing:**
+- Test detector state persistence
+- Test totalCount accuracy
+- Test independence of multiple detector instances
+- Test state reset functionality
+
+**Edge Case Testing:**
+- Test empty detector state
+- Test single item scenarios
+- Test multiple items scenarios
+- Test case sensitivity variations
+- Test brand-specific product tracking
+- Test clearing and reusing detector
+
+### Duplicate Detector Test Results
+
+- **Total Tests**: 105
+- **Pass Rate**: 100% (105/105 tests passing)
+- **Code Coverage**: 100%
+- **Test File**: [`scraper/test/duplicate-detector.test.ts`](scraper/test/duplicate-detector.test.ts:1)
+
 ## Dynamic Loading Test Scenarios
 
 ### Brand Discovery Tests
@@ -659,6 +1077,12 @@ cd scraper && pnpm test:run --grep "HTTP Client"
 # Run specific HTML parser tests
 cd scraper && pnpm test:run --grep "HTML Parser"
 
+# Run specific data normalizer tests
+cd scraper && pnpm test:run --grep "Data Normalizer"
+
+# Run specific duplicate detector tests
+cd scraper && pnpm test:run --grep "Duplicate Detector"
+
 # Run specific dynamic loading tests
 cd scraper && pnpm test:run --grep "dynamic loading"
 ```
@@ -741,18 +1165,6 @@ External HTTP requests are mocked:
 - Transaction rollbacks
 - Serialization failures
 - Deadlock detection
-- Batch operation failures
-
-**Database Failure Test Scenarios:**
-- Connection pool exhaustion
-- Invalid connection parameters
-- Retry logic on transient failures
-- Foreign key constraint violations
-- Unique constraint violations
-- CHECK constraint violations
-- Transaction rollback on errors
-- Savepoint rollback
-- Isolation level behavior
 - Cascade delete behavior
 
 ### Iteration Failures
@@ -785,7 +1197,24 @@ External HTTP requests are mocked:
 - Missing optional fields
 - Invalid data types
 - Empty results
-- Parse errors with context
+
+### Data Normalization Failures
+
+- Invalid URL format
+- Exceeding field length limits
+- Missing required fields
+- Invalid timestamp format
+- Null/undefined values in required fields
+- Malformed URLs that cannot be parsed
+
+### Duplicate Detection Failures
+
+- Case sensitivity issues
+- Incorrect slug generation
+- State corruption
+- Memory issues with large datasets
+- Incorrect count tracking
+- Brand/product association errors
 
 ## Test Maintenance
 
@@ -801,6 +1230,8 @@ Tests must be updated when:
 - Iteration patterns change
 - HTTP client behavior changes
 - HTML parser logic changes
+- Data normalization rules change
+- Duplicate detection logic changes
 
 ### Refactoring Tests
 
@@ -842,6 +1273,26 @@ Special considerations for HTML parser tests:
 - Update error scenario tests as new parsing errors are identified
 - Maintain test coverage for all parser functions
 
+### Data Normalization Test Maintenance
+
+Special considerations for data normalization tests:
+
+- Update validation tests when business rules change
+- Update length limit tests when field constraints change
+- Add new normalization tests for new data types
+- Update URL normalization tests when URL handling changes
+- Maintain test coverage for all normalization functions
+- Update error logging tests when error handling changes
+
+### Duplicate Detection Test Maintenance
+
+Special considerations for duplicate detection tests:
+
+- Add new tests for new duplicate detection scenarios
+- Update performance tests when data structures change
+- Maintain test coverage for all duplicate detection functions
+- Update integration tests with other components
+
 ## Documentation Updates
 
 This documentation was updated to include HTML Parser Testing section following the completion of Phase 3.2 HTML Parser implementation.
@@ -860,3 +1311,22 @@ This documentation was updated to include HTML Parser Testing section following 
 - [`scraper/src/html-parser.ts`](scraper/src/html-parser.ts:1)
 - [`scraper/src/parser-error.ts`](scraper/src/parser-error.ts:1)
 - [`scraper/src/types.ts`](scraper/src/types.ts:1)
+
+This documentation was updated to include Data Normalization Testing and Duplicate Detection Testing sections following the completion of Phase 3.3 Data Normalization and Duplicate Detection implementation.
+
+**Changes Made:**
+- Added comprehensive Data Normalization Testing section with 110 tests
+- Added comprehensive Duplicate Detection Testing section with 105 tests
+- Documented all test categories and their purposes
+- Included test results (96.83% coverage for data normalizer, 100% coverage for duplicate detector)
+- Added testing approaches and methodologies
+- Updated Test Maintenance section with data normalization and duplicate detection specific considerations
+
+**Test File References:**
+- [`scraper/test/data-normalizer.test.ts`](scraper/test/data-normalizer.test.ts:1) - 110 tests, 96.83% coverage
+- [`scraper/test/duplicate-detector.test.ts`](scraper/test/duplicate-detector.test.ts:1) - 105 tests, 100% coverage
+
+**Implementation References:**
+- [`scraper/src/data-normalizer.ts`](scraper/src/data-normalizer.ts:1) - Data normalization module
+- [`scraper/src/duplicate-detector.ts`](scraper/src/duplicate-detector.ts:1) - Duplicate detection module
+- [`scraper/src/types.ts`](scraper/src/types.ts:1) - Type definitions for normalized data and duplicate detector

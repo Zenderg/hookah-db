@@ -348,14 +348,133 @@
 6. Completion detection for dynamic loading
 7. Graceful error handling and recovery
 
-### 3.3 Data Normalization
+### 3.3 Data Normalization and Duplicate Detection ✅ **COMPLETED**
 
-- Implement data transformation logic
-- Create text cleaning utilities
-- Implement URL normalization
-- Set up data validation rules
-- Create error logging for invalid data
-- Implement duplicate detection across iterations
+- [x] Implement data transformation logic
+- [x] Create text cleaning utilities
+- [x] Implement URL normalization
+- [x] Set up data validation rules
+- [x] Create error logging for invalid data
+- [x] Implement duplicate detection across iterations
+
+**Implementation Notes:**
+- Created [`scraper/src/data-normalizer.ts`](scraper/src/data-normalizer.ts:1) with comprehensive data normalization implementation
+- Created [`scraper/src/duplicate-detector.ts`](scraper/src/duplicate-detector.ts:1) with efficient duplicate detection using Set and Map
+- Updated [`scraper/src/types.ts`](scraper/src/types.ts:1) with NormalizedBrand, NormalizedProduct, NormalizedBrandDetail, NormalizedProductDetail, ValidationResult, and DuplicateDetector interfaces
+- Implemented [`cleanText()`](scraper/src/data-normalizer.ts:45): Normalizes text by removing extra whitespace and normalizing line breaks
+- Implemented [`normalizeUrl()`](scraper/src/data-normalizer.ts:73): Converts relative URLs to absolute URLs and removes tracking parameters
+- Implemented [`normalizeBrandData()`](scraper/src/data-normalizer.ts:212): Transforms parsed brand data to normalized format
+- Implemented [`normalizeProductData()`](scraper/src/data-normalizer.ts:237): Transforms parsed product data to normalized format
+- Implemented [`normalizeBrandDetailData()`](scraper/src/data-normalizer.ts:264): Transforms parsed brand detail data to normalized format
+- Implemented [`normalizeProductDetailData()`](scraper/src/data-normalizer.ts:289): Transforms parsed product detail data to normalized format
+- Implemented [`validateBrandData()`](scraper/src/data-normalizer.ts:316): Validates normalized brand data against business rules
+- Implemented [`validateProductData()`](scraper/src/data-normalizer.ts:366): Validates normalized product data against business rules
+- Implemented [`logInvalidData()`](scraper/src/data-normalizer.ts:422): Logs invalid data with detailed error information
+- Implemented [`createDuplicateDetector()`](scraper/src/duplicate-detector.ts:44): Creates new duplicate detector instance
+- Implemented [`addBrand()`](scraper/src/duplicate-detector.ts:69): Adds brand to detector and checks for duplicates
+- Implemented [`addProduct()`](scraper/src/duplicate-detector.ts:101): Adds product to detector and checks for duplicates
+- Implemented [`hasBrand()`](scraper/src/duplicate-detector.ts:139): Checks if brand exists in detector
+- Implemented [`hasProduct()`](scraper/src/duplicate-detector.ts:159): Checks if product exists in detector
+- Implemented [`getBrandCount()`](scraper/src/duplicate-detector.ts:179): Gets total count of tracked brands
+- Implemented [`getProductCount()`](scraper/src/duplicate-detector.ts:195): Gets total count of tracked products
+- Implemented [`getProductCountByBrand()`](scraper/src/duplicate-detector.ts:217): Gets product count for specific brand
+- Implemented [`clear()`](scraper/src/duplicate-detector.ts:235): Clears all tracked items from detector
+- Implemented [`getBrands()`](scraper/src/duplicate-detector.ts:254): Gets all tracked brand slugs
+- Implemented [`getProducts()`](scraper/src/duplicate-detector.ts:273): Gets all tracked products with brand associations
+- Created [`scraper/test/data-normalizer.test.ts`](scraper/test/data-normalizer.test.ts:1) with 110 comprehensive tests
+- Created [`scraper/test/duplicate-detector.test.ts`](scraper/test/duplicate-detector.test.ts:1) with 105 comprehensive tests
+- Test coverage: 96.83% for data-normalizer, 100% for duplicate-detector
+- Total scraper test count: 361 tests (all passing)
+
+**Key Features:**
+
+**Data Normalization:**
+- Text cleaning: Removes extra whitespace, normalizes line breaks to spaces
+- URL normalization: Converts relative URLs to absolute, removes tracking parameters (utm_source, utm_medium, utm_campaign, utm_term, utm_content, fbclid, gclid)
+- Slug generation: Creates URL-friendly slugs from names (lowercase, hyphens instead of spaces, removes special characters)
+- Slug extraction: Extracts slugs from URLs for consistency
+- Timestamp tracking: Adds ISO 8601 scrapedAt timestamp to all normalized data
+- Optional field handling: Gracefully handles missing optional fields (description, imageUrl)
+- Length validation: Enforces maximum lengths for text fields (10000 chars), names (500 chars), and URLs (2000 chars)
+- URL validation: Validates URL format and length
+- Timestamp validation: Validates ISO 8601 timestamp format
+
+**Duplicate Detection:**
+- Case-insensitive comparison: Normalizes slugs to lowercase for comparison
+- O(1) lookup performance: Uses Set for brands and Map of Sets for products
+- Brand-level tracking: Tracks unique brand slugs
+- Product-level tracking: Tracks unique product slugs per brand
+- Total count tracking: Maintains count of all tracked items (brands + products)
+- Query functions: Provides functions to check existence, get counts, and retrieve all tracked items
+- Clear functionality: Allows resetting detector for new scraping sessions
+- Memory efficient: Uses efficient data structures for large-scale tracking
+
+**Validation Rules:**
+- Required fields: slug, name, sourceUrl, and brandSlug (for products) must be present and non-empty
+- Optional fields: description and imageUrl are optional but must be valid if present
+- Length limits: Enforces maximum lengths for all text fields
+- URL format: Validates that URLs are properly formatted
+- Timestamp format: Validates that scrapedAt is a valid ISO 8601 timestamp
+
+**Error Handling:**
+- Graceful URL handling: Returns null for invalid URLs instead of throwing errors
+- Detailed error logging: [`logInvalidData()`](scraper/src/data-normalizer.ts:422) provides structured error output with data preview
+- Console warnings: Logs warnings for normalization failures (e.g., invalid URLs)
+- Truncated previews: Limits data preview to 500 characters for readability
+
+**Integration Points:**
+- HTML Parser: Normalizes data returned by parser functions
+- Duplicate Detector: Tracks normalized data across iterations
+- Database: Stores validated, normalized data
+- HTTP Client: Uses normalized URLs for requests
+
+**Test Coverage:**
+
+**Data Normalizer Tests** ([`scraper/test/data-normalizer.test.ts`](scraper/test/data-normalizer.test.ts:1)):
+- cleanText() tests: Removing extra whitespace, trimming, normalizing line breaks, handling empty strings
+- normalizeUrl() tests: Absolute URLs, relative URLs, tracking parameter removal, malformed URLs
+- Slug generation tests: Creating slugs from names, handling special characters, normalizing
+- Slug extraction tests: Extracting slugs from URLs, handling edge cases
+- normalizeBrandData() tests: Transforming parsed brands, handling optional fields, timestamp generation
+- normalizeProductData() tests: Transforming parsed products, brand slug association
+- normalizeBrandDetailData() tests: Transforming brand details, full data extraction
+- normalizeProductDetailData() tests: Transforming product details, full data extraction
+- validateBrandData() tests: Required field validation, length validation, URL validation, timestamp validation
+- validateProductData() tests: Required field validation, brand slug validation, all validation rules
+- logInvalidData() tests: Error formatting, data preview truncation, error output
+- Edge cases: Empty strings, null/undefined values, maximum length values, malformed URLs
+- Integration tests: End-to-end normalization and validation flow
+
+**Duplicate Detector Tests** ([`scraper/test/duplicate-detector.test.ts`](scraper/test/duplicate-detector.test.ts:1)):
+- createDuplicateDetector() tests: Initial state, empty tracking sets, zero count
+- addBrand() tests: Adding new brands, detecting duplicate brands, case-insensitive comparison
+- addProduct() tests: Adding new products, detecting duplicate products, brand-specific tracking
+- hasBrand() tests: Checking brand existence, case-insensitive lookup
+- hasProduct() tests: Checking product existence, brand-specific lookup
+- getBrandCount() tests: Counting tracked brands, multiple additions
+- getProductCount() tests: Counting tracked products across all brands
+- getProductCountByBrand() tests: Counting products for specific brand
+- clear() tests: Resetting detector state, clearing all tracking
+- getBrands() tests: Retrieving all brand slugs, array conversion
+- getProducts() tests: Retrieving all products with brand associations
+- totalCount tests: Accurate counting of brands + products
+- Edge cases: Empty detector, single item, multiple brands, multiple products per brand
+- Case sensitivity: Uppercase/lowercase/mixed case handling
+
+**Test Results:**
+- **Data Normalizer**: 110 tests, 96.83% coverage, 100% pass rate
+- **Duplicate Detector**: 105 tests, 100% coverage, 100% pass rate
+- **Total Scraper Tests**: 361 tests (all passing)
+- **Overall Scraper Coverage**: Excellent coverage across all modules
+
+**Phase 3.3 Deliverables:**
+1. Complete data normalization module with text cleaning, URL normalization, and slug generation
+2. Comprehensive data validation with business rules and error reporting
+3. Efficient duplicate detection using Set and Map data structures
+4. TypeScript type definitions for normalized data structures and validation results
+5. Comprehensive test suites (215 tests: 110 for normalizer, 105 for duplicate detector)
+6. Excellent test coverage (96.83% for normalizer, 100% for duplicate detector)
+7. Integration points with HTML parser, duplicate detector, and database
 
 ### 3.4 Scraping Orchestration
 
@@ -533,9 +652,9 @@
 ### 6.3 Scraper Tests
 
 - [x] Write unit tests for HTTP client functionality
-- Write unit tests for HTML parsing functions
-- Write unit tests for data normalization
-- Write unit tests for iteration state management
+- [x] Write unit tests for HTML parsing functions
+- [x] Write unit tests for data normalization
+- [x] Write unit tests for iteration state management
 - Write unit tests for completion detection logic
 - Write integration tests for scraping workflows
 - Write tests using example HTML files
@@ -550,6 +669,16 @@
 - Created [`scraper/test/http-client.test.ts`](scraper/test/http-client.test.ts:1) with 54 comprehensive tests
 - Test coverage: 97.24% (54 tests, 100% pass rate)
 - Tests cover HTTP client functionality, retry logic, rate limiting, user agent rotation, iterative requests, and checkpoint management
+- Created [`scraper/test/html-parser.test.ts`](scraper/test/html-parser.test.ts:1) with 92 comprehensive tests
+- Test coverage: 91.99% (92 tests, 100% pass rate)
+- Tests cover HTML parsing functions, error handling, pagination metadata extraction, and completion detection
+- Created [`scraper/test/data-normalizer.test.ts`](scraper/test/data-normalizer.test.ts:1) with 110 comprehensive tests
+- Test coverage: 96.83% (110 tests, 100% pass rate)
+- Tests cover text cleaning, URL normalization, slug generation, data transformation, and validation
+- Created [`scraper/test/duplicate-detector.test.ts`](scraper/test/duplicate-detector.test.ts:1) with 105 comprehensive tests
+- Test coverage: 100% (105 tests, 100% pass rate)
+- Tests cover duplicate detection, tracking, counting, and query operations
+- Total scraper tests: 361 tests (all passing)
 
 ### 6.4 Backend Tests
 

@@ -46,6 +46,9 @@ Update documentation when:
 - Rate limiting or retry logic is updated
 - Scraping workflow is restructured
 - HTML parser implementation or modification
+- HTML parser implementation or modification
+- Data normalization logic is added or modified
+- Duplicate detection logic is added or modified
 
 ### Testing Changes
 
@@ -54,8 +57,9 @@ Update documentation when:
 - New test categories are introduced
 - Testing strategy or philosophy changes
 - Coverage requirements are modified
-- Test infrastructure is significantly updated
+- Testing infrastructure is significantly updated
 - Example HTML files are added or removed
+- Dynamic loading scenario tests are added or modified
 
 ### Operational Changes
 
@@ -159,9 +163,9 @@ Documentation must:
 
 ### Maintainability
 
-Documentation must:
+Documentation must be:
 
-- Be organized in a logical structure
+- Organized in a logical structure
 - Use consistent formatting and style
 - Avoid redundancy across files
 - Be easy to update without widespread changes
@@ -200,7 +204,7 @@ During code review:
 After deployment:
 
 - Confirm documentation matches production behavior
-- Update operational procedures if needed
+- Update any operational procedures if needed
 - Document any discovered issues or edge cases
 - Share knowledge with the team
 
@@ -324,8 +328,8 @@ This section documents the documentation updates made following the completion o
 The following documentation files were updated to reflect the HTML Parser implementation:
 
 1. **[`docs/implementation-plan.md`](docs/implementation-plan.md:285)** - Phase 3.2 section marked as completed with comprehensive implementation notes
-2. **[`docs/architecture.md`](docs/architecture.md:129)** - Added HTML Parser Component subsection with full feature documentation
-3. **[`docs/testing.md`](docs/testing.md:276)** - Added comprehensive HTML Parser Testing section with all test categories
+2. **[`docs/architecture.md`](docs/architecture.md:130)** - Added HTML Parser Component subsection with full feature documentation
+3. **[`docs/testing.md`](docs/testing.md:277)** - Added comprehensive HTML Parser Testing section with all test categories
 4. **[`docs/data-flows.md`](docs/data-flows.md:31)** - Updated to reference parser functions ([`parseBrandDetail()`](scraper/src/html-parser.ts:250), [`parseProductList()`](scraper/src/html-parser.ts:307), [`isProductDiscoveryComplete()`](scraper/src/html-parser.ts:511), [`parseProductDetail()`](scraper/src/html-parser.ts:421))
 5. **[`docs/data-model.md`](docs/data-model.md:80)** - Added Parser Data Types section with all parser type definitions
 
@@ -346,3 +350,146 @@ The HTML Parser implementation consists of:
 - Graceful error handling with context
 - Utility functions for text and URL processing
 - Comprehensive test coverage (91.99%, 92 tests)
+
+## Documentation Updates for Phase 3.3 Data Normalization and Duplicate Detection
+
+This section documents the documentation updates made following the completion of Phase 3.3 Data Normalization and Duplicate Detection implementation.
+
+### Files Updated
+
+The following documentation files were updated to reflect the Data Normalization and Duplicate Detection implementation:
+
+1. **[`docs/implementation-plan.md`](docs/implementation-plan.md:351)** - Phase 3.3 section marked as completed with comprehensive implementation notes
+2. **[`docs/architecture.md`](docs/architecture.md:173)** - Added Data Normalization Component subsection with full feature documentation
+3. **[`docs/architecture.md`](docs/architecture.md:257)** - Added Duplicate Detection Component subsection with full feature documentation
+4. **[`docs/data-flows.md`](docs/data-flows.md:31)** - Updated to include normalization and duplicate detection steps in data ingestion flow
+5. **[`docs/data-model.md`](docs/data-model.md:80)** - Added Normalized Data Types section with all normalized type definitions
+6. **[`docs/testing.md`](docs/testing.md:277)** - Added comprehensive Data Normalization Testing section with all test categories
+7. **[`docs/testing.md`](docs/testing.md:277)** - Added comprehensive Duplicate Detection Testing section with all test categories
+
+### Implementation References
+
+The Data Normalization and Duplicate Detection implementation consists of:
+
+- **Data Normalization Module**: [`scraper/src/data-normalizer.ts`](scraper/src/data-normalizer.ts:1) - Core normalization and validation functions
+- **Duplicate Detection Module**: [`scraper/src/duplicate-detector.ts`](scraper/src/duplicate-detector.ts:1) - Efficient duplicate detection using Set and Map
+- **Type Definitions**: [`scraper/src/types.ts`](scraper/src/types.ts:1) - TypeScript interfaces for normalized data and validation results
+- **Data Normalizer Test Suite**: [`scraper/test/data-normalizer.test.ts`](scraper/test/data-normalizer.test.ts:1) - 110 comprehensive tests
+- **Duplicate Detector Test Suite**: [`scraper/test/duplicate-detector.test.ts`](scraper/test/duplicate-detector.test.ts:1) - 105 comprehensive tests
+
+### Key Features Documented
+
+**Data Normalization:**
+- Text cleaning: Removes extra whitespace and normalizes line breaks
+- URL normalization: Converts relative URLs to absolute URLs and removes tracking parameters
+- Slug generation: Creates URL-friendly slugs from names
+- Timestamp tracking: Adds ISO 8601 scrapedAt timestamps to all data
+- Data validation: Validates normalized data against business rules
+- Error logging: Logs invalid data with detailed error information
+
+**Duplicate Detection:**
+- Brand-level tracking: Tracks unique brands across iterations using case-insensitive comparison
+- Product-level tracking: Tracks unique products per brand across iterations
+- O(1) lookup performance: Uses Set and Map data structures for efficient duplicate checking
+- Query functions: Provides functions to check existence, get counts, and retrieve all tracked items
+- State management: Supports clearing detector state for new scraping sessions
+
+**Validation Rules:**
+- Required fields: slug, name, sourceUrl (and brandSlug for products) must be present and non-empty
+- Optional fields: description and imageUrl are optional but must be valid if present
+- Length limits: MAX_TEXT_LENGTH (10000 chars), MAX_NAME_LENGTH (500 chars), MAX_URL_LENGTH (2000 chars)
+- URL format: URLs must be properly formatted and valid
+- Timestamp format: scrapedAt must be a valid ISO 8601 timestamp
+
+**Integration Points:**
+- HTML Parser → Normalizer: Receives raw parsed data for transformation
+- Normalizer → Duplicate Detector: Provides normalized data with slugs for duplicate checking
+- Normalizer → Database: Provides validated, normalized data for storage
+- Normalizer → Error Logging: Logs invalid data with detailed error information
+- Duplicate Detector → Scraper Orchestration: Returns duplicate status to skip or process items
+- Duplicate Detector → Progress Tracking: Provides counts and queries for monitoring
+
+### Test Coverage Results
+
+**Data Normalizer:**
+- **Total Tests**: 110
+- **Pass Rate**: 100% (110/110 tests passing)
+- **Code Coverage**: 96.83%
+- **Test File**: [`scraper/test/data-normalizer.test.ts`](scraper/test/data-normalizer.test.ts:1)
+
+**Duplicate Detector:**
+- **Total Tests**: 105
+- **Pass Rate**: 100% (105/105 tests passing)
+- **Code Coverage**: 100%
+- **Test File**: [`scraper/test/duplicate-detector.test.ts`](scraper/test/duplicate-detector.test.ts:1)
+
+**Total Scraper Tests:**
+- **All Tests**: 361 tests (54 HTTP client + 92 HTML parser + 110 data normalizer + 105 duplicate detector)
+- **Pass Rate**: 100% (361/361 tests passing)
+- **Overall Coverage**: Excellent coverage across all modules
+
+### Test Categories Documented
+
+**Data Normalization Tests:**
+- Text normalization tests (cleanText)
+- URL normalization tests (normalizeUrl)
+- Slug generation tests (generateSlug)
+- Slug extraction tests (extractSlugFromUrl)
+- Brand data normalization tests (normalizeBrandData, normalizeBrandDetailData)
+- Product data normalization tests (normalizeProductData, normalizeProductDetailData)
+- Brand data validation tests (validateBrandData)
+- Product data validation tests (validateProductData)
+- Invalid data logging tests (logInvalidData)
+- Edge cases and integration tests
+
+**Duplicate Detection Tests:**
+- Detector creation tests (createDuplicateDetector)
+- Brand duplicate detection tests (addBrand, hasBrand)
+- Product duplicate detection tests (addProduct, hasProduct)
+- Count and query tests (getBrandCount, getProductCount, getProductCountByBrand)
+- Retrieval tests (getBrands, getProducts)
+- State management tests (clear)
+- totalCount tests
+- Empty detector tests
+- Single item tests
+- Multiple items tests
+- Case sensitivity tests
+- Brand-specific product tests
+
+**Integration Tests:**
+- End-to-end normalization flow (parse → normalize → validate)
+- Duplicate detection with normalized data
+- Integration with HTML parser output
+- Error handling and logging flow
+
+### Implementation Deliverables
+
+1. Complete data normalization module with text cleaning, URL normalization, and slug generation
+2. Comprehensive data validation with business rules and error reporting
+3. Efficient duplicate detection using Set and Map data structures
+4. TypeScript type definitions for normalized data structures and validation results
+5. Comprehensive test suites (215 tests: 110 for normalizer, 105 for duplicate detector)
+6. Excellent test coverage (96.83% for normalizer, 100% for duplicate detector)
+7. Integration points with HTML parser, duplicate detector, and database
+8. Documentation updates across all relevant documentation files
+
+### Documentation Completeness
+
+All documentation files have been updated to accurately reflect the Phase 3.3 implementation:
+
+- **Implementation Plan**: Phase 3.3 marked as completed with comprehensive notes
+- **Architecture**: Data Normalization and Duplicate Detection components documented with full feature descriptions
+- **Data Flows**: Updated to include normalization and duplicate detection in data ingestion flow
+- **Data Model**: Normalized data types added with all interfaces and validation rules
+- **Testing**: Comprehensive test sections added for both data normalization and duplicate detection
+- **Documentation Updates**: This section added to document all Phase 3.3 changes
+
+### Cross-References Updated
+
+All cross-references between documentation files have been verified and updated:
+
+- Implementation plan references all new modules and test files
+- Architecture documentation describes integration points between all components
+- Data flows document the complete data ingestion pipeline with normalization and duplicate detection
+- Data model includes all normalized types and validation interfaces
+- Testing documentation covers all test categories with results

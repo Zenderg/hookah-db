@@ -187,6 +187,172 @@ Custom error class for parsing failures with detailed context.
 
 **Implementation**: [`scraper/src/parser-error.ts`](scraper/src/parser-error.ts:1)
 
+## Normalized Data Types
+
+The data normalization module ([`scraper/src/data-normalizer.ts`](scraper/src/data-normalizer.ts:1)) transforms parsed data into normalized formats ready for storage. These types include validation metadata and standardized fields.
+
+### NormalizedBrand
+
+Represents normalized brand data ready for storage.
+
+**Purpose**: Cleaned and validated brand data with standardized format.
+
+**Fields**:
+- **slug**: Unique slug identifier for the brand (lowercase, hyphenated)
+- **name**: Cleaned brand name (whitespace normalized)
+- **description**: Optional cleaned brand description
+- **imageUrl**: Optional normalized image URL (absolute, tracking parameters removed)
+- **sourceUrl**: Normalized source URL (absolute, tracking parameters removed)
+- **scrapedAt**: ISO 8601 timestamp when data was scraped
+
+**Usage**:
+- Returned by [`normalizeBrandData()`](scraper/src/data-normalizer.ts:212)
+- Validated by [`validateBrandData()`](scraper/src/data-normalizer.ts:316)
+- Checked for duplicates by [`addBrand()`](scraper/src/duplicate-detector.ts:69)
+- Ready for database insertion
+
+### NormalizedProduct
+
+Represents normalized product data ready for storage.
+
+**Purpose**: Cleaned and validated product data with standardized format and brand association.
+
+**Fields**:
+- **slug**: Unique slug identifier for the product (lowercase, hyphenated)
+- **name**: Cleaned product name (whitespace normalized)
+- **description**: Optional cleaned product description
+- **imageUrl**: Optional normalized image URL (absolute, tracking parameters removed)
+- **sourceUrl**: Normalized source URL (absolute, tracking parameters removed)
+- **brandSlug**: Brand slug for association with parent brand
+- **scrapedAt**: ISO 8601 timestamp when data was scraped
+
+**Usage**:
+- Returned by [`normalizeProductData()`](scraper/src/data-normalizer.ts:237)
+- Validated by [`validateProductData()`](scraper/src/data-normalizer.ts:366)
+- Checked for duplicates by [`addProduct()`](scraper/src/duplicate-detector.ts:101)
+- Ready for database insertion
+
+### NormalizedBrandDetail
+
+Represents normalized brand detail data ready for storage.
+
+**Purpose**: Complete normalized brand data with all available fields from brand detail pages.
+
+**Fields**:
+- **slug**: Unique slug identifier for the brand (lowercase, hyphenated)
+- **name**: Cleaned brand name (whitespace normalized)
+- **description**: Optional cleaned brand description
+- **imageUrl**: Optional normalized image URL (absolute, tracking parameters removed)
+- **sourceUrl**: Normalized source URL (absolute, tracking parameters removed)
+- **scrapedAt**: ISO 8601 timestamp when data was scraped
+
+**Usage**:
+- Returned by [`normalizeBrandDetailData()`](scraper/src/data-normalizer.ts:264)
+- Validated by [`validateBrandData()`](scraper/src/data-normalizer.ts:316)
+- Ready for database insertion
+
+### NormalizedProductDetail
+
+Represents normalized product detail data ready for storage.
+
+**Purpose**: Complete normalized product data with all available fields from product detail pages and brand association.
+
+**Fields**:
+- **slug**: Unique slug identifier for the product (lowercase, hyphenated)
+- **name**: Cleaned product name (whitespace normalized)
+- **description**: Optional cleaned product description
+- **imageUrl**: Optional normalized image URL (absolute, tracking parameters removed)
+- **sourceUrl**: Normalized source URL (absolute, tracking parameters removed)
+- **brandSlug**: Brand slug for association with parent brand
+- **scrapedAt**: ISO 8601 timestamp when data was scraped
+
+**Usage**:
+- Returned by [`normalizeProductDetailData()`](scraper/src/data-normalizer.ts:289)
+- Validated by [`validateProductData()`](scraper/src/data-normalizer.ts:366)
+- Ready for database insertion
+
+### ValidationResult
+
+Represents the result of data validation.
+
+**Purpose**: Provides structured validation results with specific error messages.
+
+**Fields**:
+- **isValid**: Boolean indicating whether data passed all validation rules
+- **errors**: Array of validation error messages (empty if valid)
+
+**Usage**:
+- Returned by [`validateBrandData()`](scraper/src/data-normalizer.ts:316) and [`validateProductData()`](scraper/src/data-normalizer.ts:366)
+- Used to determine if data should be stored or rejected
+- Logged by [`logInvalidData()`](scraper/src/data-normalizer.ts:422) for debugging
+
+### DuplicateDetector
+
+Represents the duplicate detection state for tracking brands and products across iterations.
+
+**Purpose**: Provides efficient duplicate detection with O(1) lookup performance.
+
+**Fields**:
+- **brands**: Set of brand slugs (case-insensitive) for O(1) duplicate checking
+- **products**: Map of brand slugs to product slug sets (case-insensitive) for brand-specific duplicate checking
+- **totalCount**: Total count of all items tracked (brands + products)
+
+**Usage**:
+- Created by [`createDuplicateDetector()`](scraper/src/duplicate-detector.ts:44)
+- Updated by [`addBrand()`](scraper/src/duplicate-detector.ts:69) and [`addProduct()`](scraper/src/duplicate-detector.ts:101)
+- Queried by [`hasBrand()`](scraper/src/duplicate-detector.ts:139), [`hasProduct()`](scraper/src/duplicate-detector.ts:159), [`getBrandCount()`](scraper/src/duplicate-detector.ts:179), [`getProductCount()`](scraper/src/duplicate-detector.ts:195), etc.
+- Reset by [`clear()`](scraper/src/duplicate-detector.ts:235) for new scraping sessions
+
+## Data Validation Rules
+
+### Field Length Limits
+
+- **MAX_TEXT_LENGTH**: 10000 characters for description fields
+- **MAX_NAME_LENGTH**: 500 characters for name and slug fields
+- **MAX_URL_LENGTH**: 2000 characters for URL fields
+
+### Required Fields
+
+**For Brands:**
+- slug: Required, non-empty, maximum 500 characters
+- name: Required, non-empty, maximum 500 characters
+- sourceUrl: Required, valid URL format, maximum 2000 characters
+
+**For Products:**
+- slug: Required, non-empty, maximum 500 characters
+- name: Required, non-empty, maximum 500 characters
+- sourceUrl: Required, valid URL format, maximum 2000 characters
+- brandSlug: Required, non-empty, maximum 500 characters
+
+### Optional Fields
+
+**For Brands and Products:**
+- description: Optional, maximum 10000 characters if present
+- imageUrl: Optional, valid URL format, maximum 2000 characters if present
+
+### URL Validation
+
+- Must be valid URL format
+- Must not exceed MAX_URL_LENGTH (2000 characters)
+- Relative URLs are converted to absolute URLs
+- Tracking parameters are removed (utm_source, utm_medium, utm_campaign, utm_term, utm_content, fbclid, gclid)
+- Invalid URLs return null instead of throwing errors
+
+### Timestamp Validation
+
+- scrapedAt must be a valid ISO 8601 timestamp
+- Automatically generated when normalizing data
+- Invalid timestamps cause validation failure
+
+### Slug Generation Rules
+
+- Converted to lowercase
+- Special characters removed (keeps only alphanumeric, spaces, and hyphens)
+- Spaces replaced with hyphens
+- Leading/trailing hyphens removed
+- Multiple consecutive hyphens normalized to single hyphen
+- Can be extracted from URL or generated from name
+
 ## Entity Relationships
 
 ### Brand-Product Hierarchy
@@ -294,3 +460,53 @@ All parser functions use strongly-typed interfaces defined in [`scraper/src/type
 - Errors include selector information for debugging
 - HTML preview helps identify exact failure location
 - Graceful degradation for non-critical parsing failures
+
+## Normalization Type Safety
+
+### TypeScript Interfaces
+
+All normalization functions use strongly-typed interfaces defined in [`scraper/src/types.ts`](scraper/src/types.ts:1):
+
+- **NormalizedBrand**: Normalized brand data ready for storage
+- **NormalizedProduct**: Normalized product data ready for storage
+- **NormalizedBrandDetail**: Normalized brand detail data ready for storage
+- **NormalizedProductDetail**: Normalized product detail data ready for storage
+- **ValidationResult**: Validation result with isValid flag and errors array
+- **DuplicateDetector**: Duplicate detection state with brands Set and products Map
+
+### Type Guarantees
+
+- All normalization functions return consistent normalized types
+- Optional fields are explicitly marked with `| undefined`
+- Required fields are enforced at compile time
+- Validation results provide structured error information
+- Type checking prevents common normalization errors
+
+### Error Handling
+
+- [`logInvalidData()`](scraper/src/data-normalizer.ts:422) provides structured error logging
+- Errors include specific field names and validation failures
+- Data preview is truncated to 500 characters for readability
+- Invalid URLs return null instead of throwing errors
+
+## Duplicate Detection Type Safety
+
+### TypeScript Interfaces
+
+All duplicate detection functions use strongly-typed interfaces defined in [`scraper/src/types.ts`](scraper/src/types.ts:1):
+
+- **DuplicateDetector**: Interface with brands Set, products Map, and totalCount
+- Case-insensitive comparison via [`normalizeSlug()`](scraper/src/duplicate-detector.ts:30)
+
+### Type Guarantees
+
+- All duplicate detection functions return consistent boolean results
+- Brand and product slugs are normalized to lowercase for comparison
+- O(1) lookup performance guaranteed by Set and Map data structures
+- Total count accurately reflects all tracked items
+
+### Error Handling
+
+- No exceptions thrown for duplicate detection
+- Graceful handling of missing brand product sets
+- Clear function resets all tracking state

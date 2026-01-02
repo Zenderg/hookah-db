@@ -23,6 +23,19 @@ export type {
   ParsedBrandList,
   ParsedProductList,
   HTMXPaginationInfo,
+  // Parsed type aliases
+  ParsedBrand,
+  ParsedProduct,
+  ParsedBrandDetail,
+  ParsedProductDetail,
+  // Normalized types
+  NormalizedBrand,
+  NormalizedProduct,
+  NormalizedBrandDetail,
+  NormalizedProductDetail,
+  ValidationResult,
+  // Duplicate detector
+  DuplicateDetector,
 } from './types.js';
 
 // Export parser error
@@ -41,3 +54,31 @@ export {
   isBrandDiscoveryComplete,
   isProductDiscoveryComplete,
 } from './html-parser.js';
+
+// Export data normalizer functions
+export {
+  cleanText as cleanTextNormalizer,
+  normalizeUrl as normalizeUrlNormalizer,
+  normalizeBrandData,
+  normalizeProductData,
+  normalizeBrandDetailData,
+  normalizeProductDetailData,
+  validateBrandData,
+  validateProductData,
+  logInvalidData,
+} from './data-normalizer.js';
+
+// Export duplicate detector functions
+export {
+  createDuplicateDetector,
+  addBrand,
+  addProduct,
+  hasBrand,
+  hasProduct,
+  getBrandCount,
+  getProductCount,
+  getProductCountByBrand,
+  clear,
+  getBrands,
+  getProducts,
+} from './duplicate-detector.js';

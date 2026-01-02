@@ -57,12 +57,12 @@ The scraper service is responsible for:
 - **HTTP Client**: Fetches HTML pages from htreviews.org with support for iterative requests
 - **HTML Parser**: Extracts structured data from HTML documents across multiple iterations
 - **Data Normalization**: Transforms raw scraped data into consistent formats
+- **Duplicate Detection**: Prevents duplicate processing across iterations
 - **Error Handling**: Manages network failures and parsing errors
 - **Iteration Management**: Handles dynamic loading patterns (infinite scroll, lazy loading, pagination)
 - **State Tracking**: Maintains state across iterations for brand and product discovery
 - **Completion Detection**: Identifies when all data has been loaded from dynamic lists
 - **Checkpoint Management**: Saves progress for resumable scraping operations
-- **Duplicate Detection**: Prevents duplicate processing across iterations
 - **Batch Processing**: Optimizes database operations for large data volumes
 
 #### HTTP Client Component
@@ -170,6 +170,100 @@ The HTML parser ([`scraper/src/html-parser.ts`](scraper/src/html-parser.ts:1)) p
 - Provides pagination metadata for iterative loading
 - Enables completion detection for dynamic content
 - Integrates with HTTP client for fetching HTML content
+
+#### Data Normalization Component
+
+The data normalization module ([`scraper/src/data-normalizer.ts`](scraper/src/data-normalizer.ts:1)) transforms raw parsed data into clean, standardized formats ready for storage.
+
+**Core Responsibilities:**
+- Clean and normalize text fields (remove extra whitespace, normalize line breaks)
+- Normalize URLs (convert relative to absolute, remove tracking parameters)
+- Generate URL-friendly slugs from names
+- Validate data against business rules (length limits, required fields, URL format)
+- Add ISO 8601 timestamps for tracking when data was scraped
+- Log invalid data with detailed error information
+
+**Normalization Functions:**
+- [`cleanText()`](scraper/src/data-normalizer.ts:45): Normalizes text by removing extra whitespace and normalizing line breaks to single spaces
+- [`normalizeUrl()`](scraper/src/data-normalizer.ts:73): Converts relative URLs to absolute URLs and removes tracking parameters (utm_source, utm_medium, utm_campaign, utm_term, utm_content, fbclid, gclid)
+- [`normalizeBrandData()`](scraper/src/data-normalizer.ts:212): Transforms parsed brand data to normalized format with slug, cleaned text, normalized URLs, and timestamp
+- [`normalizeProductData()`](scraper/src/data-normalizer.ts:237): Transforms parsed product data to normalized format with brand association
+- [`normalizeBrandDetailData()`](scraper/src/data-normalizer.ts:264): Transforms parsed brand detail data to normalized format
+- [`normalizeProductDetailData()`](scraper/src/data-normalizer.ts:289): Transforms parsed product detail data to normalized format
+
+**Validation Functions:**
+- [`validateBrandData()`](scraper/src/data-normalizer.ts:316): Validates normalized brand data against business rules (required fields, length limits, URL format, timestamp format)
+- [`validateProductData()`](scraper/src/data-normalizer.ts:366): Validates normalized product data against business rules (includes brandSlug validation)
+- [`logInvalidData()`](scraper/src/data-normalizer.ts:422): Logs invalid data with structured error output and data preview (truncated to 500 characters)
+
+**Validation Rules:**
+- Required fields: slug, name, sourceUrl (and brandSlug for products) must be present and non-empty
+- Optional fields: description and imageUrl are optional but must be valid if present
+- Length limits: MAX_TEXT_LENGTH (10000 chars), MAX_NAME_LENGTH (500 chars), MAX_URL_LENGTH (2000 chars)
+- URL format: URLs must be properly formatted and valid
+- Timestamp format: scrapedAt must be a valid ISO 8601 timestamp
+
+**Slug Generation:**
+- Converts names to lowercase
+- Removes special characters (keeps only alphanumeric, spaces, and hyphens)
+- Replaces spaces with hyphens
+- Removes leading/trailing hyphens
+- Normalizes multiple consecutive hyphens to single hyphen
+
+**Error Handling:**
+- Graceful URL handling: Returns null for invalid URLs instead of throwing errors
+- Console warnings: Logs warnings for normalization failures (e.g., invalid URLs)
+- Detailed error logging: Provides structured error messages with field names and specific validation failures
+- Data preview: Truncates data preview to 500 characters for readability in error logs
+
+**Integration with Scraper Architecture:**
+- Receives raw data from HTML parser
+- Produces normalized data ready for duplicate detection and database storage
+- Integrates with duplicate detector to track normalized items
+- Provides validation results to ensure data quality before storage
+
+#### Duplicate Detection Component
+
+The duplicate detection module ([`scraper/src/duplicate-detector.ts`](scraper/src/duplicate-detector.ts:1)) provides efficient duplicate detection for brands and products across multiple scraping iterations.
+
+**Core Responsibilities:**
+- Track unique brands across iterations using case-insensitive comparison
+- Track unique products per brand across iterations
+- Provide O(1) lookup performance for duplicate checking
+- Support querying tracked items (existence checks, counts, retrieval)
+- Support resetting detector state for new scraping sessions
+
+**Detection Functions:**
+- [`createDuplicateDetector()`](scraper/src/duplicate-detector.ts:44): Creates new duplicate detector instance with empty tracking sets
+- [`addBrand()`](scraper/src/duplicate-detector.ts:69): Adds brand to detector and returns true if duplicate, false if new
+- [`addProduct()`](scraper/src/duplicate-detector.ts:101): Adds product to detector and returns true if duplicate, false if new
+- [`hasBrand()`](scraper/src/duplicate-detector.ts:139): Checks if brand exists in detector (case-insensitive)
+- [`hasProduct()`](scraper/src/duplicate-detector.ts:159): Checks if product exists in detector for specific brand (case-insensitive)
+- [`getBrandCount()`](scraper/src/duplicate-detector.ts:179): Returns total count of tracked brands
+- [`getProductCount()`](scraper/src/duplicate-detector.ts:195): Returns total count of tracked products across all brands
+- [`getProductCountByBrand()`](scraper/src/duplicate-detector.ts:217): Returns product count for specific brand
+- [`clear()`](scraper/src/duplicate-detector.ts:235): Clears all tracked items from detector (resets state)
+- [`getBrands()`](scraper/src/duplicate-detector.ts:254): Returns array of all tracked brand slugs
+- [`getProducts()`](scraper/src/duplicate-detector.ts:273): Returns array of all tracked products with brand associations
+
+**Data Structures:**
+- **DuplicateDetector Interface**: Contains brands (Set<string>), products (Map<string, Set<string>>), and totalCount (number)
+- **Brand Tracking**: Uses Set for O(1) lookup and automatic deduplication
+- **Product Tracking**: Uses Map of Sets for O(1) lookup per brand and automatic deduplication
+- **Case Insensitivity**: Normalizes slugs to lowercase for comparison via [`normalizeSlug()`](scraper/src/duplicate-detector.ts:30)
+
+**Performance Characteristics:**
+- O(1) lookup time for brand existence checks
+- O(1) lookup time for product existence checks
+- O(1) insertion time for adding new brands/products
+- Memory efficient: Uses Set and Map data structures optimized for large-scale tracking
+- Scales to handle thousands of brands and products
+
+**Integration with Scraper Architecture:**
+- Receives normalized data from data normalization module
+- Tracks items across multiple iterations to prevent duplicate processing
+- Integrates with scraper orchestration to skip already-processed items
+- Provides counts and queries for progress tracking and reporting
 
 **Scraper Architecture Considerations:**
 
@@ -290,6 +384,7 @@ All services implement structured logging for:
 - Iteration progress tracking (scraper)
 - Checkpoint status logging (scraper)
 - HTTP request history (scraper HTTP client)
+- Invalid data logging (scraper data normalizer)
 
 ### Error Handling
 
@@ -301,6 +396,7 @@ Consistent error handling across services:
 - Iteration-level error isolation (scraper)
 - Checkpoint recovery mechanisms (scraper)
 - HTTP client retry with exponential backoff (scraper)
+- Data validation with detailed error logging (scraper)
 
 ### Testing
 
@@ -313,6 +409,8 @@ Comprehensive test coverage across all components:
 - Large data volume tests (scraper)
 - Checkpoint and recovery tests (scraper)
 - HTTP client tests (scraper)
+- Data normalization tests (scraper)
+- Duplicate detection tests (scraper)
 
 ## Scraper Architecture Details
 
@@ -325,7 +423,7 @@ Initial Request → Extract Items → Detect More Content?
                                               ↓
                                           Yes → Next Iteration
                                                ↓
-                                        Extract More Items → Detect More Content?
+                                         Extract More Items → Detect More Content?
                                                ↓
                                           No → Complete
 ```
@@ -354,7 +452,7 @@ The scraper supports resumable operations:
 
 - **Checkpoint Creation**: Saves state after each iteration
 - **Checkpoint Recovery**: Resumes from last saved state
-- **Incremental Updates**: Skips already-processed items
+- **Incremental Updates**: Skips already-processed items or updates only changed data
 - **Full Refresh**: Discards existing data and starts fresh
 
 ### Data Volume Considerations
@@ -380,13 +478,15 @@ Failures are isolated to prevent cascading issues:
 
 The scraper implements several optimizations:
 
-- **Batch Operations**: Group database writes for efficiency
+- **Batch Processing**: Group database writes for efficiency
 - **Concurrent Processing**: Process multiple brands in parallel (with limits)
 - **Memory Management**: Clear processed data from memory
 - **Rate Limiting**: Respect source server limits (token bucket algorithm)
 - **Caching**: Avoid redundant requests
 - **Retry Logic**: Exponential backoff with jitter for transient failures
 - **User Agent Rotation**: Distribute requests across different user agents
+- **Duplicate Detection**: Skip already-processed items using O(1) lookups
+- **Data Normalization**: Clean and validate data before storage to prevent errors
 
 ### HTTP Client Integration
 
@@ -429,3 +529,48 @@ The HTML parser ([`scraper/src/html-parser.ts`](scraper/src/html-parser.ts:1)) i
 - [`isBrandDiscoveryComplete()`](scraper/src/html-parser.ts:477): Checks if all brands discovered
 - [`isProductDiscoveryComplete()`](scraper/src/html-parser.ts:511): Checks if all products discovered
 - [`parseHTMXPagination()`](scraper/src/html-parser.ts:88): Extracts HTMX pagination metadata
+
+### Data Normalization Integration
+
+The data normalization module ([`scraper/src/data-normalizer.ts`](scraper/src/data-normalizer.ts:1)) is integrated into the scraper architecture as follows:
+
+- **Data Cleaning**: Receives raw parsed data and cleans text fields
+- **URL Normalization**: Converts relative URLs to absolute URLs and removes tracking parameters
+- **Slug Generation**: Creates URL-friendly slugs from names
+- **Data Validation**: Validates normalized data against business rules
+- **Timestamp Tracking**: Adds ISO 8601 scrapedAt timestamps to all data
+- **Error Logging**: Logs invalid data with detailed error information
+
+**Key Methods:**
+- [`cleanText()`](scraper/src/data-normalizer.ts:45): Normalizes text by removing extra whitespace
+- [`normalizeUrl()`](scraper/src/data-normalizer.ts:73): Converts relative URLs to absolute URLs
+- [`normalizeBrandData()`](scraper/src/data-normalizer.ts:212): Transforms parsed brand data to normalized format
+- [`normalizeProductData()`](scraper/src/data-normalizer.ts:237): Transforms parsed product data to normalized format
+- [`normalizeBrandDetailData()`](scraper/src/data-normalizer.ts:264): Transforms parsed brand detail data to normalized format
+- [`normalizeProductDetailData()`](scraper/src/data-normalizer.ts:289): Transforms parsed product detail data to normalized format
+- [`validateBrandData()`](scraper/src/data-normalizer.ts:316): Validates normalized brand data
+- [`validateProductData()`](scraper/src/data-normalizer.ts:366): Validates normalized product data
+- [`logInvalidData()`](scraper/src/data-normalizer.ts:422): Logs invalid data with error details
+
+### Duplicate Detection Integration
+
+The duplicate detection module ([`scraper/src/duplicate-detector.ts`](scraper/src/duplicate-detector.ts:1)) is integrated into the scraper architecture as follows:
+
+- **Brand Tracking**: Tracks unique brands across iterations using case-insensitive comparison
+- **Product Tracking**: Tracks unique products per brand across iterations
+- **Duplicate Checking**: Provides O(1) lookup for duplicate detection
+- **State Management**: Maintains counts and provides query functions
+- **Reset Capability**: Allows clearing detector state for new scraping sessions
+
+**Key Methods:**
+- [`createDuplicateDetector()`](scraper/src/duplicate-detector.ts:44): Creates new duplicate detector instance
+- [`addBrand()`](scraper/src/duplicate-detector.ts:69): Adds brand and checks for duplicates
+- [`addProduct()`](scraper/src/duplicate-detector.ts:101): Adds product and checks for duplicates
+- [`hasBrand()`](scraper/src/duplicate-detector.ts:139): Checks if brand exists
+- [`hasProduct()`](scraper/src/duplicate-detector.ts:159): Checks if product exists
+- [`getBrandCount()`](scraper/src/duplicate-detector.ts:179): Returns brand count
+- [`getProductCount()`](scraper/src/duplicate-detector.ts:195): Returns product count
+- [`getProductCountByBrand()`](scraper/src/duplicate-detector.ts:217): Returns product count for brand
+- [`clear()`](scraper/src/duplicate-detector.ts:235): Clears all tracked items
+- [`getBrands()`](scraper/src/duplicate-detector.ts:254): Returns all tracked brands
+- [`getProducts()`](scraper/src/duplicate-detector.ts:273): Returns all tracked products
