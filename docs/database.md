@@ -64,7 +64,7 @@ Stores basic information about tobacco brands.
 | `name` | VARCHAR(255) | Brand name in Russian | `Сарма` |
 | `slug` | VARCHAR(255) | URL-friendly identifier | `sarma` |
 | `description` | TEXT | Brand description | `Наши ароматы — это воспоминания...` |
-| `image_url` | TEXT | URL to brand logo/image | `https://htreviews.org/uploads/...` |
+| `image_url` | VARCHAR(500) | URL to brand logo/image | `https://htreviews.org/uploads/...` |
 | `updated_at` | TIMESTAMP | Last update timestamp | `2026-01-02 23:00:00` |
 | `parsed_at` | TIMESTAMP | Last parse timestamp | `2026-01-02 23:00:00` |
 
@@ -74,7 +74,8 @@ Stores basic information about tobacco brands.
 
 #### Indexes
 
-- `idx_brands_slug` on `slug` (UNIQUE)
+- `brands_name_idx` on `name`
+- `brands_slug_idx` on `slug` (UNIQUE)
 
 ---
 
@@ -91,18 +92,20 @@ Stores basic information about individual tobacco flavors.
 | `name` | VARCHAR(255) | Tobacco name | `Зима` |
 | `slug` | VARCHAR(255) | URL-friendly identifier | `zima` |
 | `description` | TEXT | Tobacco description | `Бодрящий мороз с сибирским характером.` |
-| `image_url` | TEXT | URL to tobacco image | `https://htreviews.org/uploads/...` |
+| `image_url` | VARCHAR(500) | URL to tobacco image | `https://htreviews.org/uploads/...` |
 | `updated_at` | TIMESTAMP | Last update timestamp | `2026-01-02 23:00:00` |
 | `parsed_at` | TIMESTAMP | Last parse timestamp | `2026-01-02 23:00:00` |
 
 #### Relationships
 
 - **Many-to-One** with `brands`: A tobacco belongs to one brand
+- **Cascade Delete**: When a brand is deleted, all its tobaccos are also deleted
 
 #### Indexes
 
-- `idx_tobaccos_brand_id` on `brand_id`
-- `idx_tobaccos_slug` on `slug` (UNIQUE with brand_id)
+- `tobaccos_brand_id_idx` on `brand_id`
+- `tobaccos_name_idx` on `name`
+- `tobaccos_slug_idx` on `slug` (UNIQUE)
 
 ---
 
@@ -116,14 +119,14 @@ Stores API keys for client authentication. Keys are manually activated/deactivat
 |--------|------|-------------|---------|
 | `id` | UUID | Primary key | `770e8400-e29b-41d4-a716-446655440002` |
 | `name` | VARCHAR(255) | Key name/description | `Client App - Production` |
-| `key_hash` | VARCHAR(255) | SHA-256 hash of API key | `a1b2c3d4...` |
+| `key_hash` | TEXT | SHA-256 hash of API key | `a1b2c3d4...` |
 | `is_active` | BOOLEAN | Whether key is active | `true` |
 | `created_at` | TIMESTAMP | Key creation timestamp | `2026-01-01 00:00:00` |
 
 #### Indexes
 
-- `idx_api_keys_key_hash` on `key_hash` (UNIQUE)
-- `idx_api_keys_is_active` on `is_active`
+- `api_keys_key_hash_idx` on `key_hash` (UNIQUE)
+- `api_keys_is_active_idx` on `is_active`
 
 ---
 
@@ -185,6 +188,7 @@ The schema follows 3NF principles:
 - **NOT NULL**: Required fields (id, name, slug, etc.)
 - **UNIQUE**: Slugs and key_hash
 - **FOREIGN KEY**: All relationships have referential integrity
+- **CASCADE DELETE**: tobaccos.brand_id references brands.id with cascade delete
 
 ---
 
@@ -194,20 +198,20 @@ The schema follows 3NF principles:
 
 ```bash
 # Generate migration
-pnpm --filter @hookah-db/database drizzle-kit generate
+pnpm --filter @hookah-db/database db:generate
 
 # Apply migration
-pnpm --filter @hookah-db/database drizzle-kit push
+pnpm --filter @hookah-db/database db:push
 ```
 
 ### Production
 
 ```bash
 # Generate migration SQL
-pnpm --filter @hookah-db/database drizzle-kit generate
+pnpm --filter @hookah-db/database db:generate
 
 # Review and apply manually
-psql -U user -d hookah_db -f migration.sql
+pnpm --filter @hookah-db/database db:migrate
 ```
 
 ### Rollback Strategy
@@ -225,6 +229,7 @@ psql -U user -d hookah_db -f migration.sql
 1. **Foreign Keys**: All foreign keys are indexed
 2. **Unique Constraints**: Slugs are unique for fast lookups
 3. **Query Patterns**: Indexes optimized for common queries
+4. **Name Indexes**: Additional indexes on name columns for search functionality
 
 ### Query Optimization
 

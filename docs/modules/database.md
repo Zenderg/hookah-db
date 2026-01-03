@@ -24,71 +24,70 @@ graph TB
 
 ## Components
 
-### 1. Schema Definitions (`src/schema.ts`)
+### 1. Schema Definitions (`src/schema/`)
 
-Defines database tables using Drizzle ORM.
+Defines database tables using Drizzle ORM. Schema is split into separate files for better organization.
 
-**Brand Table**:
+**Brand Table** (`src/schema/brands.ts`):
 ```typescript
-import { pgTable, uuid, varchar, text, timestamp } from 'drizzle-orm/pg-core';
-import { sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { pgTable, uuid, varchar, text, timestamp, index, uniqueIndex } from 'drizzle-orm/pg-core';
 
-// PostgreSQL schema
 export const brands = pgTable('brands', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: varchar('name', { length: 255 }).notNull(),
-  slug: varchar('slug', { length: 255 }).notNull().unique(),
-  description: text('description'),
-  imageUrl: text('image_url'),
-  updatedAt: timestamp('updated_at'),
-  parsedAt: timestamp('parsed_at'),
-});
-
-// SQLite schema
-export const brands = sqliteTable('brands', {
-  id: text('id').primaryKey(),
-  name: text('name').notNull(),
-  slug: text('slug').notNull().unique(),
-  description: text('description'),
-  imageUrl: text('image_url'),
-  updatedAt: integer('updated_at'),
-  parsedAt: integer('parsed_at'),
-});
-```
-
-**Tobacco Table**:
-```typescript
-import { pgTable, uuid, varchar, text, timestamp } from 'drizzle-orm/pg-core';
-import { relations } from 'drizzle-orm';
-
-export const tobaccos = pgTable('tobaccos', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  brandId: uuid('brand_id').notNull().references(() => brands.id),
-  name: varchar('name', { length: 255 }).notNull(),
   slug: varchar('slug', { length: 255 }).notNull(),
   description: text('description'),
-  imageUrl: text('image_url'),
-  updatedAt: timestamp('updated_at'),
+  imageUrl: varchar('image_url', { length: 500 }),
+  updatedAt: timestamp('updated_at').$onUpdate(() => new Date()),
   parsedAt: timestamp('parsed_at'),
-});
-
-export const tobaccosRelations = relations(tobaccos, ({ one, many }) => ({
-  brand: one(brands, {
-    fields: [tobaccos.brandId],
-    references: [brands.id],
-  }),
+}, (table) => ({
+  nameIdx: index('brands_name_idx').on(table.name),
+  slugIdx: uniqueIndex('brands_slug_idx').on(table.slug),
 }));
 ```
 
-**API Keys Table**:
+**Tobacco Table** (`src/schema/tobaccos.ts`):
 ```typescript
+import { pgTable, uuid, varchar, text, timestamp, index, uniqueIndex } from 'drizzle-orm/pg-core';
+import { brands } from './brands';
+
+export const tobaccos = pgTable('tobaccos', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  brandId: uuid('brand_id').notNull().references(() => brands.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 255 }).notNull(),
+  slug: varchar('slug', { length: 255 }).notNull(),
+  description: text('description'),
+  imageUrl: varchar('image_url', { length: 500 }),
+  updatedAt: timestamp('updated_at').$onUpdate(() => new Date()),
+  parsedAt: timestamp('parsed_at'),
+}, (table) => ({
+  brandIdIdx: index('tobaccos_brand_id_idx').on(table.brandId),
+  nameIdx: index('tobaccos_name_idx').on(table.name),
+  slugIdx: uniqueIndex('tobaccos_slug_idx').on(table.slug),
+}));
+```
+
+**API Keys Table** (`src/schema/api-keys.ts`):
+```typescript
+import { pgTable, uuid, varchar, text, boolean, timestamp, index, uniqueIndex } from 'drizzle-orm/pg-core';
+
 export const apiKeys = pgTable('api_keys', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: varchar('name', { length: 255 }).notNull(),
-  keyHash: varchar('key_hash', { length: 255 }).notNull().unique(),
+  keyHash: text('key_hash').notNull(),
   isActive: boolean('is_active').notNull().default(true),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-});
+  createdAt: timestamp('created_at').defaultNow(),
+}, (table) => ({
+  keyHashIdx: uniqueIndex('api_keys_key_hash_idx').on(table.keyHash),
+  isActiveIdx: index('api_keys_is_active_idx').on(table.isActive),
+}));
+```
+
+**Schema Index** (`src/schema/index.ts`):
+```typescript
+export * from './brands';
+export * from './tobaccos';
+export * from './api-keys';
 ```
 
 ---
@@ -126,27 +125,34 @@ Uses Drizzle Kit for database migrations.
 import type { Config } from 'drizzle-kit';
 
 export default {
-  schema: './src/schema.ts',
+  schema: './src/schema',
   out: './drizzle',
-  driver: 'pg' | 'sqlite', // Based on environment
+  dialect: 'postgresql',
   dbCredentials: {
     url: process.env.DATABASE_URL,
   },
+  verbose: true,
+  strict: true,
 } satisfies Config;
 ```
 
 **Generate Migration**:
 ```bash
-pnpm --filter @hookah-db/database drizzle-kit generate
+pnpm --filter @hookah-db/database db:generate
 ```
 
 **Apply Migration**:
 ```bash
 # Development
-pnpm --filter @hookah-db/database drizzle-kit push
+pnpm --filter @hookah-db/database db:push
 
 # Production
-psql -U user -d hookah_db -f drizzle/0001_initial.sql
+pnpm --filter @hookah-db/database db:migrate
+```
+
+**Open Drizzle Studio**:
+```bash
+pnpm --filter @hookah-db/database db:studio
 ```
 
 ---
@@ -470,7 +476,7 @@ CREATE TABLE IF NOT EXISTS brands (
   name VARCHAR(255) NOT NULL,
   slug VARCHAR(255) NOT NULL UNIQUE,
   description TEXT,
-  image_url TEXT,
+  image_url VARCHAR(500),
   updated_at TIMESTAMP,
   parsed_at TIMESTAMP
 );
@@ -482,7 +488,7 @@ CREATE TABLE IF NOT EXISTS tobaccos (
   name VARCHAR(255) NOT NULL,
   slug VARCHAR(255) NOT NULL,
   description TEXT,
-  image_url TEXT,
+  image_url VARCHAR(500),
   updated_at TIMESTAMP,
   parsed_at TIMESTAMP
 );
@@ -491,17 +497,19 @@ CREATE TABLE IF NOT EXISTS tobaccos (
 CREATE TABLE IF NOT EXISTS api_keys (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(255) NOT NULL,
-  key_hash VARCHAR(255) NOT NULL UNIQUE,
+  key_hash TEXT NOT NULL UNIQUE,
   is_active BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 -- Indexes
-CREATE INDEX IF NOT EXISTS idx_brands_slug ON brands(slug);
-CREATE INDEX IF NOT EXISTS idx_tobaccos_brand_id ON tobaccos(brand_id);
-CREATE INDEX IF NOT EXISTS idx_tobaccos_slug ON tobaccos(slug);
-CREATE INDEX IF NOT EXISTS idx_api_keys_key_hash ON api_keys(key_hash);
-CREATE INDEX IF NOT EXISTS idx_api_keys_is_active ON api_keys(is_active);
+CREATE INDEX IF NOT EXISTS brands_name_idx ON brands(name);
+CREATE UNIQUE INDEX IF NOT EXISTS brands_slug_idx ON brands(slug);
+CREATE INDEX IF NOT EXISTS tobaccos_brand_id_idx ON tobaccos(brand_id);
+CREATE INDEX IF NOT EXISTS tobaccos_name_idx ON tobaccos(name);
+CREATE UNIQUE INDEX IF NOT EXISTS tobaccos_slug_idx ON tobaccos(slug);
+CREATE UNIQUE INDEX IF NOT EXISTS api_keys_key_hash_idx ON api_keys(key_hash);
+CREATE INDEX IF NOT EXISTS api_keys_is_active_idx ON api_keys(is_active);
 ```
 
 ---

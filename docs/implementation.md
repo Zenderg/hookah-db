@@ -14,7 +14,7 @@ gantt
     Project Structure Setup           :done,   setup, 2026-01-03, 1d
     Environment Configuration        :done,   env, 2026-01-04, 1d
     section Database
-    Database Schema Definition        :db,     2026-01-05, 1d
+    Database Schema Definition        :done,   db, 2026-01-05, 1d
     Migration System Setup           :db,     2026-01-06, 1d
     section Parser
     HTTP Client Implementation      :parser,  2026-01-07, 1d
@@ -78,18 +78,20 @@ gantt
 
 ## Phase 2: Database Implementation
 
-### Step 2.1: Define Database Schema
+### Step 2.1: Define Database Schema ✅ (Completed 2026-01-03)
 
 **Objective**: Create Drizzle schema definitions.
 
 **Tasks**:
-1. Create `packages/database/src/schema.ts` with table definitions:
-   - `brands` table
-   - `tobaccos` table
-   - `api_keys` table
+1. Create `packages/database/src/schema/` directory with separate schema files:
+   - `brands.ts` - brands table definition
+   - `tobaccos.ts` - tobaccos table definition
+   - `api-keys.ts` - api_keys table definition
+   - `index.ts` - schema exports
 2. Define TypeScript interfaces for each table
-3. Add foreign key relationships
-4. Add indexes for performance
+3. Add foreign key relationships with cascade delete
+4. Add indexes for performance (brands_name_idx, brands_slug_idx, tobaccos_brand_id_idx, tobaccos_name_idx, tobaccos_slug_idx, api_keys_key_hash_idx, api_keys_is_active_idx)
+5. Configure Drizzle Kit with dialect: 'postgresql'
 
 **Expected Outcome**: Complete database schema with Drizzle.
 

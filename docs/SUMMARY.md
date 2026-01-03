@@ -68,13 +68,26 @@ docs/
 - **tobaccos**: Tobacco information (id, brandId, name, slug, description, imageUrl, updatedAt, parsedAt)
 - **api_keys**: API key management (id, name, keyHash, isActive, createdAt)
 
+**Schema Structure**:
+- Schema is split into separate files in `packages/database/src/schema/` directory
+- `brands.ts` - brands table definition with indexes
+- `tobaccos.ts` - tobaccos table definition with foreign key and indexes
+- `api-keys.ts` - api_keys table definition with indexes
+- `index.ts` - exports all schema definitions
+
+**Indexes**:
+- **brands**: `brands_name_idx` (name), `brands_slug_idx` (slug, UNIQUE)
+- **tobaccos**: `tobaccos_brand_id_idx` (brand_id), `tobaccos_name_idx` (name), `tobaccos_slug_idx` (slug, UNIQUE)
+- **api_keys**: `api_keys_key_hash_idx` (key_hash, UNIQUE), `api_keys_is_active_idx` (is_active)
+
 **Key Points**:
 - Minimal schema with only essential data
 - No lines table (user doesn't want to store line information)
 - No api_key_usage table (user doesn't need logs)
 - UUID primary keys
-- Foreign key relationship from tobaccos to brands
+- Foreign key relationship from tobaccos to brands with cascade delete
 - Unique constraints on slugs
+- Indexes created on frequently queried columns for performance
 
 ---
 
@@ -241,8 +254,10 @@ docs/
 - **Runtime**: Node.js 20+ with TypeScript 5.9.3
 - **Package Manager**: pnpm 10.27.0 with workspaces and catalog feature
 - **API Framework**: Fastify
-- **Database ORM**: Drizzle ORM
+- **Database ORM**: Drizzle ORM v0.45.1
 - **Databases**: PostgreSQL (production), SQLite (development)
+- **Database Drivers**: pg v8.16.3, better-sqlite3 v12.5.0
+- **Migration Tool**: Drizzle Kit v0.31.8
 - **HTML Parser**: Cheerio
 - **HTTP Client**: Got
 - **Testing**: Vitest 3.2.4
@@ -286,6 +301,7 @@ docs/
 - UUID primary keys (distributed system ready)
 - Foreign key constraints (data integrity)
 - Unique constraints (prevent duplicates)
+- Indexes on frequently queried columns (performance)
 
 ### API Design
 - RESTful conventions
@@ -325,7 +341,13 @@ hookah-db/
 │   ├── database/
 │   │   ├── package.json        # Database module package.json
 │   │   ├── tsconfig.json       # Database TypeScript config
+│   │   ├── drizzle.config.ts   # Drizzle Kit configuration
 │   │   └── src/
+│   │       ├── schema/         # Schema definitions
+│   │       │   ├── brands.ts
+│   │       │   ├── tobaccos.ts
+│   │       │   ├── api-keys.ts
+│   │       │   └── index.ts
 │   │       └── index.ts        # Database entry point
 │   └── shared/
 │       ├── package.json        # Shared module package.json
