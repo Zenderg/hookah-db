@@ -19,8 +19,8 @@ gantt
     section Parser
     HTTP Client Implementation      :done,   parser, 2026-01-07, 1d
     Scroll Handler Implementation   :done,   parser, 2026-01-08, 1d
-    Brand Parser Implementation     :parser,  2026-01-09, 1d
-    Tobacco Parser Implementation   :parser,  2026-01-10, 1d
+    Brand Parser Implementation     :done,   parser, 2026-01-09, 1d
+    Tobacco Parser Implementation   :done,   parser, 2026-01-10, 1d
     Data Normalizer Implementation :parser,  2026-01-11, 1d
     section API
     API Server Setup               :api,     2026-01-12, 1d
@@ -185,7 +185,7 @@ gantt
 
 ---
 
-### Step 3.4: Implement Tobacco Parser
+### Step 3.4: Implement Tobacco Parser ✅
 
 **Objective**: Parse tobacco listing and detail pages.
 

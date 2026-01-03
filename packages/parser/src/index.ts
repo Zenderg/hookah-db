@@ -43,3 +43,17 @@ export type {
   ValidationError,
   ValidationResult,
 } from './parsers/brands.js';
+
+// Tobacco Parser exports
+export {
+  parseTobaccoListing,
+  parseTobaccoDetail,
+  parseMultipleTobaccoListings,
+  validateTobacco,
+} from './parsers/tobaccos.js';
+
+export type {
+  Tobacco,
+  TobaccoListingResult,
+  TobaccoListingParserOptions,
+} from './parsers/tobaccos.js';

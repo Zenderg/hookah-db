@@ -10,16 +10,19 @@ The parser module (`packages/parser`) is responsible for fetching and parsing to
 graph TB
     A[Parser Module] --> B[HTTP Client]
     A --> C[Brand Parser]
-    A --> D[Scroll Handler]
-    A --> E[Data Extractor]
-    A --> F[Database Writer]
+    A --> D[Tobacco Parser]
+    A --> E[Scroll Handler]
+    A --> F[Data Extractor]
+    A --> G[Database Writer]
     
-    B --> G[htreviews.org]
-    C --> G
-    D --> G
+    B --> H[htreviews.org]
+    C --> H
+    D --> H
+    E --> H
     
-    E --> C
-    F --> E
+    F --> C
+    F --> D
+    G --> F
 ```
 
 ## Components
@@ -32,7 +35,7 @@ The HTTP client module provides a robust interface for fetching HTML content fro
 
 **Key Components**:
 
-- **[`HttpClient`](packages/parser/src/http/client.ts:118)**: Main HTTP client class wrapping the `got` library
+- **[`HttpClient`](packages/parser/src/http/client.ts:118)**: Main HTTP client class wrapping `got` library
 - **[`RateLimiter`](packages/parser/src/http/client.ts:85)**: Sliding window rate limiter for request throttling
 - **[`calculateRetryDelay()`](packages/parser/src/http/client.ts:251)**: Exponential backoff calculation for retries
 
@@ -79,7 +82,7 @@ const response = await httpClient.get('/tobaccos/sarma', {
 
 **Configuration**:
 
-All configuration is read from environment variables via the shared config module:
+All configuration is read from environment variables via shared config module:
 
 - `PARSER_BASE_URL` - htreviews.org URL (default: https://htreviews.org)
 - `PARSER_CONCURRENT_REQUESTS` - Concurrent requests limit (default: 3)
@@ -250,7 +253,7 @@ const result = parseMultipleBrandListings(htmlChunks);
 
 **Testing**:
 
-The brand parser has been tested with the example HTML file:
+The brand parser has been tested with example HTML file:
 
 - **Test File**: [`examples/htreviews.org_tobaccos_brands.html`](examples/htreviews.org_tobaccos_brands.html:1)
 - Successfully parses brand listing structure
@@ -260,254 +263,318 @@ The brand parser has been tested with the example HTML file:
 
 ---
 
-### 3. HTML Parser (`src/parser.ts`)
+### 3. Tobacco Parser ✅
 
-Parses HTML using Cheerio (jQuery-like syntax).
+The tobacco parser module provides specialized parsing functionality for extracting tobacco data from htreviews.org. It handles both tobacco listing pages and individual tobacco detail pages with comprehensive validation.
+
+**Implementation**: [`packages/parser/src/parsers/tobaccos.ts`](packages/parser/src/parsers/tobaccos.ts:1)
+
+**Key Components**:
+
+- **[`parseTobaccoListing()`](packages/parser/src/parsers/tobaccos.ts:258)**: Parse tobacco listing page HTML
+- **[`parseTobaccoDetail()`](packages/parser/src/parsers/tobaccos.ts:340)**: Parse tobacco detail page HTML
+- **[`parseMultipleTobaccoListings()`](packages/parser/src/parsers/tobaccos.ts:404)**: Parse multiple tobacco listing pages (for scroll handler integration)
+- **[`validateTobacco()`](packages/parser/src/parsers/tobaccos.ts:120)**: Validate tobacco data structure
+
+**TypeScript Interfaces**:
 
 ```typescript
-import * as cheerio from 'cheerio';
-import { fetchPage } from './http';
-
-export interface Brand {
-  name: string;
-  slug: string;
-  description?: string;
-  imageUrl?: string;
-}
-
+/**
+ * Tobacco data extracted from htreviews.org
+ */
 export interface Tobacco {
-  brandSlug: string;
-  name: string;
-  slug: string;
-  description?: string;
-  imageUrl?: string;
+  name: string;                    // Tobacco name (e.g., "Зима", "Кола")
+  slug: string;                    // URL-friendly identifier (e.g., "zima", "kola")
+  description: string;             // Tobacco description text
+  image_url: string;               // URL to tobacco image
+  brand_slug: string;              // Brand slug (e.g., "sarma", "dogma")
+  alternative_name?: string;        // Alternative name (e.g., "Двойное яблоко")
+  line_name?: string;              // Line name (e.g., "Классическая", "Легкая Сарма 360")
+  country?: string;                 // Country of origin
+  strength?: string;               // Strength level (e.g., "Средняя", "Лёгкая")
+  status?: string;                 // Status (e.g., "Выпускается", "Лимитированный")
 }
 
-export class HtReviewsParser {
-  private baseUrl: string;
-  
-  constructor(baseUrl: string) {
-    this.baseUrl = baseUrl;
-  }
-  
-  /**
-   * Parse brands listing page
-   */
-  async parseBrandsList(): Promise<string[]> {
-    const url = `${this.baseUrl}/tobaccos/brands?r=position&s=rating&d=desc`;
-    const html = await fetchPage(url);
-    const $ = cheerio.load(html);
-    
-    const brandSlugs: string[] = [];
-    
-    // Find brand links
-    $('a[href^="/tobaccos/"]').each((_, element) => {
-      const href = $(element).attr('href');
-      if (href && href.match(/^\/tobaccos\/[^\/]+$/)) {
-        const slug = href.replace('/tobaccos/', '');
-        if (slug && !brandSlugs.includes(slug)) {
-          brandSlugs.push(slug);
-        }
-      }
-    });
-    
-    return brandSlugs;
-  }
-  
-  /**
-   * Parse brand detail page
-   */
-  async parseBrand(brandSlug: string): Promise<Brand> {
-    const url = `${this.baseUrl}/tobaccos/${brandSlug}?r=position&s=rating&d=desc`;
-    const html = await fetchPage(url);
-    const $ = cheerio.load(html);
-    
-    // Extract brand name
-    const name = $('h1').first().text().trim() || brandSlug;
-    
-    // Extract brand description
-    const description = $('.brand-description').text().trim() || undefined;
-    
-    // Extract brand image
-    const imageUrl = $('img.brand-logo').first().attr('src') || 
-                     $('img').first().attr('src') || undefined;
-    
-    // Make image URL absolute if relative
-    const absoluteImageUrl = imageUrl && imageUrl.startsWith('/')
-      ? `${this.baseUrl}${imageUrl}`
-      : imageUrl;
-    
-    return {
-      name,
-      slug: brandSlug,
-      description,
-      imageUrl: absoluteImageUrl,
-    };
-  }
-  
-  /**
-   * Parse tobacco list from brand page
-   */
-  async parseTobaccoList(brandSlug: string): Promise<string[]> {
-    const url = `${this.baseUrl}/tobaccos/${brandSlug}?r=position&s=rating&d=desc`;
-    const tobaccoSlugs: string[] = [];
-    let offset = 0;
-    let hasMore = true;
-    
-    while (hasMore) {
-      const html = await fetchPage(`${url}&offset=${offset}`);
-      const $ = cheerio.load(html);
-      
-      // Find tobacco links
-      const links = $('a[href^="/tobaccos/"]');
-      const foundNewItems = false;
-      
-      links.each((_, element) => {
-        const href = $(element).attr('href');
-        if (href && href.match(/^\/tobaccos\/[^\/]+\/[^\/]+$/)) {
-          const parts = href.split('/');
-          const tobaccoSlug = parts[parts.length - 1];
-          
-          if (tobaccoSlug && !tobaccoSlugs.includes(tobaccoSlug)) {
-            tobaccoSlugs.push(tobaccoSlug);
-            foundNewItems = true;
-          }
-        }
-      });
-      
-      // Check if there are more items
-      const loadMoreButton = $('.load-more').length > 0;
-      hasMore = loadMoreButton && foundNewItems;
-      
-      if (hasMore) {
-        offset += 20; // Default page size
-        await new Promise(resolve => setTimeout(resolve, config.scrollDelayMs));
-      }
-    }
-    
-    return tobaccoSlugs;
-  }
-  
-  /**
-   * Parse tobacco detail page
-   */
-  async parseTobacco(brandSlug: string, tobaccoSlug: string): Promise<Tobacco> {
-    const url = `${this.baseUrl}/tobaccos/${brandSlug}/${tobaccoSlug}?r=position&s=created&d=desc`;
-    const html = await fetchPage(url);
-    const $ = cheerio.load(html);
-    
-    // Extract tobacco name
-    const name = $('h1').first().text().trim() || tobaccoSlug;
-    
-    // Extract tobacco description
-    const description = $('.tobacco-description').text().trim() || undefined;
-    
-    // Extract tobacco image
-    const imageUrl = $('img.tobacco-image').first().attr('src') || 
-                     $('img').first().attr('src') || undefined;
-    
-    // Make image URL absolute if relative
-    const absoluteImageUrl = imageUrl && imageUrl.startsWith('/')
-      ? `${this.baseUrl}${imageUrl}`
-      : imageUrl;
-    
-    return {
-      brandSlug,
-      name,
-      slug: tobaccoSlug,
-      description,
-      imageUrl: absoluteImageUrl,
-    };
-  }
+/**
+ * Parsed tobacco listing result
+ */
+export interface TobaccoListingResult {
+  tobaccos: Tobacco[];           // Array of parsed tobaccos
+  totalCount: number;             // Total number of tobaccos found
+  parsedCount: number;            // Number of tobaccos successfully parsed
+  skippedCount: number;           // Number of tobaccos that failed validation
+}
+
+/**
+ * Options for tobacco listing parser
+ */
+export interface TobaccoListingParserOptions {
+  skipValidation?: boolean;        // Skip validation for testing purposes
+  includeIncomplete?: boolean;    // Include tobaccos with missing optional fields
+  brandSlug?: string;             // Brand slug to associate with tobaccos (optional)
 }
 ```
 
+**Features**:
+
+1. **Tobacco Listing Parser**
+   - Extracts tobacco data from `.tobacco_list_item` elements
+   - Parses tobacco name, slug, description, image URL, and brand slug
+   - Handles lazy-loaded images via `data-src` attribute
+   - Supports both relative and absolute URL paths
+   - Extracts optional fields: alternative name, line name, status
+   - Provides detailed parsing statistics
+
+2. **Tobacco Detail Parser**
+   - Parses individual tobacco detail pages
+   - Uses `.object_wrapper` structure for detail pages
+   - Extracts comprehensive tobacco information including:
+     - Basic data: name, slug, description, image URL
+     - Brand information: brand slug from brand link
+     - Optional data: line name, country, strength, status
+   - Extracts slug from Schema.org JSON-LD structured data
+   - Falls back to listing structure if detail structure not found
+   - Returns validated tobacco data or null on failure
+
+3. **Multi-page Listing Parser**
+   - Designed for integration with scroll handler
+   - Processes multiple HTML chunks from paginated listings
+   - Aggregates results across all pages
+   - Maintains parsing statistics across all chunks
+
+4. **Comprehensive Validation**
+   - Validates all required fields: name, slug, description, image_url, brand_slug
+   - Checks for non-empty strings with proper trimming
+   - Validates slug format (lowercase letters, numbers, hyphens only)
+   - Validates URL format for image_url (HTTP/HTTPS only)
+   - Provides detailed error messages for each validation failure
+   - Configurable validation skipping for testing
+
+5. **Logging Integration**
+   - Uses shared logging configuration
+   - Provides debug, info, and warn level logging
+   - Logs parsing progress and statistics
+   - Logs validation failures with detailed error messages
+
+**Usage Examples**:
+
+```typescript
+import { 
+  parseTobaccoListing, 
+  parseTobaccoDetail, 
+  parseMultipleTobaccoListings 
+} from '@hookah-db/parser';
+
+// Parse a tobacco listing page
+const html = await fetchPage('/tobaccos/sarma');
+const result = parseTobaccoListing(html);
+
+console.log(`Parsed ${result.parsedCount} tobaccos, skipped ${result.skippedCount}`);
+result.tobaccos.forEach(tobacco => {
+  console.log(`- ${tobacco.name} (${tobacco.slug})`);
+  console.log(`  Brand: ${tobacco.brand_slug}`);
+  if (tobacco.line_name) {
+    console.log(`  Line: ${tobacco.line_name}`);
+  }
+});
+
+// Parse a tobacco detail page
+const tobaccoHtml = await fetchPage('/tobaccos/sarma/klassicheskaya/zima');
+const tobacco = parseTobaccoDetail(tobaccoHtml);
+
+if (tobacco) {
+  console.log(`Tobacco: ${tobacco.name}`);
+  console.log(`Description: ${tobacco.description}`);
+  console.log(`Image: ${tobacco.image_url}`);
+  console.log(`Brand: ${tobacco.brand_slug}`);
+  if (tobacco.line_name) {
+    console.log(`Line: ${tobacco.line_name}`);
+  }
+  if (tobacco.strength) {
+    console.log(`Strength: ${tobacco.strength}`);
+  }
+}
+
+// Parse multiple pages (for scroll handler integration)
+const htmlChunks = await fetchMultiplePages('/tobaccos/sarma');
+const multiResult = parseMultipleTobaccoListings(htmlChunks);
+console.log(`Total tobaccos across all pages: ${multiResult.parsedCount}`);
+
+// Parse with options (skip validation for testing)
+const testResult = parseTobaccoListing(html, {
+  skipValidation: true,
+  includeIncomplete: true,
+  brandSlug: 'sarma'
+});
+```
+
+**Data Extraction Details**:
+
+The tobacco parser extracts the following data from HTML:
+
+**From Listing Pages**:
+- **Name**: Extracted from `.tobacco_list_item_name a.tobacco_list_item_slug span` (first span)
+- **Alternative Name**: Extracted from second span in same element (optional)
+- **Slug**: Extracted from href attribute of `.tobacco_list_item_name a.tobacco_list_item_slug`, parsed from URL path
+- **Brand Slug**: Extracted from `.tobacco_list_item_brand_slug a` href attribute
+- **Line Name**: Extracted from `.tobacco_list_item_line_slug a span` (optional)
+- **Description**: Extracted from Schema.org JSON-LD `description` field, or from `.last_reviews_item_content span`
+- **Image URL**: Extracted from `data-src` attribute (lazy loading) or `src` attribute of `.tobacco_list_item_image img`
+- **Status**: Extracted from `.tobacco_list_item_status span` (optional)
+
+**From Detail Pages**:
+- **Name**: Extracted from `.object_card_title h1`
+- **Description**: Extracted from `.object_card_discr span`
+- **Image URL**: Extracted from `.object_image img src` attribute
+- **Brand Slug**: Extracted from `.object_info_item a` href attribute
+- **Line Name**: Extracted from second `.object_info_item a` element (optional)
+- **Country**: Extracted from `.object_info_item` where label is "Страна" (optional)
+- **Strength**: Extracted from `.object_info_item` where label contains "Крепость" (optional)
+- **Status**: Extracted from `.object_info_item` where label is "Статус" (optional)
+- **Slug**: Extracted from Schema.org JSON-LD `url` field or breadcrumb list
+
+**Validation Rules**:
+
+1. **Name**: Required, non-empty string after trimming
+2. **Slug**: Required, non-empty string, must match pattern `^[a-z0-9-]+$`
+3. **Description**: Required, non-empty string after trimming
+4. **Image URL**: Required, valid HTTP/HTTPS URL
+5. **Brand Slug**: Required, non-empty string after trimming
+
+**Integration with Scroll Handler**:
+
+The [`parseMultipleTobaccoListings()`](packages/parser/src/parsers/tobaccos.ts:404) function is designed to work seamlessly with the scroll handler:
+
+```typescript
+// Scroll handler fetches multiple pages
+const htmlChunks: string[] = [];
+while (hasMore) {
+  const html = await fetchPage(`/tobaccos/sarma?offset=${offset}`);
+  htmlChunks.push(html);
+  offset += pageSize;
+  // Check if more pages available...
+}
+
+// Parse all chunks at once
+const result = parseMultipleTobaccoListings(htmlChunks);
+```
+
+**Testing**:
+
+The tobacco parser has been tested with example HTML files:
+
+- **Test File 1**: [`examples/htreviews.org_tobaccos_sarma.html`](examples/htreviews.org_tobaccos_sarma.html:1)
+  - Successfully parses tobacco listing structure from brand page
+  - Validates extracted data against all validation rules
+  - Handles lazy-loaded images correctly
+  - Extracts optional fields (line name, status)
+  - Provides accurate parsing statistics
+
+- **Test File 2**: [`examples/htreviews.org_tobaccos_sarma_klassicheskaya_zima.html`](examples/htreviews.org_tobaccos_sarma_klassicheskaya_zima.html:1)
+  - Successfully parses tobacco detail page structure
+  - Extracts comprehensive tobacco information
+  - Parses Schema.org JSON-LD structured data
+  - Extracts optional fields (country, strength, status)
+  - Validates extracted data against all validation rules
+
 ---
 
-### 4. Scroll Handler (`src/scroll.ts`)
+### 4. Scroll Handler
 
 Handles infinite scroll on htreviews.org pages.
 
+**Implementation**: [`packages/parser/src/scroll/handler.ts`](packages/parser/src/scroll/handler.ts:1)
+
+**Key Components**:
+
+- **[`ScrollHandler`](packages/parser/src/scroll/handler.ts:30)**: Main scroll handler class
+- **[`fetchAllScrollContent()`](packages/parser/src/scroll/handler.ts:180)**: Convenience function for fetching all scroll content
+
+**TypeScript Interfaces**:
+
 ```typescript
-import * as cheerio from 'cheerio';
-import { fetchPage } from './http';
-import { config } from './http';
-
-export interface ScrollOptions {
-  baseUrl: string;
-  path: string;
-  initialOffset?: number;
-  pageSize?: number;
+/**
+ * Options for scroll handler
+ */
+export interface ScrollHandlerOptions {
+  httpClient: HttpClient;           // HTTP client instance
+  baseUrl: string;                  // Base URL for requests
+  path: string;                     // Path to scroll (e.g., '/tobaccos/brands')
+  initialOffset?: number;            // Initial offset (default: 0)
+  pageSize?: number;                 // Page size (default: 20)
+  maxItems?: number;                 // Maximum items to fetch (optional)
+  delayMs?: number;                 // Delay between requests (default: from PARSER_SCROLL_DELAY_MS)
 }
 
+/**
+ * Scroll result with metadata
+ */
 export interface ScrollResult {
-  items: string[];
-  totalItems: number;
-  hasMore: boolean;
+  htmlChunks: string[];            // Array of HTML chunks from each scroll
+  totalCount: number;               // Total items found
+  hasMore: boolean;                // Whether more items available
+  metadata: ScrollMetadata;         // Scroll metadata
 }
 
-export async function scrollPage(options: ScrollOptions): Promise<ScrollResult> {
-  const {
-    baseUrl,
-    path,
-    initialOffset = 0,
-    pageSize = 20,
-  } = options;
-  
-  const items: string[] = [];
-  let offset = initialOffset;
-  let hasMore = true;
-  let lastCount = 0;
-  
-  while (hasMore) {
-    const url = `${baseUrl}${path}?offset=${offset}`;
-    const html = await fetchPage(url);
-    const $ = cheerio.load(html);
-    
-    // Extract items from current page
-    const pageItems: string[] = [];
-    
-    // Example: Extract brand/tobacco slugs
-    $('a[href^="/tobaccos/"]').each((_, element) => {
-      const href = $(element).attr('href');
-      if (href) {
-        const slug = href.split('/').pop();
-        if (slug && !items.includes(slug) && !pageItems.includes(slug)) {
-          pageItems.push(slug);
-        }
-      }
-    });
-    
-    // Add new items
-    items.push(...pageItems);
-    
-    // Check if we got new items
-    const newItemsCount = pageItems.length;
-    hasMore = newItemsCount > 0 && newItemsCount === pageSize;
-    
-    if (hasMore) {
-      offset += pageSize;
-      await new Promise(resolve => setTimeout(resolve, config.scrollDelayMs));
-    }
-    
-    // Safety check: prevent infinite loop
-    if (lastCount === items.length) {
-      hasMore = false;
-    }
-    lastCount = items.length;
-  }
-  
-  return {
-    items,
-    totalItems: items.length,
-    hasMore: false,
-  };
+/**
+ * Scroll metadata
+ */
+export interface ScrollMetadata {
+  totalItems: number;              // Total items available
+  itemsPerPage: number;            // Items per page
+  currentPage: number;             // Current page number
+  totalPages: number;              // Total pages available
 }
+```
+
+**Features**:
+
+1. **Infinite Scroll Support**
+   - Uses offset/limit pagination parameters
+   - Extracts metadata from HTML data attributes
+   - Aggregates content from multiple scroll loads
+   - Configurable delay between requests via `PARSER_SCROLL_DELAY_MS`
+   - Supports maximum item limit for controlled parsing
+   - Integrates with HttpClient for rate limiting
+
+2. **Metadata Extraction**
+   - Extracts total count from `data-count` attribute
+   - Extracts offset from `data-offset` attribute
+   - Extracts target from `data-target` attribute
+   - Calculates total pages and current page number
+
+3. **Convenience Function**
+   - [`fetchAllScrollContent()`](packages/parser/src/scroll/handler.ts:180) provides simple API
+   - Automatically handles scroll until completion
+   - Returns aggregated HTML chunks
+   - Includes scroll metadata
+
+**Usage Examples**:
+
+```typescript
+import { httpClient, fetchAllScrollContent } from '@hookah-db/parser';
+
+// Fetch all brands with scroll handler
+const result = await fetchAllScrollContent({
+  httpClient,
+  baseUrl: 'https://htreviews.org',
+  path: '/tobaccos/brands',
+  maxItems: 100  // Limit to 100 brands for testing
+});
+
+console.log(`Fetched ${result.htmlChunks.length} pages`);
+console.log(`Total items: ${result.totalCount}`);
+console.log(`Metadata:`, result.metadata);
+
+// Parse all chunks
+import { parseMultipleBrandListings } from '@hookah-db/parser';
+const brands = parseMultipleBrandListings(result.htmlChunks);
+console.log(`Parsed ${brands.parsedCount} brands`);
 ```
 
 ---
 
-### 5. Data Extractor (`src/extractor.ts`)
+### 5. Data Extractor
 
 Extracts structured data from parsed HTML.
 
@@ -626,7 +693,7 @@ export class DataExtractor {
 
 ---
 
-### 6. Database Writer (`src/writer.ts`)
+### 6. Database Writer
 
 Writes parsed data to database.
 
@@ -653,7 +720,7 @@ export class DatabaseWriter {
    * Write tobacco to database
    */
   static async writeTobacco(tobacco: ExtractedTobacco): Promise<void> {
-    // First, find the brand ID
+    // First, find brand ID
     const { getBrandBySlug } = await import('@hookah-db/database');
     const brand = await getBrandBySlug(tobacco.brandSlug);
     
@@ -702,9 +769,9 @@ export class DatabaseWriter {
 
 ---
 
-### 7. Main Parser (`src/index.ts`)
+### 7. Main Parser
 
-Orchestrates the parsing process.
+Orchestrates parsing process.
 
 ```typescript
 import { HtReviewsParser } from './parser';
@@ -1101,11 +1168,11 @@ The parser module provides:
 
 - **HTTP Client**: Fetches HTML from htreviews.org with retry logic, rate limiting, and timeout handling
 - **Brand Parser**: Specialized parser for brand listing and detail pages with comprehensive validation
-- **HTML Parser**: Parses HTML using Cheerio
-- **Scroll Handler**: Handles infinite scroll on listing pages
+- **Tobacco Parser**: Specialized parser for tobacco listing and detail pages with comprehensive validation ✅
+- **Scroll Handler**: Handles infinite scroll on listing pages with metadata extraction
 - **Data Extractor**: Extracts structured data from HTML
 - **Database Writer**: Writes parsed data to database
 - **CLI**: Command-line interface for running parser
 
-For API module documentation, see [`api.md`](api.md).
-For database module documentation, see [`database.md`](database.md).
+For API module documentation, see [`api.md`](../api.md).
+For database module documentation, see [`database.md`](../database.md).
