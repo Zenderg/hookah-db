@@ -11,25 +11,15 @@
 
 ### Web Scraping
 - **Cheerio**: Fast, flexible, and lean implementation of core jQuery for server-side HTML parsing
-- **axios** or **node-fetch**: HTTP client for fetching HTML pages from htreviews.org
+- **axios**: HTTP client for fetching HTML pages from htreviews.org
 
-### API Framework (Decision Pending)
-**Options under consideration**:
-- **Express.js**: Mature, widely-used, extensive middleware ecosystem
-- **Fastify**: High performance, schema-based validation, lower overhead
-
-**Decision criteria**:
-- Performance requirements
-- Middleware availability
-- Community support
-- Learning curve
+### API Framework
+- **Express.js**: Mature, widely-used, extensive middleware ecosystem (selected for this project)
 
 ### Authentication & Security
 - **API Key Middleware**: Custom middleware for X-API-Key header validation
 - **Helmet**: Security headers for Express.js
-- **Rate Limiting**: 
-  - **express-rate-limit** (if using Express)
-  - **@fastify/rate-limit** (if using Fastify)
+- **Rate Limiting**: express-rate-limit (if using Express)
 
 ### Caching
 **Primary (In-Memory)**:
@@ -201,3 +191,23 @@ src/
 - Log scraping errors
 - Track rate limit violations
 - Monitor server resources (CPU, memory, disk)
+
+## Installed Dependencies (as of 2026-01-03)
+
+### Core Dependencies
+- cheerio: 1.1.2
+- axios: 1.13.2
+- express: 5.2.1
+
+### TypeScript & Type Definitions
+- typescript: 5.9.3
+- @types/node: 25.0.3
+- @types/express: 5.0.6
+
+### Development Tools
+- nodemon: 3.1.11
+- ts-node: 10.9.2
+- jest: 30.2.0
+- @types/jest: 30.0.0
+- ts-jest: 29.4.6
+- supertest: 7.1.4
