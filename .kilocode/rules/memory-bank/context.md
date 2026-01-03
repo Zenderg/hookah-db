@@ -12,8 +12,16 @@ The project has moved from planning to active development. The repository now co
 - TypeScript configuration ([`tsconfig.json`](tsconfig.json:1))
 - Git ignore rules ([`.gitignore`](.gitignore:1))
 - Application entry point ([`src/index.ts`](src/index.ts:1))
+- Complete data models in [`src/models/`](src/models/) directory
 
 ## Recent Changes
+
+- **Data Models Implementation** (2026-01-03):
+  - Created [`src/models/rating.ts`](src/models/rating.ts) - RatingDistribution interface for rating statistics
+  - Created [`src/models/line.ts`](src/models/line.ts) - Line interface for tobacco product lines
+  - Created [`src/models/flavor.ts`](src/models/flavor.ts) - Flavor interface with comprehensive flavor data
+  - Created [`src/models/brand.ts`](src/models/brand.ts) - Brand interface with complete brand information
+  - All models include TypeScript interfaces with detailed property definitions based on htreviews.org HTML structure analysis
 
 - **Development Environment Setup** (2026-01-03):
   - Initialized pnpm project with [`package.json`](package.json:1)
@@ -31,13 +39,12 @@ The project has moved from planning to active development. The repository now co
 
 ## Next Steps
 
-1. **Design data models**: Define TypeScript interfaces for Brand, Flavor, Line, etc.
-2. **Implement web scraper**: Create scraper to fetch and parse htreviews.org HTML
-3. **Build API server**: Set up Express server with REST endpoints
-4. **Implement caching**: Add caching layer (in-memory or Redis)
-5. **Add authentication**: Implement API key middleware
-6. **Write tests**: Create unit and integration tests
-7. **Documentation**: Write API documentation
+1. **Implement web scraper**: Create scraper to fetch and parse htreviews.org HTML
+2. **Build API server**: Set up Express server with REST endpoints
+3. **Implement caching**: Add caching layer (in-memory or Redis)
+4. **Add authentication**: Implement API key middleware
+5. **Write tests**: Create unit and integration tests
+6. **Documentation**: Write API documentation
 
 ## Technical Decisions Made
 
