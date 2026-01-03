@@ -9,7 +9,7 @@ The parser module (`packages/parser`) is responsible for fetching and parsing to
 ```mermaid
 graph TB
     A[Parser Module] --> B[HTTP Client]
-    A --> C[HTML Parser]
+    A --> C[Brand Parser]
     A --> D[Scroll Handler]
     A --> E[Data Extractor]
     A --> F[Database Writer]
@@ -90,7 +90,177 @@ All configuration is read from environment variables via the shared config modul
 
 ---
 
-### 2. HTML Parser (`src/parser.ts`)
+### 2. Brand Parser
+
+The brand parser module provides specialized parsing functionality for extracting brand data from htreviews.org. It handles both brand listing pages and individual brand detail pages with comprehensive validation.
+
+**Implementation**: [`packages/parser/src/parsers/brands.ts`](packages/parser/src/parsers/brands.ts:1)
+
+**Key Components**:
+
+- **[`parseBrandListing()`](packages/parser/src/parsers/brands.ts:258)**: Parse brand listing page HTML
+- **[`parseBrandDetail()`](packages/parser/src/parsers/brands.ts:340)**: Parse brand detail page HTML
+- **[`parseMultipleBrandListings()`](packages/parser/src/parsers/brands.ts:404)**: Parse multiple brand listing pages (for scroll handler integration)
+- **[`validateBrand()`](packages/parser/src/parsers/brands.ts:120)**: Validate brand data structure
+
+**TypeScript Interfaces**:
+
+```typescript
+/**
+ * Brand data extracted from htreviews.org
+ */
+export interface Brand {
+  name: string;           // Brand name (e.g., "Догма", "Bonche")
+  slug: string;           // URL-friendly identifier (e.g., "dogma", "bonche")
+  description: string;    // Brand description text
+  image_url: string;      // URL to brand image
+}
+
+/**
+ * Parsed brand listing result
+ */
+export interface BrandListingResult {
+  brands: Brand[];        // Array of parsed brands
+  totalCount: number;     // Total number of brands found
+  parsedCount: number;    // Number of brands successfully parsed
+  skippedCount: number;   // Number of brands that failed validation
+}
+
+/**
+ * Options for brand listing parser
+ */
+export interface BrandListingParserOptions {
+  skipValidation?: boolean;        // Skip validation for testing purposes
+  includeIncomplete?: boolean;    // Include brands with missing optional fields
+}
+
+/**
+ * Validation result
+ */
+export interface ValidationResult {
+  isValid: boolean;        // Whether brand data is valid
+  errors: ValidationError[]; // Array of validation errors
+}
+```
+
+**Features**:
+
+1. **Brand Listing Parser**
+   - Extracts brand data from `.tobacco_list_item` elements
+   - Parses brand name, slug, description, and image URL
+   - Handles lazy-loaded images via `data-src` attribute
+   - Supports both relative and absolute URL paths
+   - Provides detailed parsing statistics
+
+2. **Brand Detail Parser**
+   - Parses individual brand detail pages
+   - Uses same parsing structure as listing pages
+   - Returns validated brand data or null on failure
+   - Designed for future enhancement with detail-specific patterns
+
+3. **Multi-page Listing Parser**
+   - Designed for integration with scroll handler
+   - Processes multiple HTML chunks from paginated listings
+   - Aggregates results across all pages
+   - Maintains parsing statistics across all chunks
+
+4. **Comprehensive Validation**
+   - Validates all required fields: name, slug, description, image_url
+   - Checks for non-empty strings with proper trimming
+   - Validates slug format (lowercase letters, numbers, hyphens only)
+   - Validates URL format for image_url (HTTP/HTTPS only)
+   - Provides detailed error messages for each validation failure
+   - Configurable validation skipping for testing
+
+5. **Logging Integration**
+   - Uses shared logging configuration
+   - Provides debug, info, and warn level logging
+   - Logs parsing progress and statistics
+   - Logs validation failures with detailed error messages
+
+**Usage Examples**:
+
+```typescript
+import { parseBrandListing, parseBrandDetail, parseMultipleBrandListings } from '@hookah-db/parser';
+
+// Parse a brand listing page
+const html = await fetchPage('/tobaccos/brands');
+const result = parseBrandListing(html);
+
+console.log(`Parsed ${result.parsedCount} brands, skipped ${result.skippedCount}`);
+result.brands.forEach(brand => {
+  console.log(`- ${brand.name} (${brand.slug})`);
+});
+
+// Parse a brand detail page
+const brandHtml = await fetchPage('/tobaccos/dogma');
+const brand = parseBrandDetail(brandHtml);
+
+if (brand) {
+  console.log(`Brand: ${brand.name}`);
+  console.log(`Description: ${brand.description}`);
+  console.log(`Image: ${brand.image_url}`);
+}
+
+// Parse multiple pages (for scroll handler integration)
+const htmlChunks = await fetchMultiplePages('/tobaccos/brands');
+const multiResult = parseMultipleBrandListings(htmlChunks);
+console.log(`Total brands across all pages: ${multiResult.parsedCount}`);
+
+// Parse with options (skip validation for testing)
+const testResult = parseBrandListing(html, {
+  skipValidation: true,
+  includeIncomplete: true
+});
+```
+
+**Data Extraction Details**:
+
+The brand parser extracts the following data from HTML:
+
+- **Name**: Extracted from `.tobacco_list_item_name a.tobacco_list_item_slug span`
+- **Slug**: Extracted from href attribute of `.tobacco_list_item_name a.tobacco_list_item_slug`, parsed from URL path
+- **Description**: Extracted from `.description_content span`
+- **Image URL**: Extracted from `data-src` attribute (lazy loading) or `src` attribute of `.tobacco_list_item_image img`
+
+**Validation Rules**:
+
+1. **Name**: Required, non-empty string after trimming
+2. **Slug**: Required, non-empty string, must match pattern `^[a-z0-9-]+$`
+3. **Description**: Required, non-empty string after trimming
+4. **Image URL**: Required, valid HTTP/HTTPS URL
+
+**Integration with Scroll Handler**:
+
+The [`parseMultipleBrandListings()`](packages/parser/src/parsers/brands.ts:404) function is designed to work seamlessly with the scroll handler:
+
+```typescript
+// Scroll handler fetches multiple pages
+const htmlChunks: string[] = [];
+while (hasMore) {
+  const html = await fetchPage(`/tobaccos/brands?offset=${offset}`);
+  htmlChunks.push(html);
+  offset += pageSize;
+  // Check if more pages available...
+}
+
+// Parse all chunks at once
+const result = parseMultipleBrandListings(htmlChunks);
+```
+
+**Testing**:
+
+The brand parser has been tested with the example HTML file:
+
+- **Test File**: [`examples/htreviews.org_tobaccos_brands.html`](examples/htreviews.org_tobaccos_brands.html:1)
+- Successfully parses brand listing structure
+- Validates extracted data against all validation rules
+- Handles lazy-loaded images correctly
+- Provides accurate parsing statistics
+
+---
+
+### 3. HTML Parser (`src/parser.ts`)
 
 Parses HTML using Cheerio (jQuery-like syntax).
 
@@ -254,7 +424,7 @@ export class HtReviewsParser {
 
 ---
 
-### 3. Scroll Handler (`src/scroll.ts`)
+### 4. Scroll Handler (`src/scroll.ts`)
 
 Handles infinite scroll on htreviews.org pages.
 
@@ -337,7 +507,7 @@ export async function scrollPage(options: ScrollOptions): Promise<ScrollResult> 
 
 ---
 
-### 4. Data Extractor (`src/extractor.ts`)
+### 5. Data Extractor (`src/extractor.ts`)
 
 Extracts structured data from parsed HTML.
 
@@ -456,7 +626,7 @@ export class DataExtractor {
 
 ---
 
-### 5. Database Writer (`src/writer.ts`)
+### 6. Database Writer (`src/writer.ts`)
 
 Writes parsed data to database.
 
@@ -532,7 +702,7 @@ export class DatabaseWriter {
 
 ---
 
-### 6. Main Parser (`src/index.ts`)
+### 7. Main Parser (`src/index.ts`)
 
 Orchestrates the parsing process.
 
@@ -930,6 +1100,7 @@ main().catch(console.error);
 The parser module provides:
 
 - **HTTP Client**: Fetches HTML from htreviews.org with retry logic, rate limiting, and timeout handling
+- **Brand Parser**: Specialized parser for brand listing and detail pages with comprehensive validation
 - **HTML Parser**: Parses HTML using Cheerio
 - **Scroll Handler**: Handles infinite scroll on listing pages
 - **Data Extractor**: Extracts structured data from HTML

@@ -27,3 +27,19 @@ export type {
   ScrollResult,
   ScrollMetadata,
 } from './scroll/index.js';
+
+// Brand Parser exports
+export {
+  parseBrandListing,
+  parseBrandDetail,
+  parseMultipleBrandListings,
+  validateBrand,
+} from './parsers/brands.js';
+
+export type {
+  Brand,
+  BrandListingResult,
+  BrandListingParserOptions,
+  ValidationError,
+  ValidationResult,
+} from './parsers/brands.js';
