@@ -17,7 +17,7 @@ gantt
     Database Schema Definition        :done,   db, 2026-01-05, 1d
     Migration System Setup           :done,   db, 2026-01-06, 1d
     section Parser
-    HTTP Client Implementation      :parser,  2026-01-07, 1d
+    HTTP Client Implementation      :done,   parser, 2026-01-07, 1d
     Scroll Handler Implementation   :parser,  2026-01-08, 1d
     Brand Parser Implementation     :parser,  2026-01-09, 1d
     Tobacco Parser Implementation   :parser,  2026-01-10, 1d
@@ -78,7 +78,7 @@ gantt
 
 ## Phase 2: Database Implementation
 
-### Step 2.1: Define Database Schema ✅ (Completed 2026-01-03)
+### Step 2.1: Define Database Schema ✅
 
 **Objective**: Create Drizzle schema definitions.
 
@@ -99,7 +99,7 @@ gantt
 
 ---
 
-### Step 2.2: Set Up Migration System ✅ (Completed 2026-01-03)
+### Step 2.2: Set Up Migration System ✅
 
 **Objective**: Configure Drizzle Kit for migrations.
 
@@ -116,7 +116,7 @@ gantt
 
 ---
 
-### Step 2.3: Create Database Client ✅ (Completed 2026-01-03)
+### Step 2.3: Create Database Client ✅
 
 **Objective**: Build database access layer.
 
@@ -134,7 +134,7 @@ gantt
 
 ## Phase 3: Parser Implementation
 
-### Step 3.1: Implement HTTP Client
+### Step 3.1: Implement HTTP Client ✅
 
 **Objective**: Create HTTP client for fetching HTML.
 

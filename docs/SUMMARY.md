@@ -232,7 +232,10 @@ docs/
 
 **Contents**:
 - Technical implementation details
-- HTTP client with retry logic
+- HTTP Client with got v14.6.3
+- Retry logic with exponential backoff
+- Rate limiting with sliding window algorithm
+- Timeout handling
 - HTML parser with Cheerio
 - Scroll handler for infinite scroll
 - Data extractor
@@ -242,10 +245,13 @@ docs/
 - Performance considerations
 
 **Key Points**:
-- Axios for HTTP requests
+- got v14.6.3 for HTTP requests with built-in retry and timeout support
+- Custom sliding window rate limiter for request throttling
+- Exponential backoff retry logic (1s, 2s, 4s, 8s, capped at 30s)
+- Handles retryable HTTP status codes: 429, 500, 502, 503, 504
+- Handles network errors: ETIMEDOUT, ECONNRESET, EADDRINUSE, ECONNREFUSED, EPIPE, ENOTFOUND, ENETUNREACH, EAI_AGAIN
 - Cheerio for HTML parsing
 - Infinite scroll handling
-- Retry logic for failed requests
 - Batch operations for efficiency
 - CLI for running parser
 - Unit tests with example HTML files
@@ -273,7 +279,7 @@ docs/
 - **UUID**: crypto.randomUUID()
 - **Logging**: pino (Fastify default)
 - **Rate Limiting**: @fastify/rate-limit
-- **Concurrency**: p-limit
+- **HTTP Client**: got v14.6.3
 
 ### Key Configuration Choices
 - **pnpm Catalogs**: Centralized dependency management across packages
@@ -342,6 +348,8 @@ hookah-db/
 │   │   ├── package.json        # Parser module package.json
 │   │   ├── tsconfig.json       # Parser TypeScript config
 │   │   └── src/
+│   │       ├── http/
+│   │       │   └── client.ts   # HTTP client implementation
 │   │       └── index.ts        # Parser entry point
 │   ├── database/
 │   │   ├── package.json        # Database module package.json
@@ -455,3 +463,6 @@ The project features:
 - **SQLite-specific schemas**: Separate schema definitions for SQLite compatibility
 - **Comprehensive documentation**: All modules and features well-documented
 - **Simple architecture**: Focus on essential functionality without over-engineering
+- **Robust HTTP client**: got v14.6.3 with retry logic, rate limiting, and timeout handling
+- **Exponential backoff**: 1s, 2s, 4s, 8s, capped at 30s for failed requests
+- **Sliding window rate limiter**: Custom implementation for request throttling

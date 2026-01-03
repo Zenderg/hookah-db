@@ -24,51 +24,69 @@ graph TB
 
 ## Components
 
-### 1. HTTP Client (`src/http.ts`)
+### 1. HTTP Client
 
-Handles HTTP requests to htreviews.org with retry logic and error handling.
+The HTTP client module provides a robust interface for fetching HTML content from htreviews.org with built-in resilience features.
+
+**Implementation**: [`packages/parser/src/http/client.ts`](packages/parser/src/http/client.ts:1)
+
+**Key Components**:
+
+- **[`HttpClient`](packages/parser/src/http/client.ts:118)**: Main HTTP client class wrapping the `got` library
+- **[`RateLimiter`](packages/parser/src/http/client.ts:85)**: Sliding window rate limiter for request throttling
+- **[`calculateRetryDelay()`](packages/parser/src/http/client.ts:251)**: Exponential backoff calculation for retries
+
+**Features**:
+
+1. **Retry Logic with Exponential Backoff**
+   - Automatic retry mechanism for failed requests
+   - Exponential backoff: 1s, 2s, 4s, 8s, etc. (capped at 30s max)
+   - Configurable maximum retry attempts (default: 3, from `PARSER_MAX_RETRIES`)
+   - Handles retryable HTTP status codes: 429, 500, 502, 503, 504
+   - Handles network errors: ETIMEDOUT, ECONNRESET, EADDRINUSE, ECONNREFUSED, EPIPE, ENOTFOUND, ENETUNREACH, EAI_AGAIN
+
+2. **Rate Limiting**
+   - Sliding window algorithm for request throttling
+   - Configurable delay between requests (default: 1000ms, from `PARSER_SCROLL_DELAY_MS`)
+   - Respects HTTP 429 (Too Many Requests) responses
+   - Automatic delay calculation before each request
+
+3. **Timeout Handling**
+   - Connection timeout: 10 seconds
+   - Request timeout: 30 seconds (from `PARSER_TIMEOUT_MS`)
+   - Response timeout: 30 seconds (from `PARSER_TIMEOUT_MS`)
+   - Graceful timeout error handling with proper error classification
+
+4. **Error Handling**
+   - Custom [`HttpClientError`](packages/parser/src/http/client.ts:20) class with error type classification
+   - Distinguishes between network, HTTP, timeout, parse, and rate limit errors
+   - Comprehensive error logging based on log level configuration
+
+**Usage Example**:
 
 ```typescript
-import axios from 'axios';
+import { httpClient } from '@hookah-db/parser';
 
-export interface ParserConfig {
-  baseUrl: string;
-  concurrentRequests: number;
-  scrollDelayMs: number;
-  maxRetries: number;
-  timeoutMs: number;
-}
+// Fetch a page
+const response = await httpClient.get('/tobaccos/brands');
+const html = response.body;
 
-const config: ParserConfig = {
-  baseUrl: process.env.PARSER_BASE_URL || 'https://htreviews.org',
-  concurrentRequests: parseInt(process.env.PARSER_CONCURRENT_REQUESTS || '3'),
-  scrollDelayMs: parseInt(process.env.PARSER_SCROLL_DELAY_MS || '1000'),
-  maxRetries: parseInt(process.env.PARSER_MAX_RETRIES || '3'),
-  timeoutMs: parseInt(process.env.PARSER_TIMEOUT_MS || '30000'),
-};
-
-const client = axios.create({
-  baseURL: config.baseUrl,
-  timeout: config.timeoutMs,
-  headers: {
-    'User-Agent': 'Mozilla/5.0 (compatible; HookahDB/1.0)',
-  },
+// Fetch with custom options
+const response = await httpClient.get('/tobaccos/sarma', {
+  searchParams: { page: 1 }
 });
-
-export async function fetchPage(url: string, retries = config.maxRetries): Promise<string> {
-  try {
-    const response = await client.get(url);
-    return response.data;
-  } catch (error) {
-    if (retries > 0) {
-      console.warn(`Retrying ${url}, attempts left: ${retries}`);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      return fetchPage(url, retries - 1);
-    }
-    throw new Error(`Failed to fetch ${url}: ${error}`);
-  }
-}
 ```
+
+**Configuration**:
+
+All configuration is read from environment variables via the shared config module:
+
+- `PARSER_BASE_URL` - htreviews.org URL (default: https://htreviews.org)
+- `PARSER_CONCURRENT_REQUESTS` - Concurrent requests limit (default: 3)
+- `PARSER_SCROLL_DELAY_MS` - Delay between requests (default: 1000ms)
+- `PARSER_MAX_RETRIES` - Retry attempts (default: 3)
+- `PARSER_TIMEOUT_MS` - Request timeout (default: 30000ms)
+- `LOG_LEVEL` - Controls logging verbosity (error, warn, info, debug)
 
 ---
 
@@ -897,11 +915,21 @@ main().catch(console.error);
 
 ---
 
+## Dependencies
+
+**Dependencies**:
+- **got** v14.6.3 - HTTP client library with retry, timeout, and hooks support
+- **cheerio** - HTML parsing with jQuery-like syntax
+- **@hookah-db/database** - Database module for data storage
+- **@hookah-db/shared** - Shared configuration module
+
+---
+
 ## Summary
 
 The parser module provides:
 
-- **HTTP Client**: Fetches HTML from htreviews.org with retry logic
+- **HTTP Client**: Fetches HTML from htreviews.org with retry logic, rate limiting, and timeout handling
 - **HTML Parser**: Parses HTML using Cheerio
 - **Scroll Handler**: Handles infinite scroll on listing pages
 - **Data Extractor**: Extracts structured data from HTML

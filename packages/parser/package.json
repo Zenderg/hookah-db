@@ -13,17 +13,18 @@
     "clean": "rm -rf dist"
   },
   "devDependencies": {
-    "typescript": "catalog:",
     "@types/node": "catalog:",
-    "vitest": "catalog:",
-    "@vitest/ui": "catalog:",
-    "eslint": "catalog:",
     "@typescript-eslint/eslint-plugin": "catalog:",
     "@typescript-eslint/parser": "catalog:",
+    "@vitest/ui": "catalog:",
+    "eslint": "catalog:",
     "tsup": "catalog:",
-    "tsx": "catalog:"
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "dependencies": {
-    "@hookah-db/shared": "workspace:*"
+    "@hookah-db/shared": "workspace:*",
+    "got": "14.6.3"
   }
 }
