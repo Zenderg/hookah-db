@@ -48,7 +48,7 @@ docs/
 **Key Points**:
 - Simple pet project, not over-engineered
 - Monorepo with pnpm workspaces
-- Three main modules: API, Database, Parser
+- Four main modules: API, Database, Parser, Shared
 - REST API with API key authentication
 - Docker Compose for deployment
 
@@ -238,14 +238,14 @@ docs/
 ## Technology Stack
 
 ### Core Technologies
-- **Runtime**: Node.js with TypeScript
-- **Package Manager**: pnpm with workspaces
+- **Runtime**: Node.js 20+ with TypeScript 5.9.3
+- **Package Manager**: pnpm 10.27.0 with workspaces and catalog feature
 - **API Framework**: Fastify
 - **Database ORM**: Drizzle ORM
 - **Databases**: PostgreSQL (production), SQLite (development)
 - **HTML Parser**: Cheerio
-- **HTTP Client**: Axios
-- **Testing**: Vitest
+- **HTTP Client**: Got
+- **Testing**: Vitest 3.2.4
 - **Containerization**: Docker & Docker Compose
 
 ### Supporting Libraries
@@ -254,6 +254,14 @@ docs/
 - **Logging**: pino (Fastify default)
 - **Rate Limiting**: @fastify/rate-limit
 - **Concurrency**: p-limit
+
+### Key Configuration Choices
+- **pnpm Catalogs**: Centralized dependency management across packages
+- **TypeScript Composite Projects**: Enabled for monorepo support (composite: true)
+- **Module Resolution**: Set to "bundler" for Node 20+ compatibility
+- **ESM by Default**: All package.json files use "type": "module"
+- **Workspace Protocol**: Internal dependencies use workspace:* syntax
+- **Package References**: tsconfig files reference other packages for cross-package type checking
 
 ---
 
@@ -269,6 +277,7 @@ docs/
 - pnpm workspaces for code sharing
 - Separate packages for each module
 - Clear separation of concerns
+- Catalog feature for centralized dependency management
 
 ### Database Design
 - PostgreSQL for production (performance, reliability)
@@ -297,39 +306,42 @@ docs/
 
 ```
 hookah-db/
+├── package.json                 # Root package.json with workspace configuration
+├── pnpm-workspace.yaml         # Workspace definition with catalog
+├── tsconfig.json               # Root TypeScript configuration
+├── pnpm-lock.yaml              # Lock file (auto-generated)
 ├── packages/
-│   ├── api/              # API module
-│   │   ├── src/
-│   │   │   ├── server.ts
-│   │   │   ├── routes/
-│   │   │   ├── middleware/
-│   │   │   └── index.ts
-│   │   └── package.json
-│   ├── database/         # Database module
-│   │   ├── src/
-│   │   │   ├── schema.ts
-│   │   │   ├── client.ts
-│   │   │   ├── queries.ts
-│   │   │   └── index.ts
-│   │   ├── drizzle/
-│   │   └── package.json
-│   └── parser/           # Parser module
-│       ├── src/
-│       │   ├── http.ts
-│       │   ├── parser.ts
-│       │   ├── scroll.ts
-│       │   ├── extractor.ts
-│       │   ├── writer.ts
-│       │   └── index.ts
-│       └── package.json
-├── docs/                 # Documentation
-├── examples/             # Example HTML files
-├── docker-compose.yml    # Production compose
-├── docker-compose.dev.yml # Development compose
-├── .env.example          # Environment variables example
-├── package.json          # Root package.json
-├── pnpm-workspace.yaml   # Workspace configuration
-└── tsconfig.json         # TypeScript configuration
+│   ├── api/
+│   │   ├── package.json        # API module package.json
+│   │   ├── tsconfig.json       # API TypeScript config
+│   │   └── src/
+│   │       └── index.ts        # API entry point
+│   ├── parser/
+│   │   ├── package.json        # Parser module package.json
+│   │   ├── tsconfig.json       # Parser TypeScript config
+│   │   └── src/
+│   │       └── index.ts        # Parser entry point
+│   ├── database/
+│   │   ├── package.json        # Database module package.json
+│   │   ├── tsconfig.json       # Database TypeScript config
+│   │   └── src/
+│   │       └── index.ts        # Database entry point
+│   └── shared/
+│       ├── package.json        # Shared module package.json
+│       ├── tsconfig.json       # Shared TypeScript config
+│       └── src/
+│           └── index.ts        # Shared entry point
+├── docs/                       # Documentation
+│   ├── modules/               # Module-specific documentation
+│   ├── architecture.md        # This file
+│   ├── database.md            # Database schema documentation
+│   ├── api.md                 # API endpoints documentation
+│   └── implementation.md      # Implementation plan
+├── examples/                   # Example HTML files
+├── .gitignore                  # Git ignore file
+├── docker-compose.yml          # Production deployment (to be created)
+├── docker-compose.dev.yml      # Local development (to be created)
+└── .env.example               # Environment variables template (to be created)
 ```
 
 ---

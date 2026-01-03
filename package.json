@@ -1,0 +1,20 @@
+{
+  "name": "hookah-db",
+  "version": "0.1.0",
+  "type": "module",
+  "packageManager": "pnpm@10.27.0",
+  "private": true,
+  "scripts": {
+    "build": "pnpm --filter './packages/**' build",
+    "test": "pnpm --filter './packages/**' test",
+    "dev": "pnpm --filter './packages/**' dev",
+    "lint": "pnpm --filter './packages/**' lint",
+    "clean": "pnpm --filter './packages/**' clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "@types/node": "catalog:",
+    "vitest": "catalog:",
+    "@vitest/ui": "catalog:"
+  }
+}

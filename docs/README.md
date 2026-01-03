@@ -123,23 +123,42 @@ sequenceDiagram
 
 ```
 hookah-db/
+├── package.json                 # Root package.json with workspace configuration
+├── pnpm-workspace.yaml         # Workspace definition with catalog
+├── tsconfig.json               # Root TypeScript configuration
+├── pnpm-lock.yaml              # Lock file (auto-generated)
 ├── packages/
-│   ├── api/              # REST API server
-│   ├── parser/           # HTML parser service
-│   ├── database/         # Database schema & migrations
-│   └── shared/           # Shared types & utilities
-├── examples/             # HTML examples for testing
-├── docs/                 # Documentation
-│   ├── modules/         # Module-specific documentation
-│   ├── architecture.md  # This file
-│   ├── database.md      # Database schema documentation
-│   ├── api.md           # API endpoints documentation
-│   └── implementation.md # Implementation plan
-├── docker-compose.yml    # Production deployment
-├── docker-compose.dev.yml # Local development
-├── package.json         # Root package.json
-├── pnpm-workspace.yaml  # Workspace configuration
-└── .env.example         # Environment variables template
+│   ├── api/
+│   │   ├── package.json        # API module package.json
+│   │   ├── tsconfig.json       # API TypeScript config
+│   │   └── src/
+│   │       └── index.ts        # API entry point
+│   ├── parser/
+│   │   ├── package.json        # Parser module package.json
+│   │   ├── tsconfig.json       # Parser TypeScript config
+│   │   └── src/
+│   │       └── index.ts        # Parser entry point
+│   ├── database/
+│   │   ├── package.json        # Database module package.json
+│   │   ├── tsconfig.json       # Database TypeScript config
+│   │   └── src/
+│   │       └── index.ts        # Database entry point
+│   └── shared/
+│       ├── package.json        # Shared module package.json
+│       ├── tsconfig.json       # Shared TypeScript config
+│       └── src/
+│           └── index.ts        # Shared entry point
+├── docs/                       # Documentation
+│   ├── modules/               # Module-specific documentation
+│   ├── architecture.md        # This file
+│   ├── database.md            # Database schema documentation
+│   ├── api.md                 # API endpoints documentation
+│   └── implementation.md      # Implementation plan
+├── examples/                   # Example HTML files
+├── .gitignore                  # Git ignore file
+├── docker-compose.yml          # Production deployment (to be created)
+├── docker-compose.dev.yml      # Local development (to be created)
+└── .env.example               # Environment variables template (to be created)
 ```
 
 ---
@@ -148,15 +167,24 @@ hookah-db/
 
 ### Core Technologies
 
-- **Package Manager**: pnpm with workspace support
-- **Runtime**: Node.js 20+ with TypeScript
+- **Package Manager**: pnpm 10.27.0 with workspace support and catalog feature
+- **Runtime**: Node.js 20+ with TypeScript 5.9.3
 - **API Framework**: Fastify (modern, fast, TypeScript-friendly)
 - **Database**: PostgreSQL 15+ (production) / SQLite (development)
 - **ORM**: Drizzle ORM (lightweight, type-safe)
 - **HTML Parser**: Cheerio (jQuery-like syntax for Node.js)
 - **HTTP Client**: Got (modern, promise-based)
-- **Testing**: Vitest (fast, native ESM support)
+- **Testing**: Vitest 3.2.4 (fast, native ESM support)
 - **Containerization**: Docker & Docker Compose
+
+### Key Configuration Choices
+
+- **pnpm Catalogs**: Centralized dependency management across packages
+- **TypeScript Composite Projects**: Enabled for monorepo support (composite: true)
+- **Module Resolution**: Set to "bundler" for Node 20+ compatibility
+- **ESM by Default**: All package.json files use "type": "module"
+- **Workspace Protocol**: Internal dependencies use workspace:* syntax
+- **Package References**: tsconfig files reference other packages for cross-package type checking
 
 ### Why These Choices?
 
@@ -164,7 +192,7 @@ hookah-db/
 - **Drizzle ORM**: Lightweight, type-safe SQL, no heavy abstractions
 - **Cheerio**: Fast HTML parsing, familiar jQuery syntax
 - **Vitest**: Fast test runner, excellent TypeScript support
-- **pnpm**: Efficient disk space usage, strict workspace management
+- **pnpm**: Efficient disk space usage, strict workspace management, catalog feature for dependency deduplication
 
 ---
 
