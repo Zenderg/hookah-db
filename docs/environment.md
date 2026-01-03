@@ -202,36 +202,63 @@ NODE_ENV=production
 
 ### Environment Variable Validation
 
-The application validates environment variables on startup:
+The application uses [`@t3-oss/env-core`](https://env.t3.gg/) with Zod schemas for type-safe environment variable validation:
 
+**Location**: [`packages/shared/src/config.ts`](../packages/shared/src/config.ts)
+
+**Implementation**:
 ```typescript
-function validateEnv() {
-  const required = [
-    'DATABASE_URL',
-    'API_PORT',
-  ];
-  
-  const missing = required.filter(key => !process.env[key]);
-  
-  if (missing.length > 0) {
-    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
-  }
-  
-  // Validate numeric values
-  if (process.env.API_PORT) {
-    const port = parseInt(process.env.API_PORT);
-    if (isNaN(port) || port < 1 || port > 65535) {
-      throw new Error('API_PORT must be a valid port number (1-65535)');
-    }
-  }
-  
-  // Validate log level
-  const validLogLevels = ['debug', 'info', 'warn', 'error'];
-  if (process.env.LOG_LEVEL && !validLogLevels.includes(process.env.LOG_LEVEL)) {
-    throw new Error(`LOG_LEVEL must be one of: ${validLogLevels.join(', ')}`);
-  }
-}
+import { createEnv } from '@t3-oss/env-core';
+import { z } from 'zod';
+
+export const env = createEnv({
+  server: {
+    DATABASE_URL: z.string().url(),
+    API_PORT: z.coerce.number().int().positive().default(3000),
+    API_HOST: z.string().default('0.0.0.0'),
+    PARSER_BASE_URL: z.string().url().default('https://htreviews.org'),
+    PARSER_CONCURRENT_REQUESTS: z.coerce.number().int().positive().default(3),
+    PARSER_SCROLL_DELAY_MS: z.coerce.number().int().nonnegative().default(1000),
+    PARSER_MAX_RETRIES: z.coerce.number().int().nonnegative().default(3),
+    PARSER_TIMEOUT_MS: z.coerce.number().int().positive().default(30000),
+    LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
+    LOG_FORMAT: z.enum(['json', 'pretty']).default('json'),
+    NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+    RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60000),
+    RATE_LIMIT_MAX_REQUESTS: z.coerce.number().int().positive().default(100),
+  },
+  runtimeEnv: process.env,
+});
 ```
+
+**Features**:
+- Type-safe access to environment variables
+- Automatic validation at startup (throws if required variables are missing or invalid)
+- Default values for optional variables
+- Type coercion for numeric values
+- Enum validation for specific value sets
+
+**Usage**:
+```typescript
+import { env, isDevelopment, apiConfig } from '@hookah-db/shared';
+
+// Access validated environment variables
+const port = env.API_PORT;
+
+// Use convenience functions
+if (isDevelopment) {
+  console.log('Running in development mode');
+}
+
+// Use typed config objects
+const server = fastify({ port: apiConfig.port, host: apiConfig.host });
+```
+
+**Available Exports**:
+- `env` - Validated environment object
+- `isDevelopment`, `isProduction`, `isTest` - Boolean helpers
+- `dbConfig`, `apiConfig`, `parserConfig`, `loggingConfig`, `rateLimitConfig` - Typed config objects
+- `Env`, `DbConfig`, `ApiConfig`, `ParserConfig`, `LoggingConfig`, `RateLimitConfig` - TypeScript types
 
 ---
 
@@ -241,7 +268,7 @@ If an environment variable is not set, the application uses these defaults:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DATABASE_URL` | `./local.db` | SQLite database file |
+| `DATABASE_URL` | Required (no default) | Database connection string |
 | `API_PORT` | `3000` | API server port |
 | `API_HOST` | `0.0.0.0` | Bind to all interfaces |
 | `PARSER_BASE_URL` | `https://htreviews.org` | htreviews.org URL |
@@ -252,6 +279,8 @@ If an environment variable is not set, the application uses these defaults:
 | `LOG_LEVEL` | `info` | Info level logging |
 | `LOG_FORMAT` | `json` | JSON log format |
 | `NODE_ENV` | `development` | Development mode |
+| `RATE_LIMIT_WINDOW_MS` | `60000` | 60 second rate limit window |
+| `RATE_LIMIT_MAX_REQUESTS` | `100` | Max requests per window |
 
 ---
 

@@ -12,9 +12,13 @@
     "clean": "pnpm --filter './packages/**' clean && rm -rf node_modules"
   },
   "devDependencies": {
-    "typescript": "catalog:",
     "@types/node": "catalog:",
-    "vitest": "catalog:",
-    "@vitest/ui": "catalog:"
+    "@vitest/ui": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "dependencies": {
+    "@t3-oss/env-core": "^0.13.10",
+    "zod": "^4.3.4"
   }
 }

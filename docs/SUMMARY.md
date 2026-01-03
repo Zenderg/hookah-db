@@ -249,6 +249,7 @@ docs/
 - **Containerization**: Docker & Docker Compose
 
 ### Supporting Libraries
+- **Environment Management**: @t3-oss/env-core
 - **Validation**: Zod
 - **UUID**: crypto.randomUUID()
 - **Logging**: pino (Fastify default)

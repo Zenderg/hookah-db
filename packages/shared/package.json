@@ -12,6 +12,10 @@
     "lint": "eslint src",
     "clean": "rm -rf dist"
   },
+  "dependencies": {
+    "@t3-oss/env-core": "^0.13.10",
+    "zod": "^4.3.4"
+  },
   "devDependencies": {
     "typescript": "catalog:",
     "@types/node": "catalog:",
