@@ -18,7 +18,7 @@ gantt
     Migration System Setup           :done,   db, 2026-01-06, 1d
     section Parser
     HTTP Client Implementation      :done,   parser, 2026-01-07, 1d
-    Scroll Handler Implementation   :parser,  2026-01-08, 1d
+    Scroll Handler Implementation   :done,   parser, 2026-01-08, 1d
     Brand Parser Implementation     :parser,  2026-01-09, 1d
     Tobacco Parser Implementation   :parser,  2026-01-10, 1d
     Data Normalizer Implementation :parser,  2026-01-11, 1d
@@ -151,7 +151,7 @@ gantt
 
 ---
 
-### Step 3.2: Implement Scroll Handler
+### Step 3.2: Implement Scroll Handler ✅
 
 **Objective**: Handle infinite scroll on htreviews.org pages.
 

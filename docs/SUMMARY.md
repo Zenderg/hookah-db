@@ -251,6 +251,14 @@ docs/
 - Handles retryable HTTP status codes: 429, 500, 502, 503, 504
 - Handles network errors: ETIMEDOUT, ECONNRESET, EADDRINUSE, ECONNREFUSED, EPIPE, ENOTFOUND, ENETUNREACH, EAI_AGAIN
 - Cheerio for HTML parsing
+- **Scroll Handler** ([`packages/parser/src/scroll/handler.ts`](packages/parser/src/scroll/handler.ts)) for infinite scroll support:
+  - Uses offset/limit pagination parameters
+  - Extracts metadata from HTML data attributes
+  - Aggregates content from multiple scroll loads
+  - Configurable delay between requests via `PARSER_SCROLL_DELAY_MS`
+  - Supports maximum item limit for controlled parsing
+  - Integrates with HttpClient for rate limiting
+  - Provides convenience function [`fetchAllScrollContent()`](packages/parser/src/scroll/handler.ts) for quick usage
 - Infinite scroll handling
 - Batch operations for efficiency
 - CLI for running parser
@@ -324,7 +332,13 @@ docs/
 ### Parser Design
 - Retry logic (handle network issues)
 - Rate limiting (respect htreviews.org)
-- Infinite scroll support (get all data)
+- **Scroll Handler** (infinite scroll support with pagination)
+  - Server-side rendering detection via HTMX
+  - Incremental requests with offset/limit parameters
+  - Metadata extraction from HTML data attributes
+  - Content aggregation from multiple scroll loads
+  - Configurable delays between requests
+  - Maximum item limit support
 - Batch operations (efficiency)
 - CLI interface (easy to use)
 
@@ -350,6 +364,9 @@ hookah-db/
 │   │   └── src/
 │   │       ├── http/
 │   │       │   └── client.ts   # HTTP client implementation
+│   │       ├── scroll/
+│   │       │   ├── handler.ts   # Scroll handler implementation ✅
+│   │       │   └── index.ts     # Scroll module exports
 │   │       └── index.ts        # Parser entry point
 │   ├── database/
 │   │   ├── package.json        # Database module package.json
