@@ -157,6 +157,232 @@ pnpm --filter @hookah-db/database db:studio
 
 ---
 
+### Migration System Configuration
+
+The migration system is configured using Drizzle Kit v0.31.8 and supports dual-database deployment:
+
+**Dual-Database Support**:
+- **Development**: SQLite database with file-based storage (`file:./dev.db`)
+- **Production**: PostgreSQL database with network connection
+
+**Drizzle Kit Configuration** (`packages/database/src/drizzle.config.ts`):
+```typescript
+import type { Config } from 'drizzle-kit';
+
+export default {
+  schema: './src/schema',
+  out: './migrations',
+  dialect: 'sqlite', // Uses SQLite for development
+  driver: 'better-sqlite',
+  dbCredentials: {
+    url: process.env.DATABASE_URL,
+  },
+  verbose: true,
+  strict: true,
+} satisfies Config;
+```
+
+**Migration Directory Structure**:
+```
+packages/database/migrations/
+├── 0000_bored_nebula.sql    # Initial migration
+└── meta/                     # Migration metadata
+    ├── _journal.json         # Migration journal
+    └── 0000_snapshot.json    # Schema snapshot
+```
+
+**Available Migration Scripts**:
+- `db:generate` - Generate migrations from schema changes
+- `db:migrate` - Apply migrations to database
+- `db:push` - Push schema directly (development only)
+- `db:studio` - Open Drizzle Studio for database inspection
+
+---
+
+### SQLite-Specific Schemas
+
+SQLite schemas are separate from PostgreSQL schemas due to differences in column types and constraints:
+
+**Why Separate Schemas?**:
+- PostgreSQL uses `uuid` type, SQLite uses `text` with custom functions
+- PostgreSQL uses `timestamp` type, SQLite uses `text` with ISO format
+- Index creation syntax differs between databases
+- Foreign key constraints require different implementations
+
+**SQLite Schema Files** (`packages/database/src/schema/sqlite/`):
+
+**brands.ts**:
+```typescript
+import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import { sql } from 'drizzle-orm';
+
+export const brands = sqliteTable('brands', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name: text('name').notNull(),
+  slug: text('slug').notNull(),
+  description: text('description'),
+  imageUrl: text('image_url'),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).$onUpdate(() => new Date()),
+  parsedAt: integer('parsed_at', { mode: 'timestamp' }),
+}, (table) => ({
+  nameIdx: sql`CREATE INDEX IF NOT EXISTS brands_name_idx ON brands(name)`,
+  slugIdx: sql`CREATE UNIQUE INDEX IF NOT EXISTS brands_slug_idx ON brands(slug)`,
+}));
+```
+
+**tobaccos.ts**:
+```typescript
+import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import { sql } from 'drizzle-orm';
+import { brands } from './brands';
+
+export const tobaccos = sqliteTable('tobaccos', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  brandId: text('brand_id').notNull().references(() => brands.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  slug: text('slug').notNull(),
+  description: text('description'),
+  imageUrl: text('image_url'),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).$onUpdate(() => new Date()),
+  parsedAt: integer('parsed_at', { mode: 'timestamp' }),
+}, (table) => ({
+  brandIdIdx: sql`CREATE INDEX IF NOT EXISTS tobaccos_brand_id_idx ON tobaccos(brand_id)`,
+  nameIdx: sql`CREATE INDEX IF NOT EXISTS tobaccos_name_idx ON tobaccos(name)`,
+  slugIdx: sql`CREATE UNIQUE INDEX IF NOT EXISTS tobaccos_slug_idx ON tobaccos(slug)`,
+}));
+```
+
+**api-keys.ts**:
+```typescript
+import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import { sql } from 'drizzle-orm';
+
+export const apiKeys = sqliteTable('api_keys', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name: text('name').notNull(),
+  keyHash: text('key_hash').notNull(),
+  isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+  createdAt: integer('created_at', { mode: 'timestamp' }).defaultNow(),
+}, (table) => ({
+  keyHashIdx: sql`CREATE UNIQUE INDEX IF NOT EXISTS api_keys_key_hash_idx ON api_keys(key_hash)`,
+  isActiveIdx: sql`CREATE INDEX IF NOT EXISTS api_keys_is_active_idx ON api_keys(is_active)`,
+}));
+```
+
+**index.ts**:
+```typescript
+export * from './brands';
+export * from './tobaccos';
+export * from './api-keys';
+```
+
+---
+
+### Migration Workflow
+
+The migration workflow follows these steps:
+
+**1. Generate Migrations**:
+```bash
+pnpm --filter @hookah-db/database db:generate
+```
+This command:
+- Compares current schema with last migration snapshot
+- Generates SQL migration file in `migrations/` directory
+- Creates new snapshot in `migrations/meta/` directory
+
+**2. Apply Migrations**:
+```bash
+# For development (SQLite)
+pnpm --filter @hookah-db/database db:migrate
+
+# For production (PostgreSQL)
+pnpm --filter @hookah-db/database db:migrate
+```
+This command:
+- Executes all pending migrations
+- Updates migration journal
+- Creates/updates database schema
+
+**3. Push Schema Directly (Development Only)**:
+```bash
+pnpm --filter @hookah-db/database db:push
+```
+This command:
+- Pushes schema directly to database without migration files
+- Useful for rapid development and testing
+- Should NOT be used in production
+
+**4. Open Drizzle Studio**:
+```bash
+pnpm --filter @hookah-db/database db:studio
+```
+This command:
+- Opens Drizzle Studio web interface
+- Allows visual inspection of database
+- Supports querying and data manipulation
+
+---
+
+### Generated Migration Files
+
+**Initial Migration** (`migrations/0000_bored_nebula.sql`):
+```sql
+-- Create brands table
+CREATE TABLE IF NOT EXISTS brands (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  slug TEXT NOT NULL,
+  description TEXT,
+  image_url TEXT,
+  updated_at INTEGER,
+  parsed_at INTEGER
+);
+
+-- Create tobaccos table
+CREATE TABLE IF NOT EXISTS tobaccos (
+  id TEXT PRIMARY KEY,
+  brand_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  slug TEXT NOT NULL,
+  description TEXT,
+  image_url TEXT,
+  updated_at INTEGER,
+  parsed_at INTEGER,
+  FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
+);
+
+-- Create api_keys table
+CREATE TABLE IF NOT EXISTS api_keys (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  key_hash TEXT NOT NULL,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL
+);
+
+-- Create indexes
+CREATE INDEX IF NOT EXISTS brands_name_idx ON brands(name);
+CREATE UNIQUE INDEX IF NOT EXISTS brands_slug_idx ON brands(slug);
+CREATE INDEX IF NOT EXISTS tobaccos_brand_id_idx ON tobaccos(brand_id);
+CREATE INDEX IF NOT EXISTS tobaccos_name_idx ON tobaccos(name);
+CREATE UNIQUE INDEX IF NOT EXISTS tobaccos_slug_idx ON tobaccos(slug);
+CREATE UNIQUE INDEX IF NOT EXISTS api_keys_key_hash_idx ON api_keys(key_hash);
+CREATE INDEX IF NOT EXISTS api_keys_is_active_idx ON api_keys(is_active);
+```
+
+**Migration Metadata** (`migrations/meta/`):
+- `_journal.json` - Tracks applied migrations
+- `0000_snapshot.json` - Schema snapshot for migration 0000
+
+**What the Initial Migration Creates**:
+- 3 tables: `brands`, `tobaccos`, `api_keys`
+- 7 indexes for query optimization
+- Foreign key constraint with cascade delete
+- Unique constraints on slugs and key_hash
+
+---
+
 ### 4. Query Helpers (`src/queries.ts`)
 
 Provides helper functions for common database operations.
@@ -452,54 +678,53 @@ export async function checkConnection(): Promise<boolean> {
 
 ### Migration Files
 
-Migrations are stored in `drizzle/` directory:
+Migrations are stored in `migrations/` directory:
 
 ```
-drizzle/
-├── 0001_initial.sql
-├── 0002_add_indexes.sql
-├── 0003_update_schema.sql
-└── meta/
-    ├── 0001.json
-    ├── 0002.json
-    └── 0003.json
+migrations/
+├── 0000_bored_nebula.sql
+├── meta/
+│   ├── _journal.json
+│   └── 0000_snapshot.json
+└── (future migrations)
 ```
 
 ### Migration Example
 
 ```sql
--- 0001_initial.sql
+-- 0000_bored_nebula.sql
 
 -- Brands table
 CREATE TABLE IF NOT EXISTS brands (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name VARCHAR(255) NOT NULL,
-  slug VARCHAR(255) NOT NULL UNIQUE,
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  slug TEXT NOT NULL,
   description TEXT,
-  image_url VARCHAR(500),
-  updated_at TIMESTAMP,
-  parsed_at TIMESTAMP
+  image_url TEXT,
+  updated_at INTEGER,
+  parsed_at INTEGER
 );
 
 -- Tobaccos table
 CREATE TABLE IF NOT EXISTS tobaccos (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  brand_id UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
-  name VARCHAR(255) NOT NULL,
-  slug VARCHAR(255) NOT NULL,
+  id TEXT PRIMARY KEY,
+  brand_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  slug TEXT NOT NULL,
   description TEXT,
-  image_url VARCHAR(500),
-  updated_at TIMESTAMP,
-  parsed_at TIMESTAMP
+  image_url TEXT,
+  updated_at INTEGER,
+  parsed_at INTEGER,
+  FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
 );
 
 -- API Keys table
 CREATE TABLE IF NOT EXISTS api_keys (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name VARCHAR(255) NOT NULL,
-  key_hash TEXT NOT NULL UNIQUE,
-  is_active BOOLEAN NOT NULL DEFAULT true,
-  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  key_hash TEXT NOT NULL,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL
 );
 
 -- Indexes
@@ -689,11 +914,13 @@ export async function transaction<T>(
 The database module provides:
 
 - **Schema Definitions**: Clear table definitions with Drizzle ORM
-- **Migration System**: Versioned database migrations
+- **Migration System**: Versioned database migrations with dual-database support
 - **Query Helpers**: Reusable database query functions
 - **Upsert Operations**: Update or insert data easily
 - **Type Safety**: Full TypeScript support
 - **Multi-Database**: PostgreSQL and SQLite support
+- **Migration Workflow**: Generate, apply, and manage migrations
+- **SQLite-Specific Schemas**: Separate schemas for SQLite compatibility
 
 For API module documentation, see [`api.md`](api.md).
 For parser module documentation, see [`parser.md`](parser.md).

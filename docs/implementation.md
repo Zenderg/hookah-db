@@ -15,7 +15,7 @@ gantt
     Environment Configuration        :done,   env, 2026-01-04, 1d
     section Database
     Database Schema Definition        :done,   db, 2026-01-05, 1d
-    Migration System Setup           :db,     2026-01-06, 1d
+    Migration System Setup           :done,   db, 2026-01-06, 1d
     section Parser
     HTTP Client Implementation      :parser,  2026-01-07, 1d
     Scroll Handler Implementation   :parser,  2026-01-08, 1d
@@ -99,7 +99,7 @@ gantt
 
 ---
 
-### Step 2.2: Set Up Migration System
+### Step 2.2: Set Up Migration System ✅ (Completed 2026-01-03)
 
 **Objective**: Configure Drizzle Kit for migrations.
 

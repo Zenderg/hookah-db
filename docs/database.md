@@ -192,7 +192,32 @@ The schema follows 3NF principles:
 
 ---
 
+## Schema Structure
+
+**Schema Structure**:
+- PostgreSQL schemas are in `packages/database/src/schema/` directory
+- SQLite schemas are in `packages/database/src/schema/sqlite/` directory
+- `brands.ts` - brands table definition with indexes
+- `tobaccos.ts` - tobaccos table definition with foreign key and indexes
+- `api-keys.ts` - api_keys table definition with indexes
+- `index.ts` - exports all schema definitions
+
+---
+
 ## Migration Strategy
+
+The project uses Drizzle Kit for database migrations:
+
+- **Development**: SQLite database with file-based storage
+- **Production**: PostgreSQL database with network connection
+- **Migration Tool**: Drizzle Kit v0.31.8
+- **Migration Directory**: `packages/database/migrations/`
+
+**Available Scripts**:
+- `db:generate` - Generate migrations from schema changes
+- `db:migrate` - Apply migrations to database
+- `db:push` - Push schema directly (development only)
+- `db:studio` - Open Drizzle Studio for database inspection
 
 ### Development
 
@@ -274,5 +299,6 @@ This database schema provides a solid foundation for storing and querying hookah
 - **Maintainable**: Clear relationships and constraints
 - **Extensible**: Easy to add new features
 - **Simple**: Minimal data, only essential information stored
+- **Dual-Database**: Supports both SQLite (development) and PostgreSQL (production)
 
 For implementation details, see [`docs/modules/database.md`](docs/modules/database.md).

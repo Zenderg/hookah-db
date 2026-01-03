@@ -69,7 +69,8 @@ docs/
 - **api_keys**: API key management (id, name, keyHash, isActive, createdAt)
 
 **Schema Structure**:
-- Schema is split into separate files in `packages/database/src/schema/` directory
+- PostgreSQL schemas are in `packages/database/src/schema/` directory
+- SQLite schemas are in `packages/database/src/schema/sqlite/` directory
 - `brands.ts` - brands table definition with indexes
 - `tobaccos.ts` - tobaccos table definition with foreign key and indexes
 - `api-keys.ts` - api_keys table definition with indexes
@@ -88,6 +89,7 @@ docs/
 - Foreign key relationship from tobaccos to brands with cascade delete
 - Unique constraints on slugs
 - Indexes created on frequently queried columns for performance
+- Dual-database support: SQLite for development, PostgreSQL for production
 
 ---
 
@@ -221,6 +223,8 @@ docs/
 - Transaction support
 - Unit tests for queries
 - Indexes for performance
+- Dual-database support with SQLite-specific schemas
+- Migration workflow with generate, migrate, push, and studio commands
 
 ---
 
@@ -302,6 +306,7 @@ docs/
 - Foreign key constraints (data integrity)
 - Unique constraints (prevent duplicates)
 - Indexes on frequently queried columns (performance)
+- Dual-database support with separate schemas for SQLite compatibility
 
 ### API Design
 - RESTful conventions
@@ -342,8 +347,18 @@ hookah-db/
 │   │   ├── package.json        # Database module package.json
 │   │   ├── tsconfig.json       # Database TypeScript config
 │   │   ├── drizzle.config.ts   # Drizzle Kit configuration
+│   │   ├── migrations/         # Database migration files
+│   │   │   ├── 0000_bored_nebula.sql  # Initial migration
+│   │   │   └── meta/          # Migration metadata
+│   │   │       ├── _journal.json
+│   │   │       └── 0000_snapshot.json
 │   │   └── src/
-│   │       ├── schema/         # Schema definitions
+│   │       ├── schema/         # PostgreSQL schema definitions
+│   │       │   ├── brands.ts
+│   │       │   ├── tobaccos.ts
+│   │       │   ├── api-keys.ts
+│   │       │   └── index.ts
+│   │       ├── schema/sqlite/  # SQLite schema definitions
 │   │       │   ├── brands.ts
 │   │       │   ├── tobaccos.ts
 │   │       │   ├── api-keys.ts
@@ -433,3 +448,10 @@ If you have any questions about the documentation or need clarification on any a
 ## Summary
 
 This documentation provides a complete guide for implementing the Hookah Tobacco Database API project. The architecture is designed to be simple and maintainable, focusing on core functionality without over-engineering. All documentation is in English as requested, and the project is structured as a monorepo with pnpm workspaces for easy development and deployment.
+
+The project features:
+- **Dual-database support**: SQLite for development, PostgreSQL for production
+- **Migration system**: Drizzle Kit with versioned migrations
+- **SQLite-specific schemas**: Separate schema definitions for SQLite compatibility
+- **Comprehensive documentation**: All modules and features well-documented
+- **Simple architecture**: Focus on essential functionality without over-engineering

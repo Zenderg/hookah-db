@@ -9,19 +9,20 @@ This document describes all environment variables used across the Hookah Tobacco
 ### Database
 
 ```env
-DATABASE_URL=postgresql://user:password@localhost:5432/hookah_db
+DATABASE_URL=file:./dev.db
 ```
 
-**Description**: Connection string for PostgreSQL database (production) or SQLite file path (development).
+**Description**: Connection string for SQLite database (development) or PostgreSQL database (production).
 
 **Examples**:
-- Production: `postgresql://hookah_user:secure_password@db.example.com:5432/hookah_db`
-- Development: `./local.db`
+- Development (SQLite): `file:./dev.db`
+- Production (PostgreSQL): `postgresql://hookah_user:secure_password@db.example.com:5432/hookah_db`
 
 **Notes**:
-- For development, SQLite is used with a local file path
+- For development, SQLite is used with a file-based connection string
 - For production, PostgreSQL is used with full connection string
 - Connection string format: `postgresql://[user[:password]@][host][:port][/dbname]`
+- SQLite format: `file:[path/to/database.db]`
 
 ---
 
@@ -132,7 +133,7 @@ PARSER_CRON_SCHEDULE=0 2 * * *
 
 ```env
 # Database
-DATABASE_URL=./local.db
+DATABASE_URL=file:./dev.db
 
 # API
 API_PORT=3000
@@ -213,7 +214,7 @@ import { z } from 'zod';
 
 export const env = createEnv({
   server: {
-    DATABASE_URL: z.string().url(),
+    DATABASE_URL: z.string().min(1),
     API_PORT: z.coerce.number().int().positive().default(3000),
     API_HOST: z.string().default('0.0.0.0'),
     PARSER_BASE_URL: z.string().url().default('https://htreviews.org'),
@@ -296,6 +297,16 @@ If an environment variable is not set, the application uses these defaults:
 3. Check database credentials
 4. Ensure database is accessible from Docker container
 
+### SQLite File Not Found
+
+**Error**: `SQLITE_CANTOPEN: unable to open database file`
+
+**Solutions**:
+1. Check that the directory for the SQLite file exists
+2. Verify the DATABASE_URL path is correct
+3. Ensure the application has write permissions to the directory
+4. Create the directory if needed: `mkdir -p data`
+
 ### Parser Timeout
 
 **Error**: `Request timeout after 30000ms`
@@ -361,6 +372,7 @@ This environment variable configuration provides:
 - **Security**: Proper handling of sensitive data
 - **Validation**: Startup validation of required variables
 - **Flexibility**: Easy to adjust configuration
+- **Dual-Database Support**: SQLite for development, PostgreSQL for production
 
 For main documentation, see [`README.md`](README.md).
 For implementation details, see [`implementation.md`](implementation.md).
