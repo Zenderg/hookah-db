@@ -1,0 +1,21 @@
+{
+  "name": "@hookah-db/config",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shared configuration files for hookah-db monorepo",
+  "main": "index.js",
+  "files": [
+    "eslint",
+    "jest"
+  ],
+  "scripts": {
+    "build": "echo 'No build needed for config package'",
+    "dev": "echo 'No dev needed for config package'",
+    "type-check": "echo 'No type-check needed for config package'",
+    "clean": "echo 'No clean needed for config package'",
+    "lint": "echo 'No linting needed for config package'"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

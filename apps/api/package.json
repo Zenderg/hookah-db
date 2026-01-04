@@ -1,0 +1,31 @@
+{
+  "name": "@hookah-db/api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "API server for hookah-db",
+  "main": "dist/server.js",
+  "types": "dist/server.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "nodemon --exec ts-node src/server.ts",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "lint": "echo 'No linting configured for api app'",
+    "start": "node dist/server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@hookah-db/types": "workspace:*",
+    "@hookah-db/utils": "workspace:*",
+    "@hookah-db/services": "workspace:*",
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "nodemon": "^3.1.11",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  }
+}

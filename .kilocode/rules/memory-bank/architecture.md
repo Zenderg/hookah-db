@@ -42,59 +42,76 @@ graph TB
 
 ```
 hookah-db/
-├── src/
+├── apps/                  # Application packages
+│   ├── api/               # REST API server
+│   │   ├── src/
+│   │   │   ├── server.ts  # Express server setup
+│   │   │   ├── routes/    # API route definitions
+│   │   │   ├── middleware/# Express middleware
+│   │   │   └── controllers/# Request handlers
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   └── cli/               # CLI application
+│       ├── src/
+│       │   └── index.ts   # CLI entry point
+│       ├── package.json
+│       └── tsconfig.json
+├── packages/              # Shared packages
+│   ├── types/             # TypeScript interfaces and types
+│   │   ├── src/
+│   │   │   ├── brand.ts   # Brand interface
+│   │   │   ├── flavor.ts  # Flavor interface
+│   │   │   ├── line.ts    # Line interface
+│   │   │   ├── rating.ts  # RatingDistribution interface
+│   │   │   └── index.ts   # Type exports
+│   │   ├── package.json
+│   │   └── tsconfig.json
 │   ├── scraper/           # Web scraping module
-│   │   ├── index.ts       # Main scraper entry point
-│   │   ├── brands.ts      # Brand page scraper
-│   │   ├── flavors.ts     # Flavor page scraper
-│   │   └── parser.ts      # HTML parsing utilities
+│   │   ├── src/
+│   │   │   └── index.ts   # Main scraper entry point
+│   │   ├── package.json
+│   │   └── tsconfig.json
 │   ├── parser/            # Data parsing and transformation
-│   │   ├── brand.ts       # Brand data parser
-│   │   ├── flavor.ts      # Flavor data parser
-│   │   └── line.ts        # Line data parser
+│   │   ├── src/
+│   │   │   └── index.ts   # Data parser entry point
+│   │   ├── package.json
+│   │   └── tsconfig.json
 │   ├── cache/             # Caching layer
-│   │   ├── index.ts       # Cache interface
-│   │   ├── memory.ts      # In-memory cache implementation
-│   │   └── redis.ts       # Redis cache implementation (optional)
-│   ├── api/               # API server
-│   │   ├── server.ts      # Express/Fastify server setup
-│   │   ├── routes/        # API route definitions
-│   │   │   ├── brands.ts
-│   │   │   ├── flavors.ts
-│   │   │   └── health.ts
-│   │   ├── middleware/    # Express/Fastify middleware
-│   │   │   ├── auth.ts     # API key authentication
-│   │   │   ├── rateLimit.ts
-│   │   │   └── errorHandler.ts
-│   │   └── controllers/   # Request handlers
-│   │       ├── brands.ts
-│   │       └── flavors.ts
-│   ├── models/            # TypeScript interfaces and types
-│   │   ├── brand.ts
-│   │   ├── flavor.ts
-│   │   ├── line.ts
-│   │   └── rating.ts
+│   │   ├── src/
+│   │   │   └── index.ts   # Cache interface and implementations
+│   │   ├── package.json
+│   │   └── tsconfig.json
 │   ├── services/          # Business logic
-│   │   ├── scraper.ts     # Scraping orchestration
-│   │   ├── cache.ts       # Cache management
-│   │   └── data.ts        # Data access layer
+│   │   ├── src/
+│   │   │   └── index.ts   # Service orchestration
+│   │   ├── package.json
+│   │   └── tsconfig.json
 │   ├── utils/             # Utility functions
-│   │   ├── logger.ts
-│   │   ├── validator.ts
-│   │   └── formatter.ts
-│   └── index.ts           # Application entry point
+│   │   ├── src/
+│   │   │   └── index.ts   # Utility functions
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   ├── config/            # Shared configuration
+│   │   └── package.json
+│   └── tsconfig/          # Shared TypeScript configurations
+│       ├── base.json      # Base TypeScript config
+│       ├── node.json      # Node.js TypeScript config
+│       └── package.json
 ├── examples/              # Example HTML files for reference
 │   ├── htreviews.org_tobaccos_brands.html
 │   ├── htreviews.org_tobaccos_sarma.html
 │   └── htreviews.org_tobaccos_sarma_klassicheskaya_zima.html
-├── tests/                # Test files
+├── tests/                 # Test files
 │   ├── unit/
 │   └── integration/
-├── .kilocode/            # Kilo Code configuration
+├── .kilocode/             # Kilo Code configuration
 │   └── rules/
-│       └── memory-bank/  # Memory bank files
-├── package.json
-├── tsconfig.json
+│       └── memory-bank/   # Memory bank files
+├── pnpm-workspace.yaml    # pnpm workspace configuration
+├── turbo.json             # Turborepo configuration
+├── .npmrc                 # npm/pnpm configuration
+├── package.json           # Root package.json
+├── tsconfig.json          # Root TypeScript config
 └── README.md
 ```
 
@@ -206,12 +223,13 @@ GET /health
 
 ```mermaid
 graph LR
-    Scraper[Web Scraper] --> Parser[Data Parser]
-    Parser --> Models[TypeScript Models]
-    Parser --> Cache[Cache Layer]
-    Cache --> Controllers[API Controllers]
+    Scraper[@hookah-db/scraper] --> Parser[@hookah-db/parser]
+    Parser --> Types[@hookah-db/types]
+    Parser --> Cache[@hookah-db/cache]
+    Cache --> Services[@hookah-db/services]
+    Services --> Controllers[API Controllers]
     Controllers --> Routes[API Routes]
-    Routes --> Server[API Server]
+    Routes --> Server[@hookah-db/api]
     Auth[Auth Middleware] --> Server
     RateLimit[Rate Limit Middleware] --> Server
 ```
@@ -228,3 +246,26 @@ graph LR
 - **Factory Pattern**: Parser factory for different page types
 - **Middleware Pattern**: Express/Fastify middleware for cross-cutting concerns
 - **Strategy Pattern**: Different caching strategies (in-memory vs Redis)
+- **Monorepo Pattern**: Shared packages organized by dependency layer
+
+## Package Dependency Layers
+
+```
+Application Layer
+├── @hookah-db/api (depends on: services, utils, config)
+└── @hookah-db/cli (depends on: services, utils, config)
+
+Business Layer
+└── @hookah-db/services (depends on: scraper, parser, cache, types, utils)
+
+Core Layer
+├── @hookah-db/scraper (depends on: types, utils, config)
+├── @hookah-db/parser (depends on: types, utils, config)
+└── @hookah-db/cache (depends on: types, utils, config)
+
+Utility Layer
+├── @hookah-db/types (no dependencies)
+├── @hookah-db/utils (depends on: types)
+├── @hookah-db/config (no dependencies)
+└── @hookah-db/tsconfig (no dependencies)
+```

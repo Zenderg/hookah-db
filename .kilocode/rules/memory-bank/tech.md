@@ -8,6 +8,9 @@
 
 ### Package Management
 - **pnpm**: Fast, disk space efficient package manager (preferred over npm/yarn)
+- **pnpm Workspaces**: Monorepo workspace management
+- **Turborepo**: Build system for monorepo with intelligent caching and task orchestration
+- **@changesets/cli**: Version management and changelog generation for monorepo packages
 
 ### Web Scraping
 - **Cheerio**: Fast, flexible, and lean implementation of core jQuery for server-side HTML parsing
@@ -62,44 +65,109 @@
 
 ### Initial Setup Commands
 ```bash
-# Initialize project
-pnpm init
+# Install all dependencies across workspace
+pnpm install
 
-# Install TypeScript
-pnpm add -D typescript @types/node
+# Build all packages
+pnpm build
 
-# Install dependencies
-pnpm add cheerio axios express
-pnpm add -D @types/express
+# Run specific app in development mode
+pnpm --filter @hookah-db/api dev
 
-# Install development tools
-pnpm add -D nodemon ts-node jest @types/jest ts-jest supertest
+# Run CLI app
+pnpm --filter @hookah-db/cli start
+
+# Type-check all packages
+pnpm type-check
+
+# Clean all build artifacts
+pnpm clean
 ```
 
 ### TypeScript Configuration
-- **tsconfig.json**: TypeScript compiler configuration
+- **tsconfig.json**: Root TypeScript configuration
+- **packages/tsconfig/base.json**: Base TypeScript config shared across packages
+- **packages/tsconfig/node.json**: Node.js-specific TypeScript config
 - **Strict mode**: Enabled for maximum type safety
 - **Target**: ES2024 or newer
 - **Module system**: CommonJS or ESNext (depending on Node.js version)
 
 ## Project Structure
 
-### Directory Organization
+### Monorepo Organization
+
+The project uses a monorepo structure with pnpm workspaces and Turborepo for build orchestration:
+
 ```
-src/
-├── api/              # API layer
-├── cache/            # Caching implementations
-├── models/           # TypeScript interfaces/types
-├── parser/           # Data parsing logic
-├── scraper/          # Web scraping logic
-├── services/         # Business logic
-└── utils/            # Utility functions
+hookah-db/
+├── apps/                  # Application packages
+│   ├── api/               # REST API server
+│   │   ├── src/
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   └── cli/               # CLI application
+│       ├── src/
+│       ├── package.json
+│       └── tsconfig.json
+├── packages/              # Shared packages
+│   ├── types/             # TypeScript interfaces and types
+│   ├── scraper/           # Web scraping module
+│   ├── parser/            # Data parsing and transformation
+│   ├── cache/             # Caching layer
+│   ├── services/          # Business logic
+│   ├── utils/             # Utility functions
+│   ├── config/            # Shared configuration
+│   └── tsconfig/          # Shared TypeScript configurations
+├── pnpm-workspace.yaml    # pnpm workspace configuration
+├── turbo.json             # Turborepo configuration
+└── package.json           # Root package.json
+```
+
+### Package Naming Convention
+
+All packages use the `@hookah-db/*` naming convention:
+- `@hookah-db/api` - REST API server
+- `@hookah-db/cli` - CLI application
+- `@hookah-db/types` - TypeScript types and interfaces
+- `@hookah-db/scraper` - Web scraping module
+- `@hookah-db/parser` - Data parsing module
+- `@hookah-db/cache` - Caching layer
+- `@hookah-db/services` - Business logic services
+- `@hookah-db/utils` - Utility functions
+- `@hookah-db/config` - Shared configuration
+- `@hookah-db/tsconfig` - Shared TypeScript configurations
+
+### Workspace Dependencies
+
+Packages use the `workspace:*` protocol to reference other packages in the monorepo:
+
+```json
+{
+  "dependencies": {
+    "@hookah-db/types": "workspace:*",
+    "@hookah-db/utils": "workspace:*"
+  }
+}
 ```
 
 ### Build Process
-- **Development**: Use `ts-node` for direct TypeScript execution
-- **Production**: Compile TypeScript to JavaScript using `tsc`
-- **Watch mode**: `nodemon` with `ts-node` for development
+
+**Development**:
+- Use `pnpm --filter @hookah-db/api dev` to run specific apps in development mode
+- Turborepo handles dependency graph and parallel execution
+- Automatic rebuilds on file changes (via nodemon/ts-node)
+
+**Build All**:
+- `pnpm build` - Builds all packages in dependency order
+- Turborepo caches build artifacts for faster subsequent builds
+- TypeScript compilation to JavaScript
+
+**Type Checking**:
+- `pnpm type-check` - Type-checks all packages
+- Can be run on individual packages: `pnpm --filter @hookah-db/api type-check`
+
+**Clean**:
+- `pnpm clean` - Removes all build artifacts and cache
 
 ## Technical Constraints
 
@@ -152,6 +220,12 @@ src/
 - Pagination for large datasets
 - Filtering and sorting capabilities
 
+### Monorepo Development
+- Use `pnpm --filter <package>` to run commands on specific packages
+- Turborepo automatically handles dependency ordering
+- Shared types and utilities are imported via `@hookah-db/*` packages
+- Changes to shared packages trigger rebuilds of dependent packages
+
 ## Environment Variables
 
 ### Required Variables
@@ -173,12 +247,12 @@ src/
 ## Deployment Considerations
 
 ### Development
-- Use `nodemon` for hot-reloading
+- Use `pnpm --filter @hookah-db/api dev` for hot-reloading
 - Run with `ts-node` for TypeScript support
 - Local caching (in-memory)
 
 ### Production
-- Compile TypeScript to JavaScript
+- Build all packages with `pnpm build`
 - Use process manager (PM2, systemd)
 - Consider Redis for distributed caching
 - Implement proper logging (winston, pino)
@@ -192,12 +266,16 @@ src/
 - Track rate limit violations
 - Monitor server resources (CPU, memory, disk)
 
-## Installed Dependencies (as of 2026-01-03)
+## Installed Dependencies (as of 2026-01-04)
 
 ### Core Dependencies
 - cheerio: 1.1.2
 - axios: 1.13.2
 - express: 5.2.1
+
+### Build & Workspace Tools
+- turbo: 2.0+
+- @changesets/cli: Latest
 
 ### TypeScript & Type Definitions
 - typescript: 5.9.3

@@ -4,23 +4,35 @@
 
 **Project Phase**: Development
 
-The project has moved from planning to active development. The repository now contains:
+The project has been restructured as a monorepo using pnpm workspaces and Turborepo. The repository now contains:
 - Example HTML files from htreviews.org for reference (brands listing, brand detail page, flavor detail page)
-- Complete project structure with `.kilocode` configuration
+- Complete monorepo structure with `.kilocode` configuration
 - Development environment fully configured with TypeScript, Express.js, and all dependencies
-- Package configuration ([`package.json`](package.json:1))
-- TypeScript configuration ([`tsconfig.json`](tsconfig.json:1))
+- Workspace configuration files ([`pnpm-workspace.yaml`](pnpm-workspace.yaml:1), [`turbo.json`](turbo.json:1), [`.npmrc`](.npmrc:1))
+- Root package configuration ([`package.json`](package.json:1))
+- Root TypeScript configuration ([`tsconfig.json`](tsconfig.json:1))
 - Git ignore rules ([`.gitignore`](.gitignore:1))
-- Application entry point ([`src/index.ts`](src/index.ts:1))
-- Complete data models in [`src/models/`](src/models/) directory
+- Application packages in [`apps/`](apps/) directory (api, cli)
+- Shared packages in [`packages/`](packages/) directory (types, utils, scraper, parser, cache, services, config, tsconfig)
+- Complete data models in [`packages/types/src/`](packages/types/src/) directory
 
 ## Recent Changes
 
+- **Monorepo Migration** (2026-01-04):
+  - Migrated from single-package structure to monorepo using pnpm workspaces
+  - Added Turborepo for build orchestration and caching
+  - Added @changesets/cli for version management
+  - Restructured codebase into apps/ and packages/ directories
+  - Created workspace configuration files: [`pnpm-workspace.yaml`](pnpm-workspace.yaml:1), [`turbo.json`](turbo.json:1), [`.npmrc`](.npmrc:1)
+  - Set up package naming convention: @hookah-db/* for all packages
+  - Configured workspace:* protocol for internal dependencies
+  - Organized packages by dependency layer (utility, core, business, application)
+
 - **Data Models Implementation** (2026-01-03):
-  - Created [`src/models/rating.ts`](src/models/rating.ts) - RatingDistribution interface for rating statistics
-  - Created [`src/models/line.ts`](src/models/line.ts) - Line interface for tobacco product lines
-  - Created [`src/models/flavor.ts`](src/models/flavor.ts) - Flavor interface with comprehensive flavor data
-  - Created [`src/models/brand.ts`](src/models/brand.ts) - Brand interface with complete brand information
+  - Created [`packages/types/src/rating.ts`](packages/types/src/rating.ts) - RatingDistribution interface for rating statistics
+  - Created [`packages/types/src/line.ts`](packages/types/src/line.ts) - Line interface for tobacco product lines
+  - Created [`packages/types/src/flavor.ts`](packages/types/src/flavor.ts) - Flavor interface with comprehensive flavor data
+  - Created [`packages/types/src/brand.ts`](packages/types/src/brand.ts) - Brand interface with complete brand information
   - All models include TypeScript interfaces with detailed property definitions based on htreviews.org HTML structure analysis
 
 - **Development Environment Setup** (2026-01-03):
@@ -31,7 +43,7 @@ The project has moved from planning to active development. The repository now co
   - Created [`tsconfig.json`](tsconfig.json:1) with strict mode, ES2024 target, CommonJS modules
   - Created [`.gitignore`](.gitignore:1) for node_modules, dist, .env, logs, coverage
   - Established complete project directory structure
-  - Created [`src/index.ts`](src/index.ts:1) as application entry point
+  - Created application entry points: [`apps/api/src/server.ts`](apps/api/src/server.ts:1), [`apps/cli/src/index.ts`](apps/cli/src/index.ts:1)
 
 - Initial project setup
 - Created example HTML files to understand htreviews.org structure
@@ -51,6 +63,8 @@ The project has moved from planning to active development. The repository now co
 - **API Framework**: Express.js (selected for mature ecosystem and extensive middleware)
 - **HTTP Client**: axios (selected for reliable HTTP requests)
 - **Package Manager**: pnpm (fast, disk space efficient)
+- **Monorepo**: pnpm workspaces + Turborepo (efficient build orchestration and caching)
+- **Version Management**: @changesets/cli (for versioning and changelog generation)
 
 ## Technical Decisions Pending
 
@@ -66,3 +80,5 @@ The project has moved from planning to active development. The repository now co
 - Should provide robust error handling for scraping failures
 - Must maintain data consistency between scrapes
 - Need to implement proper attribution to htreviews.org
+- Monorepo structure requires careful dependency management
+- Workspace protocol (workspace:*) must be used for internal dependencies
