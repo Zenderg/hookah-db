@@ -32,6 +32,11 @@
 - **Redis**: Distributed caching for production environments with multiple instances
 - **ioredis**: High-performance Redis client for Node.js
 
+### Scheduler
+- **node-cron**: Cron job scheduler for automated task execution
+- Configuration via environment variables for flexible scheduling
+- Graceful shutdown and error handling
+
 ### Data Validation
 - **Zod**: TypeScript-first schema validation for API requests/responses
 - **Joi** (alternative): Object schema validation
@@ -123,6 +128,7 @@ hookah-db/
 │   ├── parser/            # Data parsing and transformation
 │   ├── cache/             # Caching layer
 │   ├── services/          # Business logic
+│   ├── scheduler/         # Cron job scheduler
 │   ├── utils/             # Utility functions
 │   ├── config/            # Shared configuration
 │   └── tsconfig/          # Shared TypeScript configurations
@@ -141,6 +147,7 @@ All packages use the `@hookah-db/*` naming convention:
 - `@hookah-db/parser` - Data parsing module
 - `@hookah-db/cache` - Caching layer
 - `@hookah-db/services` - Business logic services
+- `@hookah-db/scheduler` - Cron job scheduler
 - `@hookah-db/utils` - Utility functions
 - `@hookah-db/config` - Shared configuration
 - `@hookah-db/tsconfig` - Shared TypeScript configurations
@@ -247,6 +254,13 @@ Packages use the `workspace:*` protocol to reference other packages in the monor
 - `RATE_LIMIT_MAX`: Maximum requests per window (default: 100)
 - `LOG_LEVEL`: Logging level (default: info)
 
+### Scheduler Configuration
+- `SCHEDULER_ENABLED`: Enable/disable scheduler (default: true)
+- `CRON_SCHEDULE_BRANDS`: Cron expression for brand refresh (default: "0 2 * * *")
+- `CRON_SCHEDULE_FLAVORS`: Cron expression for flavor refresh (default: "0 3 * * *")
+- `CRON_SCHEDULE_ALL`: Cron expression for full data refresh (default: "0 4 * * *")
+- `EXECUTION_HISTORY_LIMIT`: Maximum execution history entries (default: 100)
+
 ### API Keys
 - Store in `.env` file (not committed to git)
 - Format: `API_KEY_<CLIENT_NAME>=<key>`
@@ -273,6 +287,7 @@ Packages use the `workspace:*` protocol to reference other packages in the monor
 - Log scraping errors
 - Track rate limit violations
 - Monitor server resources (CPU, memory, disk)
+- Monitor scheduler job execution and errors
 
 ## Installed Dependencies (as of 2026-01-05)
 
@@ -311,6 +326,10 @@ Packages use the `workspace:*` protocol to reference other packages in the monor
 ### Caching
 - node-cache: 5.1.2
 - @types/node-cache: 4.2.5
+
+### Scheduler
+- node-cron: 3.0.3
+- @types/node-cron: 3.0.11
 
 ### Environment & Configuration
 - dotenv: latest

@@ -63,6 +63,9 @@ importers:
       '@hookah-db/cache':
         specifier: workspace:*
         version: link:../../packages/cache
+      '@hookah-db/scheduler':
+        specifier: workspace:*
+        version: link:../../packages/scheduler
       '@hookah-db/scraper':
         specifier: workspace:*
         version: link:../../packages/scraper
@@ -180,6 +183,28 @@ importers:
         specifier: ^1.1.2
         version: 1.1.2
     devDependencies:
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/scheduler:
+    dependencies:
+      '@hookah-db/config':
+        specifier: workspace:*
+        version: link:../config
+      '@hookah-db/services':
+        specifier: workspace:*
+        version: link:../services
+      '@hookah-db/types':
+        specifier: workspace:*
+        version: link:../types
+      node-cron:
+        specifier: ^3.0.3
+        version: 3.0.3
+    devDependencies:
+      '@types/node-cron':
+        specifier: ^3.0.11
+        version: 3.0.11
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
@@ -740,6 +765,9 @@ packages:
   '@types/node-cache@4.2.5':
     resolution: {integrity: sha512-faK2Owokboz53g8ooq2dw3iDJ6/HMTCIa2RvMte5WMTiABy+wA558K+iuyRtlR67Un5q9gEKysSDtqZYbSa0Pg==}
     deprecated: This is a stub types definition. node-cache provides its own type definitions, so you do not need this installed.
+
+  '@types/node-cron@3.0.11':
+    resolution: {integrity: sha512-0ikrnug3/IyneSHqCBeslAhlK2aBfYek1fGo4bP4QnZPmiqSGRK+Oy7ZMisLWkesffJvQ1cqAcBnJC+8+nxIAg==}
 
   '@types/node@12.20.55':
     resolution: {integrity: sha512-J8xLz7q2OFulZ2cyGTLE1TbbZcjpno7FaN6zdJNrgAdrJ+DZzh/uFR6YrTb4C+nXakvud8Q4+rbhoIWlYQbUFQ==}
@@ -1903,6 +1931,10 @@ packages:
     resolution: {integrity: sha512-t1QzWwnk4sjLWaQAS8CHgOJ+RAfmHpxFWmc36IWTiWHQfs0w5JDMBS1b1ZxQteo0vVVuWJvIUKHDkkeK7vIGCg==}
     engines: {node: '>= 8.0.0'}
 
+  node-cron@3.0.3:
+    resolution: {integrity: sha512-dOal67//nohNgYWb+nWmg5dkFdIwDm8EpeGYMekPMrngV3637lqnX0lbUcCtgibHTz6SEz7DAIjKvKDFYCnO1A==}
+    engines: {node: '>=6.0.0'}
+
   node-int64@0.4.0:
     resolution: {integrity: sha512-O5lz91xSOeoXP6DulyHfllpq+Eg00MWitZIbtPfoSEvqIHdl5gfcY6hYzDWnj0qD5tz52PI08u9qUvSVeUBeHw==}
 
@@ -2427,6 +2459,10 @@ packages:
     hasBin: true
     peerDependencies:
       browserslist: '>= 4.21.0'
+
+  uuid@8.3.2:
+    resolution: {integrity: sha512-+NYs2QeMWy+GWFOEm9xnn6HCDp0l7QBD7ml8zLUmJ+93Q5NF0NocErnwkTkXVFNiX3/fpC6afS8Dhb/gz7R7eg==}
+    hasBin: true
 
   v8-compile-cache-lib@3.0.1:
     resolution: {integrity: sha512-wa7YjyUGfNZngI/vtK0UHAN+lgDCxBPCylVXGp0zu59Fz5aiGtNXaq3DhIov063MorB+VfufLh3JlF2KdTK3xg==}
@@ -3263,6 +3299,8 @@ snapshots:
   '@types/node-cache@4.2.5':
     dependencies:
       node-cache: 5.1.2
+
+  '@types/node-cron@3.0.11': {}
 
   '@types/node@12.20.55': {}
 
@@ -4573,6 +4611,10 @@ snapshots:
     dependencies:
       clone: 2.1.2
 
+  node-cron@3.0.3:
+    dependencies:
+      uuid: 8.3.2
+
   node-int64@0.4.0: {}
 
   node-releases@2.0.27: {}
@@ -5102,6 +5144,8 @@ snapshots:
       browserslist: 4.28.1
       escalade: 3.2.0
       picocolors: 1.1.1
+
+  uuid@8.3.2: {}
 
   v8-compile-cache-lib@3.0.1: {}
 

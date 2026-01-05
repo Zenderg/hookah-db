@@ -21,6 +21,8 @@ Hookah Tobacco Database API is a centralized data service that aggregates and pr
 - **RESTful API**: Clean, documented endpoints for data retrieval
 - **Data Caching**: Efficient caching strategy to minimize scraping load
 - **Error Handling**: Robust error handling and rate limiting
+- **Automated Scheduler**: Cron-based automatic data refresh with configurable schedules
+- **Monitoring**: Comprehensive statistics and execution history tracking
 
 ## Technology Stack
 
@@ -32,6 +34,7 @@ Hookah Tobacco Database API is a centralized data service that aggregates and pr
 - **Authentication**: API key middleware
 - **Caching**: In-memory or Redis caching
 - **Data Validation**: Zod or similar schema validation
+- **Scheduler**: node-cron for automated task scheduling
 
 ## Data Structure
 

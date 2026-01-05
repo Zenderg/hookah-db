@@ -6,10 +6,16 @@ import {
   healthCheck,
   healthCheckDetailed,
 } from './controllers';
-import { errorHandler } from './middleware';
+import { errorHandler, authMiddleware } from './middleware';
 import swaggerJsdoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
 import swaggerOptions from './swagger';
+import { Scheduler, createScheduler } from '@hookah-db/scheduler';
+import { DataService } from '@hookah-db/services';
+import { BrandService } from '@hookah-db/services';
+import { FlavorService } from '@hookah-db/services';
+import { createCache } from '@hookah-db/cache';
+import { scrapeBrandsList, scrapeBrandDetails, scrapeFlavorDetails } from '@hookah-db/scraper';
 
 // Load environment variables from .env file in root directory
 // __dirname is apps/api/src, so we need to go up 3 levels to reach root
@@ -158,6 +164,34 @@ app.get('/api-docs.json', (_req: Request, res: Response) => {
 app.use('/api/v1/brands', brandRoutes);
 app.use('/api/v1/flavors', flavorRoutes);
 
+// Scheduler routes (authentication required)
+app.get('/api/v1/scheduler/stats', authMiddleware, (_req: Request, res: Response) => {
+  if (!scheduler) {
+    res.status(503).json({ error: 'Scheduler not initialized' });
+    return;
+  }
+  const stats = scheduler.getStats();
+  res.json(stats);
+});
+
+app.get('/api/v1/scheduler/jobs', authMiddleware, (_req: Request, res: Response) => {
+  if (!scheduler) {
+    res.status(503).json({ error: 'Scheduler not initialized' });
+    return;
+  }
+  const tasks = scheduler.getAllTasks();
+  const jobs = tasks.map(task => ({
+    id: task.taskId,
+    name: task.name,
+    enabled: task.enabled,
+    lastRun: task.lastRun,
+    nextRun: task.nextRun,
+    totalRuns: task.runCount,
+    errorCount: task.errorCount,
+  }));
+  res.json({ jobs });
+});
+
 // 404 handler for undefined routes
 app.use((req: Request, res: Response, _next: NextFunction) => {
   res.status(404).json({ error: 'Not Found', message: `Route ${req.method} ${req.url} not found` });
@@ -166,15 +200,80 @@ app.use((req: Request, res: Response, _next: NextFunction) => {
 // Error handling middleware (must be last)
 app.use(errorHandler);
 
+// Initialize scheduler
+let scheduler: Scheduler | null = null;
+
+// Initialize cache instance
+const cache = createCache({ type: 'memory', defaultTTL: 86400 });
+
+// Initialize DataService with required services
+const brandService = new BrandService(cache, scrapeBrandsList, scrapeBrandDetails);
+const flavorService = new FlavorService(cache, scrapeFlavorDetails);
+const dataService = new DataService(brandService, flavorService);
+
+// Create scheduler configuration
+const schedulerConfig = {
+  enabled: process.env.SCHEDULER_ENABLED === 'true',
+  brandsSchedule: process.env.CRON_SCHEDULE_BRANDS || '0 2 * * *',
+  flavorsSchedule: process.env.CRON_SCHEDULE_FLAVORS || '0 3 * * *',
+  allDataSchedule: process.env.CRON_SCHEDULE_ALL || '0 4 * * *',
+  maxExecutionHistory: parseInt(process.env.MAX_EXECUTION_HISTORY || '100', 10),
+};
+
+// Create scheduler instance
+if (schedulerConfig.enabled) {
+  scheduler = createScheduler(schedulerConfig);
+  console.log('Scheduler instance created');
+}
+
+// Graceful shutdown handlers
+const gracefulShutdown = async (signal: string) => {
+  console.log(`${signal} received, shutting down gracefully...`);
+  
+  if (scheduler) {
+    console.log('Stopping scheduler...');
+    await scheduler.stop();
+    console.log('Scheduler stopped');
+  }
+  
+  process.exit(0);
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
 // Server startup
 const PORT = process.env.PORT || 3000;
 
-export function startServer(): void {
+export async function startServer(): Promise<void> {
+  // Start scheduler if enabled
+  if (scheduler && schedulerConfig.enabled) {
+    try {
+      // Schedule default refresh tasks
+      scheduler.scheduleDefaultRefreshTasks(() => dataService.refreshAllCache());
+      
+      await scheduler.start();
+      console.log('Scheduler started successfully');
+      console.log(`  - Brands refresh: ${schedulerConfig.brandsSchedule}`);
+      console.log(`  - Flavors refresh: ${schedulerConfig.flavorsSchedule}`);
+      console.log(`  - All data refresh: ${schedulerConfig.allDataSchedule}`);
+    } catch (error) {
+      console.error('Failed to start scheduler:', error);
+      // Continue without scheduler if it fails to start
+    }
+  } else {
+    console.log('Scheduler is disabled');
+  }
+
   app.listen(PORT, () => {
     console.log(`Hookah Tobacco Database API server is running on port ${PORT}`);
     console.log(`Health check: http://localhost:${PORT}/health`);
     console.log(`API v1: http://localhost:${PORT}/api/v1`);
     console.log(`API Documentation: http://localhost:${PORT}/api-docs`);
+    if (scheduler && schedulerConfig.enabled) {
+      console.log(`Scheduler stats: http://localhost:${PORT}/api/v1/scheduler/stats`);
+      console.log(`Scheduler jobs: http://localhost:${PORT}/api/v1/scheduler/jobs`);
+    }
   });
 }
 
@@ -183,5 +282,8 @@ export default app;
 
 // Start server if this file is run directly
 if (require.main === module) {
-  startServer();
+  startServer().catch((error) => {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  });
 }

@@ -2,7 +2,7 @@
 
 ## Current State
 
-**Project Phase**: Development - API Layer Complete
+**Project Phase**: Development - API Layer Complete with Scheduler
 
 The project has been restructured as a monorepo using pnpm workspaces and Turborepo. The repository now contains:
 - Example HTML files from htreviews.org for reference (brands listing, brand detail page, flavor detail page)
@@ -13,7 +13,7 @@ The project has been restructured as a monorepo using pnpm workspaces and Turbor
 - Root TypeScript configuration ([`tsconfig.json`](tsconfig.json:1))
 - Git ignore rules ([`.gitignore`](.gitignore:1))
 - Application packages in [`apps/`](apps/) directory (api, cli)
-- Shared packages in [`packages/`](packages/) directory (types, utils, scraper, parser, cache, services, config, tsconfig)
+- Shared packages in [`packages/`](packages/) directory (types, utils, scraper, parser, cache, services, scheduler, config, tsconfig)
 - Complete data models in [`packages/types/src/`](packages/types/src/) directory
 - **Fully implemented web scraper module** in [`packages/scraper/`](packages/scraper/)
 - **Fully implemented cache module** in [`packages/cache/`](packages/cache/)
@@ -21,6 +21,12 @@ The project has been restructured as a monorepo using pnpm workspaces and Turbor
   - BrandService: Brand data management with cache integration
   - FlavorService: Flavor data management with cache integration
   - DataService: Orchestration service for data fetching and caching
+- **Fully implemented scheduler module** in [`packages/scheduler/`](packages/scheduler/) with:
+  - Scheduler class with cron job management
+  - Integration with DataService for automatic data refresh
+  - Configuration via environment variables
+  - Comprehensive statistics and monitoring
+  - 117 unit tests (87 unit + 30 integration, 100% pass rate)
 - **Fully implemented API server** in [`apps/api/`](apps/api/) with:
   - Authentication middleware with API key validation
   - Rate limiting middleware using express-rate-limit
@@ -32,9 +38,22 @@ The project has been restructured as a monorepo using pnpm workspaces and Turbor
   - Flavor routes with 4 endpoints
   - Server setup with proper middleware order
   - Swagger/OpenAPI documentation with interactive UI
-- **Comprehensive test suite** with 874 unit tests and 20+ integration tests
+  - Scheduler integration with graceful shutdown
+  - New API endpoints for scheduler monitoring
+- **Comprehensive test suite** with 991 unit tests and 20+ integration tests
 
 ## Recent Changes
+
+- **Scheduler Implementation** (2026-01-05):
+  - Created packages/scheduler/ with full cron job management
+  - Implemented Scheduler class with lifecycle methods (start, stop, restart)
+  - Added task management (scheduleJob, unscheduleJob, enableJob, disableJob)
+  - Integrated with DataService for automatic data refresh
+  - Added configuration via environment variables (SCHEDULER_ENABLED, CRON_SCHEDULE_*)
+  - Integrated scheduler into API server with graceful shutdown
+  - Added new API endpoints for scheduler monitoring
+  - Created comprehensive test suite with 117 tests (100% pass rate)
+  - Dependencies installed: node-cron@3.0.3, @types/node-cron@3.0.11
 
 - **API Testing and Security Fix** (2026-01-05):
   - Created comprehensive API test suite covering all endpoints
@@ -116,7 +135,7 @@ The project has been restructured as a monorepo using pnpm workspaces and Turbor
     - 35 tests for flavor routes in [`tests/unit/api/flavor-routes.test.ts`](tests/unit/api/flavor-routes.test.ts:1)
     - 24 tests for health endpoints in [`tests/unit/api/health.test.ts`](tests/unit/api/health.test.ts:1)
   - All 119 API tests passing (119/119)
-  - Total project tests: 874 tests (all passing)
+  - Total project tests: 991 tests (all passing)
   - Dependencies installed: express-rate-limit@7.5.0, @types/express-rate-limit@7.1.0
 
 - **Services Package Implementation** (2026-01-05):
@@ -213,10 +232,9 @@ The project has been restructured as a monorepo using pnpm workspaces and Turbor
 
 ## Next Steps
 
-1. **Implement data refresh scheduler**: Automated cache refresh on schedule (node-cron, bull, or agenda)
-2. **Set up monitoring**: Implement structured logging (winston or pino) for production
-3. **Add persistent storage**: Consider Redis for distributed caching or database for structured data
-4. **Deploy API server**: Set up production deployment with process manager (PM2, systemd)
+1. **Set up monitoring**: Implement structured logging (winston or pino) for production
+2. **Add persistent storage**: Consider Redis for distributed caching or database for structured data
+3. **Deploy API server**: Set up production deployment with process manager (PM2, systemd)
 
 ## Technical Decisions Made
 
@@ -233,12 +251,12 @@ The project has been restructured as a monorepo using pnpm workspaces and Turbor
 - **Rate Limiting**: express-rate-limit for IP-based rate limiting
 - **Error Handling**: Centralized error handling middleware with consistent JSON responses
 - **API Documentation**: Swagger/OpenAPI with swagger-jsdoc and swagger-ui-express for interactive documentation
+- **Scheduler**: node-cron for automated data refresh with configurable schedules
 
 ## Technical Decisions Pending
 
 - **Database**: Whether to use persistent storage or just cache
-- **Scraping Strategy**: How frequently to scrape htreviews.org
-- **Data Refresh Scheduler**: Implementation approach for automated cache refresh
+- **Scraping Strategy**: How frequently to scrape htreviews.org (scheduler implemented, schedules configurable)
 
 ## Key Considerations
 
@@ -252,9 +270,11 @@ The project has been restructured as a monorepo using pnpm workspaces and Turbor
 - All cache functions are fully tested with 73 unit tests (100% pass rate)
 - All service functions are fully tested with 198 unit tests (100% pass rate)
 - All API functions are fully tested with 119 unit tests (100% pass rate)
+- All scheduler functions are fully tested with 117 unit tests (100% pass rate)
 - Integration tests available but disabled by default to respect htreviews.org resources
 - Cache layer implemented with in-memory storage using node-cache, with interface designed for future Redis implementation
 - Services layer implements cache-first strategy with fallback to scraper for data retrieval
 - Business logic layer is now complete with comprehensive orchestration of scraper and cache
 - API layer is now complete with authentication, rate limiting, error handling, Swagger/OpenAPI documentation, and comprehensive test coverage
+- Scheduler layer provides automated data refresh with configurable cron schedules and comprehensive monitoring
 - API documentation available at /api-docs (Swagger UI) and /api-docs.json (OpenAPI spec)

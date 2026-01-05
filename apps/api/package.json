@@ -21,6 +21,7 @@
     "@hookah-db/cache": "workspace:*",
     "@hookah-db/scraper": "workspace:*",
     "@hookah-db/services": "workspace:*",
+    "@hookah-db/scheduler": "workspace:*",
     "@hookah-db/types": "workspace:*",
     "@hookah-db/utils": "workspace:*",
     "@types/dotenv": "^8.2.3",

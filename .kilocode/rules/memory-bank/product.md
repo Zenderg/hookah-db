@@ -40,6 +40,7 @@ graph LR
 3. **Cache Layer**: Stores parsed data to minimize scraping frequency
 4. **API Server**: RESTful endpoints for data retrieval
 5. **Authentication**: API key-based access control for authorized clients
+6. **Scheduler**: Automated cron-based data refresh with configurable schedules
 
 ### API Endpoints
 
@@ -48,6 +49,8 @@ graph LR
 - `GET /api/v1/flavors` - List all flavors with filtering
 - `GET /api/v1/flavors/:slug` - Get flavor details
 - `GET /api/v1/brands/:brandSlug/flavors` - Get flavors for a specific brand
+- `GET /api/v1/scheduler/stats` - Get scheduler statistics
+- `GET /api/v1/scheduler/jobs` - List all scheduled jobs
 
 ## User Experience Goals
 
@@ -57,6 +60,7 @@ graph LR
 - **Reliable Access**: High uptime with cached data for fast responses
 - **Predictable Rate Limits**: Clear rate limiting to prevent abuse
 - **Comprehensive Data**: Access to brands, flavors, ratings, reviews, and metadata
+- **Automated Updates**: Data refreshed automatically on configurable schedules
 
 ### For htreviews.org
 
@@ -77,7 +81,8 @@ graph LR
 ## Success Metrics
 
 - **API Reliability**: 99.9% uptime
-- **Data Freshness**: Cache updated at least daily
+- **Data Freshness**: Cache updated at least daily (configurable via scheduler)
 - **Response Time**: <200ms average response time
 - **Client Satisfaction**: Low error rates, comprehensive documentation
 - **Server Load**: Minimal impact on htreviews.org through intelligent caching
+- **Scheduler Reliability**: 100% successful job execution with error tracking
