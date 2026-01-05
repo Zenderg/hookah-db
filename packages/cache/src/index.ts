@@ -1,6 +1,9 @@
 /**
  * Cache layer for hookah-db
- * This package will contain cache implementations
+ * This package provides caching implementations for the Hookah Tobacco Database API
  */
 
-export {};
+export type { ICache, CacheEntry, CacheStats } from './types';
+export { InMemoryCache } from './in-memory-cache';
+export { createCache } from './cache-factory';
+export type { CacheType, CacheConfig } from './cache-factory';

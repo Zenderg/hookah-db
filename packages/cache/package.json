@@ -27,9 +27,11 @@
   "license": "ISC",
   "dependencies": {
     "@hookah-db/types": "workspace:*",
-    "@hookah-db/utils": "workspace:*"
+    "@hookah-db/utils": "workspace:*",
+    "node-cache": "^5.1.2"
   },
   "devDependencies": {
+    "@types/node-cache": "^4.2.5",
     "typescript": "^5.9.3"
   }
 }

@@ -2,7 +2,7 @@
 
 ## Current State
 
-**Project Phase**: Development - Web Scraper Complete
+**Project Phase**: Development - Web Scraper and Cache Complete
 
 The project has been restructured as a monorepo using pnpm workspaces and Turborepo. The repository now contains:
 - Example HTML files from htreviews.org for reference (brands listing, brand detail page, flavor detail page)
@@ -16,9 +16,23 @@ The project has been restructured as a monorepo using pnpm workspaces and Turbor
 - Shared packages in [`packages/`](packages/) directory (types, utils, scraper, parser, cache, services, config, tsconfig)
 - Complete data models in [`packages/types/src/`](packages/types/src/) directory
 - **Fully implemented web scraper module** in [`packages/scraper/`](packages/scraper/)
-- **Comprehensive test suite** with 408 unit tests and 20+ integration tests
+- **Fully implemented cache module** in [`packages/cache/`](packages/cache/)
+- **Comprehensive test suite** with 481 unit tests and 20+ integration tests
 
 ## Recent Changes
+
+- **Cache Layer Implementation** (2026-01-05):
+  - Implemented cache interface and types in [`packages/cache/src/types.ts`](packages/cache/src/types.ts:1)
+  - Implemented InMemoryCache class with full ICache interface in [`packages/cache/src/in-memory-cache.ts`](packages/cache/src/in-memory-cache.ts:1)
+  - Implemented cache factory function for creating cache instances in [`packages/cache/src/cache-factory.ts`](packages/cache/src/cache-factory.ts:1)
+  - Created comprehensive test suite with 73 tests in [`tests/unit/cache/in-memory-cache.test.ts`](tests/unit/cache/in-memory-cache.test.ts:1):
+    - Cache operations: get, set, delete, has, clear, flush, keys, size, getStats
+    - TTL support: set with TTL, get remaining TTL, get expired items
+    - Namespace support: namespaced cache operations
+    - Error handling: invalid keys, null/undefined values, serialization errors
+    - Performance: bulk operations, concurrent access
+  - All 73 cache tests passing (73/73)
+  - Dependencies installed: node-cache@5.1.2, @types/node-cache@4.2.5
 
 - **Web Scraper Implementation** (2026-01-05):
   - Implemented HTTP client with retry logic and rate limiting in [`packages/scraper/src/http-client.ts`](packages/scraper/src/http-client.ts:1)
@@ -78,12 +92,11 @@ The project has been restructured as a monorepo using pnpm workspaces and Turbor
 
 ## Next Steps
 
-1. **Implement data parser**: Create parser module to transform scraped data (optional, may be integrated with scraper)
-2. **Implement caching**: Add caching layer (in-memory or Redis)
-3. **Build API server**: Set up Express server with REST endpoints
-4. **Add authentication**: Implement API key middleware
-5. **Write API tests**: Create tests for API endpoints
-6. **Documentation**: Write API documentation
+1. **Implement services**: Create services package to orchestrate scraper and cache
+2. **Build API server**: Set up Express server with REST endpoints
+3. **Add authentication**: Implement API key middleware
+4. **Write API tests**: Create tests for API endpoints
+5. **Documentation**: Write API documentation
 
 ## Technical Decisions Made
 
@@ -94,22 +107,23 @@ The project has been restructured as a monorepo using pnpm workspaces and Turbor
 - **Version Management**: @changesets/cli (for versioning and changelog generation)
 - **Testing Framework**: Jest (selected for comprehensive testing capabilities)
 - **Scraper Architecture**: Modular design with separate HTTP client, HTML parser, and scraper classes
+- **Caching Solution**: In-memory with node-cache, with interface designed for future Redis implementation
 
 ## Technical Decisions Pending
 
-- **Caching Solution**: In-memory vs Redis (to be decided)
 - **Database**: Whether to use persistent storage or just cache
 - **Scraping Strategy**: How frequently to scrape htreviews.org
 - **Rate Limiting**: Implementation approach for API rate limiting
-- **Parser Module**: Whether to create separate parser package or integrate with scraper
 
 ## Key Considerations
 
 - Must be respectful of htreviews.org's server resources (rate limiting implemented)
 - Need to handle potential HTML structure changes on htreviews.org (CSS selectors documented)
 - Should provide robust error handling for scraping failures (comprehensive error handling implemented)
-- Must maintain data consistency between scrapes (to be addressed by caching layer)
+- Must maintain data consistency between scrapes (addressed by caching layer)
 - Need to implement proper attribution to htreviews.org (to be added to API)
 - Monorepo structure requires careful dependency management (workspace:* protocol used)
 - All scraper functions are fully tested with 408 unit tests (100% pass rate)
+- All cache functions are fully tested with 73 unit tests (100% pass rate)
 - Integration tests available but disabled by default to respect htreviews.org resources
+- Cache layer implemented with in-memory storage using node-cache, with interface designed for future Redis implementation
