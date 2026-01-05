@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: hookah-db-api-dev
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env.dev
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - LOG_LEVEL=debug
+    volumes:
+      # Mount source code for development with hot reload
+      - ./apps/api/src:/app/apps/api/src
+      - ./packages:/app/packages
+      # Mount TypeScript config files
+      - ./tsconfig.json:/app/tsconfig.json
+      - ./turbo.json:/app/turbo.json
+    command: npx nodemon --watch src --ext ts --exec npx ts-node --project /app/tsconfig.dev.json src/server.ts
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - hookah-db-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: hookah-db-redis-dev
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    networks:
+      - hookah-db-network
+
+networks:
+  hookah-db-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+    driver: local

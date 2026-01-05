@@ -1,7 +1,8 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import express, { Express, Request, Response, NextFunction } from 'express';
-import { brandRoutes, flavorRoutes } from './routes';
+import brandRoutes from './routes/brand-routes';
+import flavorRoutes from './routes/flavor-routes';
 import {
   healthCheck,
   healthCheckDetailed,

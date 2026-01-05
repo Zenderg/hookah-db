@@ -2,7 +2,7 @@
 
 ## Current State
 
-**Project Phase**: Development - API Layer Complete with Scheduler and Logging
+**Project Phase**: Development - Docker Setup Complete
 
 The project has been restructured as a monorepo using pnpm workspaces and Turborepo. The repository now contains:
 - Example HTML files from htreviews.org for reference (brands listing, brand detail page, flavor detail page)
@@ -54,11 +54,45 @@ The project has been restructured as a monorepo using pnpm workspaces and Turbor
   - Combined logging middleware for convenience
   - Error handler middleware with automatic error logging
   - Comprehensive test coverage (100+ tests)
+- **Fully implemented Docker setup** with multi-stage Dockerfile and Docker Compose configurations:
+  - Multi-stage Dockerfile with dependencies, development, and production stages
+  - Development environment with hot reload and volume mounts
+  - Production environment with optimized runtime and health checks
+  - Redis integration for distributed caching
+  - Docker Compose configurations for both dev and prod environments
+  - TypeScript configuration for Docker environments ([`tsconfig.docker.json`](tsconfig.docker.json:1))
+  - tsx runtime for production to avoid TypeScript workspace resolution issues
+  - Both development and production environments fully functional and tested
 - **Comprehensive test suite** with 1100+ unit tests and 20+ integration tests
 - **Complete logging documentation** in [`docs/LOGGING.md`](docs/LOGGING.md:1)
 - **Environment variable examples** in [`.env.example`](.env.example:1)
 
 ## Recent Changes
+
+- **Docker Setup Implementation** (2026-01-05):
+  - Created multi-stage [`Dockerfile`](Dockerfile:1) with three stages: dependencies, development, and production
+  - Implemented development Docker Compose configuration in [`docker-compose.dev.yml`](docker-compose.dev.yml:1):
+    - API service with hot reload via nodemon and volume mounts for live code updates
+    - Redis service for distributed caching with persistent storage
+    - Bridge network for container communication
+    - Environment configuration via [`.env.dev`](.env.dev:1)
+  - Implemented production Docker Compose configuration in [`docker-compose.prod.yml`](docker-compose.prod.yml:1):
+    - Optimized API service with health checks and logging configuration
+    - Redis service with memory limits and LRU eviction policy
+    - Health checks for both API and Redis services
+    - Log rotation with size limits (10MB max, 3 files)
+    - Environment configuration via [`.env.prod`](.env.prod:1)
+  - Created Docker-specific TypeScript configuration in [`tsconfig.docker.json`](tsconfig.docker.json:1):
+    - Extends base TypeScript config
+    - Configured for CommonJS modules and ES2022 target
+    - ts-node configuration with transpileOnly mode for faster execution
+    - Experimental specifier resolution for workspace compatibility
+  - Implemented tsx runtime for production to avoid JSDoc YAML parsing issues with ts-node
+  - Added comprehensive health checks for container monitoring
+  - Configured volume mounts for development with hot reload
+  - Set up Redis with AOF persistence and memory management
+  - Both development and production environments tested and fully functional
+  - Dependencies: node:22-alpine, redis:7-alpine, tsx, nodemon
 
 - **Logging System Implementation** (2026-01-05):
   - Created [`packages/utils/src/logger.ts`](packages/utils/src/logger.ts:1) with Logger class wrapping Winston
@@ -265,8 +299,8 @@ The project has been restructured as a monorepo using pnpm workspaces and Turbor
 ## Next Steps
 
 1. **Set up monitoring**: Implement structured logging (winston or pino) for production ✅ **COMPLETED**
-2. **Add persistent storage**: Consider Redis for distributed caching or database for structured data
-3. **Deploy API server**: Set up production deployment with process manager (PM2, systemd)
+2. **Add persistent storage**: Consider Redis for distributed caching or database for structured data ✅ **Docker setup includes Redis**
+3. **Deploy API server**: Set up production deployment with process manager (PM2, systemd) ✅ **Docker setup provides containerized deployment**
 
 ## Technical Decisions Made
 
@@ -285,6 +319,9 @@ The project has been restructured as a monorepo using pnpm workspaces and Turbor
 - **API Documentation**: Swagger/OpenAPI with swagger-jsdoc and swagger-ui-express for interactive documentation
 - **Scheduler**: node-cron for automated data refresh with configurable schedules
 - **Logging**: Winston with winston-daily-rotate-file for production-ready structured logging
+- **Containerization**: Docker with multi-stage builds for development and production environments
+- **Runtime**: tsx for production to avoid TypeScript workspace resolution issues
+- **Orchestration**: Docker Compose for multi-container setup (API + Redis)
 
 ## Technical Decisions Pending
 
@@ -312,6 +349,10 @@ The project has been restructured as a monorepo using pnpm workspaces and Turbor
 - API layer is now complete with authentication, rate limiting, error handling, Swagger/OpenAPI documentation, and comprehensive test coverage
 - Scheduler layer provides automated data refresh with configurable cron schedules and comprehensive monitoring
 - Logging layer provides production-ready structured logging with Winston, file rotation, correlation ID tracking, and request/response middleware
+- Docker setup provides containerized deployment with development and production configurations
 - API documentation available at /api-docs (Swagger UI) and /api-docs.json (OpenAPI spec)
 - Logging documentation available at [`docs/LOGGING.md`](docs/LOGGING.md:1)
 - Environment variable examples available at [`.env.example`](.env.example:1)
+- Docker development environment supports hot reload with volume mounts
+- Docker production environment includes health checks and log rotation
+- Redis integration provides distributed caching with persistence and memory management

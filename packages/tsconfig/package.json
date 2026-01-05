@@ -8,6 +8,9 @@
     "base.json",
     "node.json"
   ],
+  "scripts": {
+    "build": "echo 'No build needed for tsconfig package'"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC"

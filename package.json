@@ -12,7 +12,8 @@
     "clean": "turbo run clean",
     "changeset": "changeset",
     "version-packages": "changeset version",
-    "release": "turbo run build && changeset publish"
+    "release": "turbo run build && changeset publish",
+    "docker:build": "pnpm build"
   },
   "keywords": [],
   "author": "",

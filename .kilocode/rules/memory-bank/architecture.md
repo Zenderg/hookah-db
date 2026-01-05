@@ -65,6 +65,112 @@ graph TB
     style P fill:#c8e6c9
 ```
 
+## Docker Deployment Architecture
+
+The Docker deployment uses a multi-container architecture with API and Redis services:
+
+```mermaid
+graph TB
+    subgraph "Docker Network: hookah-db-network"
+        subgraph "API Container"
+            A1[Node.js 22 Alpine]
+            A2[Express.js Server]
+            A3[TypeScript Runtime tsx]
+            A4[Health Check Endpoint]
+        end
+        
+        subgraph "Redis Container"
+            R1[Redis 7 Alpine]
+            R2[AOF Persistence]
+            R3[Memory Management]
+            R4[Health Check]
+        end
+    end
+    
+    subgraph "Host System"
+        V1[Volume Mounts - Dev]
+        V2[Volume Mounts - Prod]
+        E1[Environment Files]
+    end
+    
+    subgraph "External"
+        E2[htreviews.org]
+        C[Authorized Clients]
+    end
+    
+    V1 --> A1
+    V2 --> R1
+    E1 --> A1
+    E1 --> R1
+    A2 --> R1
+    R1 --> A2
+    A2 --> E2
+    E2 --> A2
+    C --> A2
+    A4 -.-> A1
+    
+    style A1 fill:#e1f5ff
+    style R1 fill:#fff4e1
+    style C fill:#c8e6c9
+```
+
+### Docker Container Architecture
+
+**API Container** (`hookah-db-api-dev` / `hookah-db-api-prod`):
+- **Base Image**: node:22-alpine
+- **Runtime**: Node.js with tsx for TypeScript execution
+- **Components**:
+  - Express.js API server
+  - Authentication middleware
+  - Rate limiting middleware
+  - Error handling middleware
+  - Logging system (Winston)
+  - Scheduler (node-cron)
+  - Health check endpoint
+- **Development Features**:
+  - Hot reload via nodemon
+  - Volume mounts for live code updates
+  - Debug logging enabled
+- **Production Features**:
+  - Optimized runtime with tsx
+  - Health checks (30s interval, 10s timeout)
+  - Log rotation (10MB max, 3 files)
+  - Automatic restart on failure
+  - No hot reload (performance optimized)
+
+**Redis Container** (`hookah-db-redis-dev` / `hookah-db-redis-prod`):
+- **Base Image**: redis:7-alpine
+- **Components**:
+  - Redis server with AOF persistence
+  - Memory management with LRU eviction
+  - Health check endpoint
+- **Development Features**:
+  - AOF persistence enabled
+  - Volume mount for data persistence
+- **Production Features**:
+  - AOF persistence enabled
+  - Memory limit: 256MB
+  - Eviction policy: allkeys-lru
+  - Health checks (10s interval, 5s timeout)
+  - Log rotation (10MB max, 3 files)
+  - Automatic restart on failure
+
+**Network Configuration**:
+- **Network Name**: hookah-db-network
+- **Type**: Bridge network
+- **Purpose**: Container-to-container communication
+- **Port Mappings**:
+  - API: 3000:3000 (host:container)
+  - Redis: 6379:6379 (host:container)
+
+**Volume Management**:
+- **redis-data**: Persistent storage for Redis AOF files
+- **Development Volume Mounts**:
+  - `./apps/api/src:/app/apps/api/src` - Hot reload for API source
+  - `./packages:/app/packages` - Hot reload for shared packages
+  - `./tsconfig.json:/app/tsconfig.json` - TypeScript config
+  - `./turbo.json:/app/turbo.json` - Turborepo config
+
 ## Source Code Structure
 
 ```
@@ -172,6 +278,10 @@ hookah-db/
 ├── .kilocode/             # Kilo Code configuration
 │   └── rules/
 │       └── memory-bank/   # Memory bank files
+├── Dockerfile             # Multi-stage Docker build configuration
+├── docker-compose.dev.yml  # Development Docker Compose configuration
+├── docker-compose.prod.yml # Production Docker Compose configuration
+├── tsconfig.docker.json   # Docker-specific TypeScript configuration
 ├── pnpm-workspace.yaml    # pnpm workspace configuration
 ├── turbo.json             # Turborepo configuration
 ├── .npmrc                 # npm/pnpm configuration
@@ -465,6 +575,38 @@ The API includes comprehensive Swagger/OpenAPI documentation:
 - **Rate Limiting**: Per-key rate limits (e.g., 100 requests/minute)
 - **Implementation**: Custom middleware validates X-API-Key header against environment variables
 
+### Docker Implementation
+
+**Multi-Stage Dockerfile** ([`Dockerfile`](Dockerfile:1)):
+- **Stage 1 - Dependencies**: Installs all dependencies with frozen lockfile for reproducible builds
+- **Stage 2 - Development**: Development environment with hot reload via nodemon and volume mounts
+- **Stage 3 - Production**: Optimized production runtime with health checks and logging
+
+**Docker Compose - Development** ([`docker-compose.dev.yml`](docker-compose.dev.yml:1)):
+- API service with hot reload and volume mounts
+- Redis service with AOF persistence
+- Bridge network for container communication
+- Environment configuration via `.env.dev`
+
+**Docker Compose - Production** ([`docker-compose.prod.yml`](docker-compose.prod.yml:1)):
+- Optimized API service with health checks and log rotation
+- Redis service with memory limits and LRU eviction policy
+- Health checks for both services
+- Log rotation with size limits
+- Environment configuration via `.env.prod`
+
+**Docker-Specific TypeScript Configuration** ([`tsconfig.docker.json`](tsconfig.docker.json:1)):
+- Extends base TypeScript config
+- Configured for CommonJS modules and ES2022 target
+- ts-node configuration with transpileOnly mode
+- Experimental specifier resolution for workspace compatibility
+
+**Runtime Decisions**:
+- **tsx**: Used for production runtime to avoid ts-node JSDoc YAML parsing issues
+- **nodemon**: Used for development hot reload
+- **node:22-alpine**: Lightweight base image for smaller container sizes
+- **redis:7-alpine**: Lightweight Redis image with AOF persistence
+
 ## Component Relationships
 
 ```mermaid
@@ -482,6 +624,8 @@ graph LR
     Swagger[Swagger UI] --> Server
     Scheduler[@hookah-db/scheduler] --> Services
     Scheduler --> Server
+    Redis[Redis Cache] --> Cache
+    Cache --> Redis
 ```
 
 ## Critical Implementation Paths
@@ -492,6 +636,8 @@ graph LR
 4. **Error Handling Path**: Controller throws error → Error handler middleware catches → Log error → Return JSON error response
 5. **Documentation Path**: JSDoc comments → swagger-jsdoc → OpenAPI spec → Swagger UI
 6. **Scheduler Path**: Cron trigger → Execute job → Call DataService → Update cache → Log execution
+7. **Docker Build Path**: Dockerfile stages (dependencies → development/production) → Container images → Docker Compose orchestration
+8. **Docker Deployment Path**: Build images → Create network → Start containers → Health checks → Volume mounts → Service communication
 
 ## Design Patterns
 
@@ -504,6 +650,8 @@ graph LR
 - **Route Handler Pattern**: Route definitions separate from controller logic
 - **Documentation-First Pattern**: JSDoc comments drive API specification generation
 - **Scheduler Pattern**: Cron-based task scheduling with lifecycle management
+- **Container Pattern**: Multi-stage Docker builds for development and production
+- **Orchestration Pattern**: Docker Compose for multi-container deployment
 
 ## Package Dependency Layers
 

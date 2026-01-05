@@ -1,0 +1,81 @@
+# Build artifacts (exclude root dist only, keep package and apps dist for production)
+/dist
+.tsbuildinfo/
+**/.tsbuildinfo/
+build/
+**/build/
+
+# Test files
+tests/
+**/tests/
+*.test.ts
+**/*.test.ts
+*.test.js
+**/*.test.js
+*.spec.ts
+**/*.spec.ts
+*.spec.js
+**/*.spec.js
+coverage/
+**/coverage/
+
+# Git files
+.git/
+.gitignore
+.gitattributes
+
+# Environment files (exclude local/dev files, keep examples)
+.env
+.env.local
+.env.*.local
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+logs/
+*.log
+**/*.log
+
+# Documentation
+README.md
+docs/
+.kilocode/
+plans/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Development tools
+.eslintrc*
+.prettierrc*
+.editorconfig
+
+# Examples
+examples/
+
+# Package manager debug logs
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Docker files (keep Dockerfile.prod for production builds)
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Temporary files
+.DS_Store
+Thumbs.db
+*.tmp
+
+# Cache files
+.cache/
+.turbo/
+.next/

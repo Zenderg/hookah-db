@@ -12,6 +12,13 @@
 - **Turborepo**: Build system for monorepo with intelligent caching and task orchestration
 - **@changesets/cli**: Version management and changelog generation for monorepo packages
 
+### Containerization
+- **Docker**: Container platform for consistent development and production environments
+- **Docker Compose**: Multi-container orchestration for development and production
+- **Multi-stage Dockerfile**: Optimized builds with separate stages for dependencies, development, and production
+- **tsx**: Fast TypeScript runtime for production Docker containers (avoids ts-node JSDoc YAML parsing issues)
+- **nodemon**: Development tool for hot reload in Docker containers
+
 ### Web Scraping
 - **Cheerio**: Fast, flexible, and lean implementation of core jQuery for server-side HTML parsing
 - **axios**: HTTP client for fetching HTML pages from htreviews.org
@@ -81,6 +88,8 @@
 ### Prerequisites
 - Node.js (LTS version recommended, e.g., 22.x or 24.x)
 - pnpm (install via `npm install -g pnpm`)
+- Docker (for containerized development and production)
+- Docker Compose (for multi-container orchestration)
 - Git
 
 ### Initial Setup Commands
@@ -104,6 +113,68 @@ pnpm type-check
 pnpm clean
 ```
 
+### Docker Setup
+
+#### Development Environment
+```bash
+# Build and start development containers with hot reload
+docker-compose -f docker-compose.dev.yml up --build
+
+# Start development containers in detached mode
+docker-compose -f docker-compose.dev.yml up -d
+
+# View development logs
+docker-compose -f docker-compose.dev.yml logs -f
+
+# Stop development containers
+docker-compose -f docker-compose.dev.yml down
+
+# Stop development containers and remove volumes
+docker-compose -f docker-compose.dev.yml down -v
+```
+
+#### Production Environment
+```bash
+# Build and start production containers
+docker-compose -f docker-compose.prod.yml up --build
+
+# Start production containers in detached mode
+docker-compose -f docker-compose.prod.yml up -d
+
+# View production logs
+docker-compose -f docker-compose.prod.yml logs -f
+
+# Stop production containers
+docker-compose -f docker-compose.prod.yml down
+
+# Stop production containers and remove volumes
+docker-compose -f docker-compose.prod.yml down -v
+```
+
+#### Docker Commands
+```bash
+# Build specific stage
+docker build --target development -t hookah-db-api:dev .
+docker build --target production -t hookah-db-api:prod .
+
+# Run container with custom environment
+docker run -p 3000:3000 --env-file .env.prod hookah-db-api:prod
+
+# Execute commands in running container
+docker exec -it hookah-db-api-prod sh
+docker exec -it hookah-db-api-prod npx tsx src/server.ts
+
+# View container logs
+docker logs hookah-db-api-prod
+docker logs -f hookah-db-api-prod
+
+# Check container health
+docker inspect hookah-db-api-prod | grep -A 10 Health
+
+# Connect to Redis in container
+docker exec -it hookah-db-redis-prod redis-cli
+```
+
 ### Accessing API Documentation
 Once the API server is running (default: `http://localhost:3000`), you can access:
 - **Swagger UI**: Interactive API documentation at `http://localhost:3000/api-docs`
@@ -114,6 +185,7 @@ Comprehensive logging documentation is available at [`docs/LOGGING.md`](docs/LOG
 
 ### TypeScript Configuration
 - **tsconfig.json**: Root TypeScript configuration
+- **tsconfig.docker.json**: Docker-specific TypeScript configuration (CommonJS, ES2022, ts-node settings)
 - **packages/tsconfig/base.json**: Base TypeScript config shared across packages
 - **packages/tsconfig/node.json**: Node.js-specific TypeScript config
 - **Strict mode**: Enabled for maximum type safety
@@ -149,10 +221,38 @@ hookah-db/
 │   └── tsconfig/          # Shared TypeScript configurations
 ├── docs/                 # Documentation
 │   └── LOGGING.md        # Comprehensive logging documentation
+├── Dockerfile             # Multi-stage Docker build configuration
+├── docker-compose.dev.yml  # Development Docker Compose configuration
+├── docker-compose.prod.yml # Production Docker Compose configuration
+├── tsconfig.docker.json   # Docker-specific TypeScript configuration
 ├── pnpm-workspace.yaml    # pnpm workspace configuration
 ├── turbo.json             # Turborepo configuration
 └── package.json           # Root package.json
 ```
+
+### Docker Architecture
+
+The Docker setup uses a multi-stage build approach:
+
+**Stages**:
+1. **Dependencies**: Installs all dependencies with frozen lockfile for reproducible builds
+2. **Development**: Development environment with hot reload via nodemon and volume mounts
+3. **Production**: Optimized production runtime with health checks and logging
+
+**Services** (Docker Compose):
+- **API Service**: Node.js API server with Express.js
+  - Development: Hot reload with nodemon and volume mounts
+  - Production: Optimized runtime with health checks and log rotation
+- **Redis Service**: Redis 7 Alpine for distributed caching
+  - AOF persistence enabled
+  - Memory limits and LRU eviction policy (production)
+  - Health checks for monitoring
+
+**Networks**:
+- **hookah-db-network**: Bridge network for container communication
+
+**Volumes**:
+- **redis-data**: Persistent storage for Redis data
 
 ### Package Naming Convention
 
@@ -184,10 +284,21 @@ Packages use the `workspace:*` protocol to reference other packages in the monor
 
 ### Build Process
 
-**Development**:
+**Local Development**:
 - Use `pnpm --filter @hookah-db/api dev` to run specific apps in development mode
 - Turborepo handles dependency graph and parallel execution
 - Automatic rebuilds on file changes (via nodemon/ts-node)
+
+**Docker Development**:
+- Use `docker-compose -f docker-compose.dev.yml up` for containerized development
+- Hot reload via nodemon with volume mounts
+- Changes to source code are reflected immediately in containers
+
+**Docker Production**:
+- Use `docker-compose -f docker-compose.prod.yml up` for production deployment
+- Optimized multi-stage builds for smaller image sizes
+- Health checks and log rotation configured
+- No hot reload (production-optimized)
 
 **Build All**:
 - `pnpm build` - Builds all packages in dependency order
@@ -207,16 +318,21 @@ Packages use the `workspace:*` protocol to reference other packages in the monor
 - API response time: <200ms (average)
 - Cache hit rate: >90%
 - Scraping interval: At least 24 hours between full scrapes
+- Container startup time: <30 seconds (production)
 
 ### Scalability Considerations
 - Support up to 10 authorized API clients
 - Handle 100+ brands with 10,000+ flavors
 - Rate limiting: ~100 requests/minute per client
+- Horizontal scaling: Can deploy multiple API containers with load balancer
+- Redis clustering: Can scale Redis for high-availability
 
 ### Resource Limits
 - Memory usage: <500MB for in-memory cache
 - Network bandwidth: Minimal (only scraping htreviews.org)
 - CPU usage: Low (scraping is I/O bound)
+- Container memory: Configurable via Docker Compose
+- Redis memory: 256MB max with LRU eviction (production)
 
 ### External Dependencies
 - **htreviews.org**: Must be respectful of server resources
@@ -268,6 +384,17 @@ Packages use the `workspace:*` protocol to reference other packages in the monor
 - Configure log levels appropriately for each environment
 - Use child loggers for modules to add context
 
+### Docker Best Practices
+- Use multi-stage builds for smaller image sizes
+- Leverage Docker layer caching for faster builds
+- Use .dockerignore to exclude unnecessary files
+- Mount volumes for development (hot reload)
+- Use health checks for container monitoring
+- Configure log rotation to prevent disk space issues
+- Use specific version tags for base images (node:22-alpine)
+- Keep containers stateless (use volumes for persistence)
+- Use environment-specific configurations (.env.dev, .env.prod)
+
 ## Environment Variables
 
 ### Required Variables
@@ -282,6 +409,11 @@ Packages use the `workspace:*` protocol to reference other packages in the monor
 - `LOG_LEVEL`: Logging level (default: info)
 - `LOG_DIR`: Directory for log files (default: ./logs)
 - `SERVICE_NAME`: Service name for log identification (default: hookah-db)
+
+### Docker-Specific Variables
+- `NODE_ENV`: Environment (development/production)
+- `PORT`: Container port (default: 3000)
+- `LOG_LEVEL`: Container log level (debug for dev, info for prod)
 
 ### Scheduler Configuration
 - `SCHEDULER_ENABLED`: Enable/disable scheduler (default: true)
@@ -301,14 +433,26 @@ Packages use the `workspace:*` protocol to reference other packages in the monor
 - Use `pnpm --filter @hookah-db/api dev` for hot-reloading
 - Run with `ts-node` for TypeScript support
 - Local caching (in-memory)
+- Or use Docker: `docker-compose -f docker-compose.dev.yml up`
 
 ### Production
 - Build all packages with `pnpm build`
-- Use process manager (PM2, systemd)
+- Use Docker Compose for containerized deployment: `docker-compose -f docker-compose.prod.yml up -d`
+- Use process manager (PM2, systemd) if not using Docker
 - Consider Redis for distributed caching
 - Implement proper logging (winston, pino)
 - Set up health check endpoints
 - Configure reverse proxy (nginx, Apache)
+- Use environment-specific configurations (.env.prod)
+
+### Docker Deployment
+- **Development**: Use docker-compose.dev.yml with hot reload and volume mounts
+- **Production**: Use docker-compose.prod.yml with optimized builds and health checks
+- **Image Registry**: Push images to Docker Hub or private registry for CI/CD
+- **Orchestration**: Consider Kubernetes or Docker Swarm for larger deployments
+- **Monitoring**: Use container health checks and log aggregation
+- **Scaling**: Deploy multiple API containers behind a load balancer
+- **Updates**: Use rolling updates to minimize downtime
 
 ### Monitoring
 - Track API response times
@@ -319,6 +463,9 @@ Packages use the `workspace:*` protocol to reference other packages in the monor
 - Monitor scheduler job execution and errors
 - Monitor log file sizes and rotation
 - Track correlation IDs for request tracing
+- Monitor container health and restarts
+- Monitor Redis memory usage and eviction rates
+- Track Docker resource usage (CPU, memory, disk I/O)
 
 ## Installed Dependencies (as of 2026-01-05)
 
@@ -371,3 +518,7 @@ Packages use the `workspace:*` protocol to reference other packages in the monor
 
 ### Environment & Configuration
 - dotenv: latest
+
+### Docker Runtime
+- tsx: Latest (for production Docker runtime)
+- nodemon: 3.1.11 (for development Docker hot reload)
