@@ -2,7 +2,7 @@
 
 ## Current State
 
-**Project Phase**: Development - Business Logic Layer Complete
+**Project Phase**: Development - API Layer Complete
 
 The project has been restructured as a monorepo using pnpm workspaces and Turborepo. The repository now contains:
 - Example HTML files from htreviews.org for reference (brands listing, brand detail page, flavor detail page)
@@ -21,9 +21,70 @@ The project has been restructured as a monorepo using pnpm workspaces and Turbor
   - BrandService: Brand data management with cache integration
   - FlavorService: Flavor data management with cache integration
   - DataService: Orchestration service for data fetching and caching
-- **Comprehensive test suite** with 755 unit tests and 20+ integration tests
+- **Fully implemented API server** in [`apps/api/`](apps/api/) with:
+  - Authentication middleware with API key validation
+  - Rate limiting middleware using express-rate-limit
+  - Error handling middleware with consistent JSON responses
+  - Brand controller with 3 functions
+  - Flavor controller with 4 functions
+  - Health controller with 2 functions
+  - Brand routes with 4 endpoints
+  - Flavor routes with 4 endpoints
+  - Server setup with proper middleware order
+- **Comprehensive test suite** with 874 unit tests and 20+ integration tests
 
 ## Recent Changes
+
+- **API Server Implementation** (2026-01-05):
+  - Implemented authentication middleware in [`apps/api/src/middleware/auth-middleware.ts`](apps/api/src/middleware/auth-middleware.ts:1):
+    - API key validation from X-API-Key header
+    - Support for multiple API keys via environment variables
+    - Consistent error responses for missing/invalid keys
+  - Implemented rate limiting middleware in [`apps/api/src/middleware/rate-limit-middleware.ts`](apps/api/src/middleware/rate-limit-middleware.ts:1):
+    - express-rate-limit integration
+    - Configurable window and max requests
+    - IP-based tracking
+    - Custom error responses
+  - Implemented error handling middleware in [`apps/api/src/middleware/error-handler-middleware.ts`](apps/api/src/middleware/error-handler-middleware.ts:1):
+    - Centralized error handling
+    - Consistent JSON error responses
+    - Proper HTTP status codes
+    - Error logging
+  - Created brand controller in [`apps/api/src/controllers/brand-controller.ts`](apps/api/src/controllers/brand-controller.ts:1):
+    - getBrands: List all brands with pagination
+    - getBrandBySlug: Get brand details by slug
+    - refreshBrands: Trigger brand data refresh
+  - Created flavor controller in [`apps/api/src/controllers/flavor-controller.ts`](apps/api/src/controllers/flavor-controller.ts:1):
+    - getFlavors: List all flavors with filtering
+    - getFlavorBySlug: Get flavor details by slug
+    - getFlavorsByBrand: Get flavors for specific brand
+    - refreshFlavors: Trigger flavor data refresh
+  - Created health controller in [`apps/api/src/controllers/health-controller.ts`](apps/api/src/controllers/health-controller.ts:1):
+    - healthCheck: Basic health check
+    - healthCheckDetailed: Detailed health check with cache stats
+  - Created brand routes in [`apps/api/src/routes/brand-routes.ts`](apps/api/src/routes/brand-routes.ts:1):
+    - GET /api/v1/brands - List brands
+    - GET /api/v1/brands/:slug - Get brand by slug
+    - POST /api/v1/brands/refresh - Refresh brand data
+    - GET /api/v1/brands/:brandSlug/flavors - Get brand flavors
+  - Created flavor routes in [`apps/api/src/routes/flavor-routes.ts`](apps/api/src/routes/flavor-routes.ts:1):
+    - GET /api/v1/flavors - List flavors
+    - GET /api/v1/flavors/:slug - Get flavor by slug
+    - POST /api/v1/flavors/refresh - Refresh flavor data
+  - Wired everything together in [`apps/api/src/server.ts`](apps/api/src/server.ts:1):
+    - Express server setup
+    - Middleware order: CORS → JSON parsing → Rate limiting → Authentication → Routes → Error handling
+    - Health check endpoints
+    - API v1 routes
+    - 404 handler
+  - Created comprehensive API test suite:
+    - 33 tests for middleware in [`tests/unit/api/middleware.test.ts`](tests/unit/api/middleware.test.ts:1)
+    - 27 tests for brand routes in [`tests/unit/api/brand-routes.test.ts`](tests/unit/api/brand-routes.test.ts:1)
+    - 35 tests for flavor routes in [`tests/unit/api/flavor-routes.test.ts`](tests/unit/api/flavor-routes.test.ts:1)
+    - 24 tests for health endpoints in [`tests/unit/api/health.test.ts`](tests/unit/api/health.test.ts:1)
+  - All 119 API tests passing (119/119)
+  - Total project tests: 874 tests (all passing)
+  - Dependencies installed: express-rate-limit@7.5.0, @types/express-rate-limit@7.1.0
 
 - **Services Package Implementation** (2026-01-05):
   - Implemented BrandService in [`packages/services/src/brand-service.ts`](packages/services/src/brand-service.ts:1):
@@ -46,7 +107,6 @@ The project has been restructured as a monorepo using pnpm workspaces and Turbor
     - 67 tests for FlavorService in [`tests/unit/services/flavor-service.test.ts`](tests/unit/services/flavor-service.test.ts:1)
     - 64 tests for DataService in [`tests/unit/services/data-service.test.ts`](tests/unit/services/data-service.test.ts:1)
   - All 198 service tests passing (198/198)
-  - Total project tests: 755 tests (all passing)
   - Dependencies installed: No additional dependencies required
 
 - **Cache Layer Implementation** (2026-01-05):
@@ -120,10 +180,10 @@ The project has been restructured as a monorepo using pnpm workspaces and Turbor
 
 ## Next Steps
 
-1. **Build API server**: Set up Express server with REST endpoints
-2. **Add authentication**: Implement API key middleware
-3. **Write API tests**: Create tests for API endpoints
-4. **Documentation**: Write API documentation
+1. **Write API documentation**: Create Swagger/OpenAPI documentation for API endpoints
+2. **Deploy API server**: Set up production deployment with process manager
+3. **Set up monitoring**: Implement logging and monitoring for production
+4. **Implement data refresh scheduler**: Automated cache refresh on schedule
 
 ## Technical Decisions Made
 
@@ -136,12 +196,15 @@ The project has been restructured as a monorepo using pnpm workspaces and Turbor
 - **Scraper Architecture**: Modular design with separate HTTP client, HTML parser, and scraper classes
 - **Caching Solution**: In-memory with node-cache, with interface designed for future Redis implementation
 - **Services Architecture**: Service layer with cache-first strategy and comprehensive error handling
+- **API Authentication**: API key-based authentication via X-API-Key header
+- **Rate Limiting**: express-rate-limit for IP-based rate limiting
+- **Error Handling**: Centralized error handling middleware with consistent JSON responses
 
 ## Technical Decisions Pending
 
 - **Database**: Whether to use persistent storage or just cache
 - **Scraping Strategy**: How frequently to scrape htreviews.org
-- **Rate Limiting**: Implementation approach for API rate limiting
+- **Data Refresh Scheduler**: Implementation approach for automated cache refresh
 
 ## Key Considerations
 
@@ -154,7 +217,9 @@ The project has been restructured as a monorepo using pnpm workspaces and Turbor
 - All scraper functions are fully tested with 408 unit tests (100% pass rate)
 - All cache functions are fully tested with 73 unit tests (100% pass rate)
 - All service functions are fully tested with 198 unit tests (100% pass rate)
+- All API functions are fully tested with 119 unit tests (100% pass rate)
 - Integration tests available but disabled by default to respect htreviews.org resources
 - Cache layer implemented with in-memory storage using node-cache, with interface designed for future Redis implementation
 - Services layer implements cache-first strategy with fallback to scraper for data retrieval
 - Business logic layer is now complete with comprehensive orchestration of scraper and cache
+- API layer is now complete with authentication, rate limiting, error handling, and comprehensive test coverage
