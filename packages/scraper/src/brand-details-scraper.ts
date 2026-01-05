@@ -20,6 +20,10 @@ import {
   parseInteger,
   extractSlugFromUrl,
 } from './html-parser';
+import { LoggerFactory } from '@hookah-db/utils';
+
+// Initialize logger
+const logger = LoggerFactory.createEnvironmentLogger('scraper');
 
 // ============================================================================
 // Brand Details Scraper Implementation
@@ -36,19 +40,19 @@ import {
  */
 export async function scrapeBrandDetails(brandSlug: string): Promise<Brand | null> {
   const scraper = new Scraper();
-
+  
   try {
     // Fetch and parse brand detail page
     const $ = await scraper.fetchAndParse(`/tobaccos/${brandSlug}`);
-
+    
     // Extract brand basic information
     const brand = extractBrandBasicInfo($, brandSlug);
     
     if (!brand) {
-      console.warn(`Failed to extract basic brand info for slug: ${brandSlug}`);
+      logger.warn('Failed to extract basic brand info', { brandSlug } as any);
       return null;
     }
-
+    
     // Extract rating distribution (not used in Brand model but available for future use)
     parseRatingDistribution($, '.score_meter .score_meter_item');
     
@@ -77,13 +81,17 @@ export async function scrapeBrandDetails(brandSlug: string): Promise<Brand | nul
       flavors: [], // Flavors will be scraped separately
     };
 
-    console.log(`Successfully scraped brand details for: ${brand.name} (${brandSlug})`);
-    console.log(`  - Lines: ${lines.length}`);
-    console.log(`  - Rating: ${brand.rating} (${brand.ratingsCount} ratings)`);
+    logger.info('Successfully scraped brand details', { 
+      brandName: brand.name, 
+      brandSlug, 
+      linesCount: lines.length,
+      rating: brand.rating,
+      ratingsCount: brand.ratingsCount 
+    } as any);
 
     return brandDetails;
   } catch (error) {
-    console.error(`Failed to scrape brand details for ${brandSlug}`);
+    logger.error('Failed to scrape brand details', { brandSlug, error } as any);
     return null;
   }
 }
@@ -104,7 +112,7 @@ function extractBrandBasicInfo($: CheerioAPI, brandSlug: string): Brand | null {
     const nameEn = extractText($, '.object_card_title span');
 
     if (!name) {
-      console.warn('Brand name not found');
+      logger.warn('Brand name not found' as any);
       return null;
     }
 
@@ -166,7 +174,7 @@ function extractBrandBasicInfo($: CheerioAPI, brandSlug: string): Brand | null {
       flavors: [], // Will be populated separately
     };
   } catch (error) {
-    console.error('Error extracting brand basic info:', error);
+    logger.error('Error extracting brand basic info', { error } as any);
     return null;
   }
 }
@@ -273,7 +281,7 @@ function extractLines($: CheerioAPI, brandSlug: string): Line[] {
         lines.push(line);
       }
     } catch (error) {
-      console.error('Error parsing line item:', error);
+      logger.error('Error parsing line item', { error } as any);
       // Skip invalid items and continue with others
     }
   }
@@ -295,7 +303,7 @@ function parseLineItem(lineItem: any, brandSlug: string): Line | null {
   const slug = extractSlugFromUrl(href);
 
   if (!slug) {
-    console.warn('Line slug not found');
+    logger.warn('Line slug not found' as any);
     return null;
   }
 

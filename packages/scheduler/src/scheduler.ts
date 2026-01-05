@@ -15,11 +15,33 @@ import type {
   SchedulerStats,
   ScheduledTask as ScheduledTaskInterface
 } from './types';
+import { LoggerFactory } from '@hookah-db/utils';
+
+// Initialize logger
+const logger = LoggerFactory.createEnvironmentLogger('scheduler');
 
 /**
  * Internal task wrapper that includes cron task instance and running status
  */
-interface InternalScheduledTask extends ScheduledTaskInterface {
+interface InternalScheduledTask {
+  /** Unique task identifier */
+  taskId: string;
+  /** Task name */
+  name: string;
+  /** Cron expression for scheduling */
+  cronExpression: string;
+  /** Task function to execute */
+  task: () => Promise<void>;
+  /** Whether task is enabled */
+  enabled: boolean;
+  /** Total number of successful runs */
+  runCount: number;
+  /** Total number of errors */
+  errorCount: number;
+  /** Execution history */
+  executionHistory: TaskExecutionResult[];
+  /** Last run timestamp */
+  lastRun?: Date;
   /** Cron task instance from node-cron */
   cronTask: CronTask;
   /** Whether task is currently running (scheduled) */
@@ -30,7 +52,7 @@ interface InternalScheduledTask extends ScheduledTaskInterface {
  * Scheduler class for managing scheduled tasks
  *
  * This class provides a centralized way to schedule and manage
- * periodic data refresh operations, ensuring the cache stays
+ * periodic data refresh operations, ensuring that cache stays
  * up-to-date with minimal manual intervention.
  */
 export class Scheduler {
@@ -65,7 +87,7 @@ export class Scheduler {
   // ==========================================================================
 
   /**
-   * Start the scheduler and begin executing scheduled tasks
+   * Start scheduler and begin executing scheduled tasks
    *
    * Initializes all configured cron tasks and starts their execution.
    * Only starts if scheduler is enabled in configuration.
@@ -78,15 +100,14 @@ export class Scheduler {
     }
 
     if (!this.config.enabled) {
-      console.log('[Scheduler] Scheduler is disabled in configuration');
+      logger.info('Scheduler is disabled in configuration' as any);
       return;
     }
 
     this.isRunning = true;
     this.startTime = new Date();
 
-    console.log('[Scheduler] Starting scheduler...');
-    console.log(`[Scheduler] Timezone: ${this.config.timezone}`);
+    logger.info('Starting scheduler', { timezone: this.config.timezone } as any);
 
     // Start all enabled tasks
     let startedCount = 0;
@@ -95,26 +116,29 @@ export class Scheduler {
         task.cronTask.start();
         task.isRunning = true;
         startedCount++;
-        console.log(`[Scheduler] Task '${task.name}' (ID: ${task.taskId}) started`);
+        logger.info('Task started', { 
+          taskName: task.name, 
+          taskId: task.taskId 
+        } as any);
       }
     });
 
-    console.log(`[Scheduler] Started ${startedCount} tasks`);
+    logger.info('Started tasks', { count: startedCount } as any);
   }
 
   /**
-   * Stop the scheduler and cancel all scheduled tasks
+   * Stop scheduler and cancel all scheduled tasks
    *
-   * Gracefully stops all cron tasks and clears the task registry.
+   * Gracefully stops all cron tasks and clears task registry.
    * This should be called during application shutdown.
    */
   async stop(): Promise<void> {
     if (!this.isRunning) {
-      console.log('[Scheduler] Scheduler is not running');
+      logger.info('Scheduler is not running' as any);
       return;
     }
 
-    console.log('[Scheduler] Stopping scheduler...');
+    logger.info('Stopping scheduler' as any);
 
     // Stop all tasks
     let stoppedCount = 0;
@@ -123,13 +147,16 @@ export class Scheduler {
         task.cronTask.stop();
         task.isRunning = false;
         stoppedCount++;
-        console.log(`[Scheduler] Task '${task.name}' (ID: ${task.taskId}) stopped`);
+        logger.info('Task stopped', { 
+          taskName: task.name, 
+          taskId: task.taskId 
+        } as any);
       }
     });
 
     this.isRunning = false;
-    console.log(`[Scheduler] Stopped ${stoppedCount} tasks`);
-    console.log('[Scheduler] Scheduler stopped successfully');
+    logger.info('Stopped tasks', { count: stoppedCount } as any);
+    logger.info('Scheduler stopped successfully' as any);
   }
 
   // ==========================================================================
@@ -191,7 +218,11 @@ export class Scheduler {
       task.isRunning = true;
     }
 
-    console.log(`[Scheduler] Task '${config.name}' (ID: ${taskId}) scheduled with expression: ${config.cronExpression}`);
+    logger.info('Task scheduled', { 
+      taskName: config.name, 
+      taskId, 
+      cronExpression: config.cronExpression 
+    } as any);
 
     return taskId;
   }
@@ -205,17 +236,20 @@ export class Scheduler {
   unscheduleJob(taskId: string): boolean {
     const task = this.tasks.get(taskId);
     if (!task) {
-      console.log(`[Scheduler] Task with ID '${taskId}' not found`);
+      logger.info('Task not found', { taskId } as any);
       return false;
     }
 
-    // Stop the cron task
+    // Stop cron task
     if (task.isRunning) {
       task.cronTask.stop();
     }
 
     this.tasks.delete(taskId);
-    console.log(`[Scheduler] Task '${task.name}' (ID: ${taskId}) unscheduled`);
+    logger.info('Task unscheduled', { 
+      taskName: task.name, 
+      taskId 
+    } as any);
     return true;
   }
 
@@ -228,20 +262,23 @@ export class Scheduler {
   enableJob(taskId: string): boolean {
     const task = this.tasks.get(taskId);
     if (!task) {
-      console.log(`[Scheduler] Task with ID '${taskId}' not found`);
+      logger.info('Task not found', { taskId } as any);
       return false;
     }
 
     if (!task.enabled) {
       task.enabled = true;
-      
+
       // Start cron task if scheduler is running
       if (this.isRunning && !task.isRunning) {
         task.cronTask.start();
         task.isRunning = true;
       }
 
-      console.log(`[Scheduler] Task '${task.name}' (ID: ${taskId}) enabled`);
+      logger.info('Task enabled', { 
+        taskName: task.name, 
+        taskId 
+      } as any);
     }
 
     return true;
@@ -256,20 +293,23 @@ export class Scheduler {
   disableJob(taskId: string): boolean {
     const task = this.tasks.get(taskId);
     if (!task) {
-      console.log(`[Scheduler] Task with ID '${taskId}' not found`);
+      logger.info('Task not found', { taskId } as any);
       return false;
     }
 
     if (task.enabled) {
       task.enabled = false;
-      
+
       // Stop cron task if it's running
       if (task.isRunning) {
         task.cronTask.stop();
         task.isRunning = false;
       }
 
-      console.log(`[Scheduler] Task '${task.name}' (ID: ${taskId}) disabled`);
+      logger.info('Task disabled', { 
+        taskName: task.name, 
+        taskId 
+      } as any);
     }
 
     return true;
@@ -282,7 +322,7 @@ export class Scheduler {
   /**
    * Schedule brands data refresh task
    *
-   * Creates a scheduled task to refresh brand data using the configured
+   * Creates a scheduled task to refresh brand data using configured
    * brandsSchedule cron expression.
    *
    * @param refreshBrands Function to refresh brand data (typically DataService.refreshAllCache)
@@ -300,7 +340,7 @@ export class Scheduler {
   /**
    * Schedule flavors data refresh task
    *
-   * Creates a scheduled task to refresh flavor data using the configured
+   * Creates a scheduled task to refresh flavor data using configured
    * flavorsSchedule cron expression.
    *
    * @param refreshFlavors Function to refresh flavor data (typically DataService.refreshAllCache)
@@ -318,7 +358,7 @@ export class Scheduler {
   /**
    * Schedule all data refresh task
    *
-   * Creates a scheduled task to refresh all cached data using the configured
+   * Creates a scheduled task to refresh all cached data using configured
    * allDataSchedule cron expression.
    *
    * @param refreshAllData Function to refresh all data (typically DataService.refreshAllCache)
@@ -351,8 +391,8 @@ export class Scheduler {
     const flavorsTaskId = this.scheduleFlavorsRefresh(refreshAllData);
     const allDataTaskId = this.scheduleAllDataRefresh(refreshAllData);
 
-    console.log('[Scheduler] All default refresh tasks scheduled');
-    
+    logger.info('All default refresh tasks scheduled' as any);
+
     return {
       brandsTaskId,
       flavorsTaskId,
@@ -382,7 +422,11 @@ export class Scheduler {
     }
 
     const startTime = new Date();
-    console.log(`[Scheduler] Starting task '${taskName}' (ID: ${taskId}) at ${startTime.toISOString()}`);
+    logger.info('Starting task', { 
+      taskName, 
+      taskId, 
+      startTime: startTime.toISOString() 
+    } as any);
 
     try {
       await task();
@@ -407,7 +451,11 @@ export class Scheduler {
       scheduledTask.executionHistory.push(result);
       this.trimExecutionHistory(scheduledTask);
 
-      console.log(`[Scheduler] Task '${taskName}' (ID: ${taskId}) completed successfully in ${duration}ms`);
+      logger.info('Task completed successfully', { 
+        taskName, 
+        taskId, 
+        duration 
+      } as any);
     } catch (error) {
       const endTime = new Date();
       const duration = endTime.getTime() - startTime.getTime();
@@ -430,7 +478,12 @@ export class Scheduler {
       scheduledTask.executionHistory.push(result);
       this.trimExecutionHistory(scheduledTask);
 
-      console.error(`[Scheduler] Task '${taskName}' (ID: ${taskId}) failed after ${duration}ms:`, error);
+      logger.error('Task failed', { 
+        taskName, 
+        taskId, 
+        duration, 
+        error 
+      } as any);
     }
   }
 
@@ -457,10 +510,10 @@ export class Scheduler {
    */
   getStats(): SchedulerStats {
     const tasksArray = Array.from(this.tasks.values());
-    
+
     const totalRuns = tasksArray.reduce((sum, task) => sum + task.runCount, 0);
     const totalErrors = tasksArray.reduce((sum, task) => sum + task.errorCount, 0);
-    
+
     const activeTasksCount = tasksArray.filter(task => task.enabled).length;
 
     const allExecutionResults = tasksArray.flatMap(task => task.executionHistory);
@@ -520,7 +573,7 @@ export class Scheduler {
     }
 
     const history = [...task.executionHistory];
-    
+
     if (limit !== undefined && limit > 0) {
       return history.slice(-limit);
     }
@@ -536,13 +589,17 @@ export class Scheduler {
   clearExecutionHistory(taskId: string): void {
     const task = this.tasks.get(taskId);
     if (!task) {
-      console.log(`[Scheduler] Task with ID '${taskId}' not found`);
+      logger.info('Task not found', { taskId } as any);
       return;
     }
 
     const clearedCount = task.executionHistory.length;
     task.executionHistory = [];
-    console.log(`[Scheduler] Cleared ${clearedCount} execution history entries for task '${task.name}' (ID: ${taskId})`);
+    logger.info('Cleared execution history', { 
+      taskName: task.name, 
+      taskId, 
+      count: clearedCount 
+    } as any);
   }
 
   /**

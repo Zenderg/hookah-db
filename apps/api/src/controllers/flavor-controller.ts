@@ -2,7 +2,7 @@
  * Flavor Controller
  * 
  * Handles HTTP requests for flavor-related operations.
- * Coordinates between Express routes and the FlavorService.
+ * Coordinates between Express routes and FlavorService.
  */
 
 import { Request, Response } from 'express';
@@ -10,6 +10,10 @@ import { FlavorService } from '@hookah-db/services';
 import { Flavor } from '@hookah-db/types';
 import { createCache } from '@hookah-db/cache';
 import { scrapeFlavorDetails } from '@hookah-db/scraper';
+import { LoggerFactory } from '@hookah-db/utils';
+
+// Initialize logger
+const logger = LoggerFactory.createEnvironmentLogger('flavor-controller');
 
 // ============================================================================
 // Service Initialization
@@ -83,7 +87,7 @@ export async function getFlavors(req: Request, res: Response): Promise<void> {
     if (strength) {
       flavors = flavors.filter(
         flavor => flavor.userStrength?.toLowerCase() === strength.toLowerCase() ||
-                  flavor.officialStrength?.toLowerCase() === strength.toLowerCase()
+                   flavor.officialStrength?.toLowerCase() === strength.toLowerCase()
       );
     }
 
@@ -132,7 +136,7 @@ export async function getFlavors(req: Request, res: Response): Promise<void> {
       },
     });
   } catch (error) {
-    console.error('Error in getFlavors controller:', error);
+    logger.error('Error in getFlavors controller', { error } as any);
     throw error;
   }
 }
@@ -169,7 +173,7 @@ export async function getFlavorBySlug(req: Request, res: Response): Promise<void
     // Send response
     res.status(200).json(flavor);
   } catch (error) {
-    console.error(`Error in getFlavorBySlug controller for slug '${req.params.slug}':`, error);
+    logger.error('Error in getFlavorBySlug controller', { slug: req.params.slug, error } as any);
     throw error;
   }
 }
@@ -212,7 +216,7 @@ export async function getFlavorsByBrand(req: Request, res: Response): Promise<vo
     const lineSlug = req.query.lineSlug as string | undefined;
     const sort = req.query.sort as string | undefined;
 
-    // Get flavors for the brand
+    // Get flavors for brand
     let flavors = await flavorService.getFlavorsByBrand(brandSlug);
 
     // Check if brand has any flavors
@@ -264,7 +268,7 @@ export async function getFlavorsByBrand(req: Request, res: Response): Promise<vo
       },
     });
   } catch (error) {
-    console.error(`Error in getFlavorsByBrand controller for brand '${req.params.brandSlug}':`, error);
+    logger.error('Error in getFlavorsByBrand controller', { brandSlug: req.params.brandSlug, error } as any);
     throw error;
   }
 }
@@ -303,7 +307,7 @@ export async function refreshFlavors(_req: Request, res: Response): Promise<void
       data: flavors,
     });
   } catch (error) {
-    console.error('Error in refreshFlavors controller:', error);
+    logger.error('Error in refreshFlavors controller', { error } as any);
     throw error;
   }
 }

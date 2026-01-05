@@ -8,6 +8,10 @@
 import { Brand } from '@hookah-db/types';
 import { scrapeBrandsList, scrapeBrandDetails } from '@hookah-db/scraper';
 import { ICache } from '@hookah-db/cache';
+import { LoggerFactory } from '@hookah-db/utils';
+
+// Initialize logger
+const logger = LoggerFactory.createEnvironmentLogger('brand-service');
 
 // ============================================================================
 // Constants
@@ -98,12 +102,12 @@ export class BrandService {
       
       return brands;
     } catch (error) {
-      console.error('Failed to scrape brands list:', error);
+      logger.error('Failed to scrape brands list', { error } as any);
       
       // Fall back to cached data if available
       const cachedBrands = this.cache.getBrands();
       if (cachedBrands && cachedBrands.length > 0) {
-        console.warn('Returning stale cached brands data');
+        logger.warn('Returning stale cached brands data' as any);
         return cachedBrands;
       }
       
@@ -146,12 +150,12 @@ export class BrandService {
       // Brand not found
       return null;
     } catch (error) {
-      console.error(`Failed to scrape brand details for slug: ${slug}`, error);
+      logger.error('Failed to scrape brand details', { slug, error } as any);
       
       // Fall back to cached data if available
       const cachedBrand = this.cache.getBrand(slug);
       if (cachedBrand) {
-        console.warn(`Returning stale cached brand data for slug: ${slug}`);
+        logger.warn('Returning stale cached brand data', { slug } as any);
         return cachedBrand;
       }
       
@@ -180,7 +184,7 @@ export class BrandService {
       
       return filteredBrands;
     } catch (error) {
-      console.error(`Failed to get brands by country: ${country}`, error);
+      logger.error('Failed to get brands by country', { country, error } as any);
       return [];
     }
   }
@@ -198,7 +202,7 @@ export class BrandService {
       // Force refresh by passing true to getAllBrands
       await this.getAllBrands(true);
     } catch (error) {
-      console.error('Failed to refresh brand cache:', error);
+      logger.error('Failed to refresh brand cache', { error } as any);
       throw error;
     }
   }

@@ -12,13 +12,17 @@ import {
   extractSlugFromUrl,
   CheerioAPI,
 } from './html-parser';
+import { LoggerFactory } from '@hookah-db/utils';
+
+// Initialize logger
+const logger = LoggerFactory.createEnvironmentLogger('scraper');
 
 // ============================================================================
 // Type Definitions
 // ============================================================================
 
 /**
- * Brand summary with basic information extracted from the brands listing page
+ * Brand summary with basic information extracted from brands listing page
  * This is a partial Brand object with only the fields available on the listing page
  */
 export interface BrandSummary {
@@ -50,7 +54,7 @@ export interface BrandSummary {
 export async function scrapeBrandsList(): Promise<BrandSummary[]> {
   const scraper = new Scraper();
   const brands: BrandSummary[] = [];
-
+  
   try {
     // Fetch and parse the brands listing page
     const $ = await scraper.fetchAndParse('/tobaccos/brands');
@@ -65,14 +69,17 @@ export async function scrapeBrandsList(): Promise<BrandSummary[]> {
       const $section = $(section.selector);
       
       if ($section.length === 0) {
-        console.warn(`Section "${section.name}" not found on brands page`);
+        logger.warn('Section not found on brands page', { section: section.name } as any);
         continue;
       }
 
       // Extract all brand items from this section
       const $items = $section.find('.tobacco_list_item');
       
-      console.log(`Found ${$items.length} brands in "${section.name}" section`);
+      logger.info('Found brands in section', { 
+        section: section.name, 
+        count: $items.length 
+      } as any);
 
       $items.each((_, element) => {
         try {
@@ -83,13 +90,13 @@ export async function scrapeBrandsList(): Promise<BrandSummary[]> {
             brands.push(brand);
           }
         } catch (error) {
-          console.error('Error parsing brand item:', error);
+          logger.error('Error parsing brand item', { error } as any);
           // Skip invalid items and continue with others
         }
       });
     }
 
-    console.log(`Successfully scraped ${brands.length} brands total`);
+    logger.info('Successfully scraped brands', { total: brands.length } as any);
 
     // TODO: Implement pagination support
     // Check if there are more pages by looking for pagination controls
@@ -98,7 +105,7 @@ export async function scrapeBrandsList(): Promise<BrandSummary[]> {
 
     return brands;
   } catch (error) {
-    console.error('Failed to scrape brands list:', error);
+    logger.error('Failed to scrape brands list', { error } as any);
     // Return empty array if scraping fails completely
     return [];
   }
@@ -125,7 +132,7 @@ function parseBrandItem($: CheerioAPI, element: any): BrandSummary {
   // Extract brand name (first span in the slug element)
   const name = $slugElement.find('span:first-child').text().trim();
 
-  // For now, nameEn is the same as name (will be updated from brand detail page later)
+  // For now, nameEn is the same as name (will be updated from the brand detail page later)
   const nameEn = name;
 
   // Extract country

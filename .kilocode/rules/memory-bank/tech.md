@@ -37,6 +37,18 @@
 - Configuration via environment variables for flexible scheduling
 - Graceful shutdown and error handling
 
+### Logging
+- **Winston**: Versatile logging library for Node.js with multiple transports
+- **winston-daily-rotate-file**: Daily log rotation with configurable retention
+- **UUID**: Unique identifier generation for correlation IDs
+- **Structured logging**: JSON-formatted logs for easy parsing and analysis
+- **Multiple log levels**: ERROR, WARN, INFO, HTTP, VERBOSE, DEBUG, SILLY
+- **Multiple transports**: Console, file, and combined logging options
+- **Log rotation**: Daily rotation with automatic compression and retention
+- **Correlation ID tracking**: Request tracing across distributed systems
+- **Sensitive data filtering**: Automatic redaction of passwords, tokens, etc.
+- **Express middleware**: Automatic HTTP request/response logging
+
 ### Data Validation
 - **Zod**: TypeScript-first schema validation for API requests/responses
 - **Joi** (alternative): Object schema validation
@@ -97,6 +109,9 @@ Once the API server is running (default: `http://localhost:3000`), you can acces
 - **Swagger UI**: Interactive API documentation at `http://localhost:3000/api-docs`
 - **OpenAPI JSON**: Raw specification at `http://localhost:3000/api-docs.json`
 
+### Accessing Logging Documentation
+Comprehensive logging documentation is available at [`docs/LOGGING.md`](docs/LOGGING.md).
+
 ### TypeScript Configuration
 - **tsconfig.json**: Root TypeScript configuration
 - **packages/tsconfig/base.json**: Base TypeScript config shared across packages
@@ -132,6 +147,8 @@ hookah-db/
 │   ├── utils/             # Utility functions
 │   ├── config/            # Shared configuration
 │   └── tsconfig/          # Shared TypeScript configurations
+├── docs/                 # Documentation
+│   └── LOGGING.md        # Comprehensive logging documentation
 ├── pnpm-workspace.yaml    # pnpm workspace configuration
 ├── turbo.json             # Turborepo configuration
 └── package.json           # Root package.json
@@ -148,7 +165,7 @@ All packages use the `@hookah-db/*` naming convention:
 - `@hookah-db/cache` - Caching layer
 - `@hookah-db/services` - Business logic services
 - `@hookah-db/scheduler` - Cron job scheduler
-- `@hookah-db/utils` - Utility functions
+- `@hookah-db/utils` - Utility functions and logging system
 - `@hookah-db/config` - Shared configuration
 - `@hookah-db/tsconfig` - Shared TypeScript configurations
 
@@ -241,6 +258,16 @@ Packages use the `workspace:*` protocol to reference other packages in the monor
 - Shared types and utilities are imported via `@hookah-db/*` packages
 - Changes to shared packages trigger rebuilds of dependent packages
 
+### Logging Best Practices
+- Use appropriate log levels (error, warn, info, http, verbose, debug, silly)
+- Include relevant metadata in log entries
+- Filter sensitive data (passwords, tokens, API keys)
+- Use correlation IDs for request tracing
+- Log errors with stack traces
+- Use structured logging with JSON format in production
+- Configure log levels appropriately for each environment
+- Use child loggers for modules to add context
+
 ## Environment Variables
 
 ### Required Variables
@@ -253,6 +280,8 @@ Packages use the `workspace:*` protocol to reference other packages in the monor
 - `RATE_LIMIT_WINDOW`: Rate limit time window in milliseconds (default: 60000)
 - `RATE_LIMIT_MAX`: Maximum requests per window (default: 100)
 - `LOG_LEVEL`: Logging level (default: info)
+- `LOG_DIR`: Directory for log files (default: ./logs)
+- `SERVICE_NAME`: Service name for log identification (default: hookah-db)
 
 ### Scheduler Configuration
 - `SCHEDULER_ENABLED`: Enable/disable scheduler (default: true)
@@ -288,6 +317,8 @@ Packages use the `workspace:*` protocol to reference other packages in the monor
 - Track rate limit violations
 - Monitor server resources (CPU, memory, disk)
 - Monitor scheduler job execution and errors
+- Monitor log file sizes and rotation
+- Track correlation IDs for request tracing
 
 ## Installed Dependencies (as of 2026-01-05)
 
@@ -330,6 +361,13 @@ Packages use the `workspace:*` protocol to reference other packages in the monor
 ### Scheduler
 - node-cron: 3.0.3
 - @types/node-cron: 3.0.11
+
+### Logging
+- winston: 3.11.0
+- winston-daily-rotate-file: 4.7.1
+- @types/winston: 4.4.0
+- uuid: 9.0.1
+- @types/uuid: 9.0.8
 
 ### Environment & Configuration
 - dotenv: latest

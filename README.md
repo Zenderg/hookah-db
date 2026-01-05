@@ -11,6 +11,7 @@ A centralized data service that aggregates and provides structured information a
 - **Data Caching**: Efficient caching strategy to minimize scraping load
 - **Error Handling**: Robust error handling and rate limiting
 - **Automated Data Refresh**: Cron-based scheduler for automatic cache updates with configurable schedules
+- **Structured Logging**: Production-ready logging with Winston, file rotation, and request/response tracking
 
 ## Monorepo Structure
 
@@ -25,7 +26,7 @@ hookah-db/
 │   └── cli/               # CLI tool
 ├── packages/                # Shared packages
 │   ├── types/              # TypeScript types and interfaces
-│   ├── utils/              # Utility functions
+│   ├── utils/              # Utility functions (includes logging)
 │   ├── scraper/            # Web scraping logic
 │   ├── parser/             # HTML parsing logic
 │   ├── cache/              # Caching implementations
@@ -33,6 +34,8 @@ hookah-db/
 │   ├── scheduler/          # Cron job scheduler
 │   ├── config/             # Shared configuration
 │   └── tsconfig/           # TypeScript configurations
+├── docs/                   # Documentation
+│   └── LOGGING.md          # Comprehensive logging documentation
 ├── examples/                # Example HTML files
 └── .kilocode/             # Kilo Code configuration
 ```
@@ -40,7 +43,7 @@ hookah-db/
 ### Packages
 
 - **@hookah-db/types**: Shared TypeScript types and interfaces
-- **@hookah-db/utils**: Utility functions
+- **@hookah-db/utils**: Utility functions and logging system
 - **@hookah-db/scraper**: Web scraping logic for htreviews.org
 - **@hookah-db/parser**: HTML parsing with Cheerio
 - **@hookah-db/cache**: Caching layer (in-memory/Redis)
@@ -120,6 +123,59 @@ pnpm test
 pnpm test scheduler
 ```
 
+## Logging
+
+The project includes a comprehensive logging system built on Winston for production-ready structured logging.
+
+### Quick Start
+
+```typescript
+import { LoggerFactory } from '@hookah-db/utils';
+
+// Get logger configured for current environment
+const logger = LoggerFactory.createEnvironmentLogger('my-service');
+
+// Log messages at different levels
+logger.info('Application started');
+logger.error('An error occurred', { error: err });
+logger.debug('Debug information', { data: someData });
+```
+
+### Key Features
+
+- **Environment-aware configuration**: Automatically configures based on NODE_ENV
+- **Multiple transports**: Console, file, and combined logging
+- **Log rotation**: Daily file rotation with configurable retention
+- **Correlation ID tracking**: Request tracing across distributed systems
+- **Request/Response middleware**: Automatic HTTP logging for Express
+- **Sensitive data filtering**: Automatic redaction of passwords, tokens, etc.
+- **Log levels**: ERROR, WARN, INFO, HTTP, VERBOSE, DEBUG, SILLY
+- **Multiple formats**: JSON, simple, and pretty-printed output
+
+### Environment Variables
+
+```bash
+# Logging configuration
+LOG_LEVEL=info                    # Minimum log level (error, warn, info, http, verbose, debug, silly)
+LOG_DIR=./logs                    # Directory for log files
+SERVICE_NAME=hookah-db           # Service name for log identification
+NODE_ENV=production              # Environment (development, staging, production)
+```
+
+### Middleware Usage
+
+```typescript
+import express from 'express';
+import { createLoggingMiddleware } from './middleware/logging-middleware';
+
+const app = express();
+
+// Add logging middleware (logs both requests and responses)
+app.use(createLoggingMiddleware());
+```
+
+For comprehensive logging documentation, see [docs/LOGGING.md](docs/LOGGING.md).
+
 ## Technology Stack
 
 - **Runtime**: Node.js
@@ -128,6 +184,7 @@ pnpm test scheduler
 - **Build System**: Turborepo
 - **Web Scraping**: Cheerio, axios
 - **API Framework**: Express.js
+- **Logging**: Winston, winston-daily-rotate-file
 - **Scheduler**: node-cron for automated task scheduling
 - **Testing**: Jest, Supertest
 

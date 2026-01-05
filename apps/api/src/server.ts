@@ -16,6 +16,10 @@ import { BrandService } from '@hookah-db/services';
 import { FlavorService } from '@hookah-db/services';
 import { createCache } from '@hookah-db/cache';
 import { scrapeBrandsList, scrapeBrandDetails, scrapeFlavorDetails } from '@hookah-db/scraper';
+import { LoggerFactory } from '@hookah-db/utils';
+
+// Initialize logger
+const logger = LoggerFactory.createEnvironmentLogger('api-server');
 
 // Load environment variables from .env file in root directory
 // __dirname is apps/api/src, so we need to go up 3 levels to reach root
@@ -31,7 +35,7 @@ app.use(express.urlencoded({ extended: true }));
 // Request logging (optional, for development)
 if (process.env.NODE_ENV !== 'production') {
   app.use((req: Request, _res: Response, next: NextFunction) => {
-    console.log(`${req.method} ${req.url}`);
+    logger.info(`${req.method} ${req.url}` as any);
     next();
   });
 }
@@ -41,7 +45,7 @@ if (process.env.NODE_ENV !== 'production') {
  * /health:
  *   get:
  *     summary: Basic health check
- *     description: Returns basic API health status to verify the service is running. This endpoint is lightweight and does not require authentication.
+ *     description: Returns basic API health status to verify that service is running. This endpoint is lightweight and does not require authentication.
  *     tags:
  *       - Health
  *     responses:
@@ -223,17 +227,17 @@ const schedulerConfig = {
 // Create scheduler instance
 if (schedulerConfig.enabled) {
   scheduler = createScheduler(schedulerConfig);
-  console.log('Scheduler instance created');
+  logger.info('Scheduler instance created' as any);
 }
 
 // Graceful shutdown handlers
 const gracefulShutdown = async (signal: string) => {
-  console.log(`${signal} received, shutting down gracefully...`);
+  logger.info(`${signal} received, shutting down gracefully...` as any);
   
   if (scheduler) {
-    console.log('Stopping scheduler...');
+    logger.info('Stopping scheduler...' as any);
     await scheduler.stop();
-    console.log('Scheduler stopped');
+    logger.info('Scheduler stopped' as any);
   }
   
   process.exit(0);
@@ -253,26 +257,26 @@ export async function startServer(): Promise<void> {
       scheduler.scheduleDefaultRefreshTasks(() => dataService.refreshAllCache());
       
       await scheduler.start();
-      console.log('Scheduler started successfully');
-      console.log(`  - Brands refresh: ${schedulerConfig.brandsSchedule}`);
-      console.log(`  - Flavors refresh: ${schedulerConfig.flavorsSchedule}`);
-      console.log(`  - All data refresh: ${schedulerConfig.allDataSchedule}`);
+      logger.info('Scheduler started successfully' as any);
+      logger.info(`  - Brands refresh: ${schedulerConfig.brandsSchedule}` as any);
+      logger.info(`  - Flavors refresh: ${schedulerConfig.flavorsSchedule}` as any);
+      logger.info(`  - All data refresh: ${schedulerConfig.allDataSchedule}` as any);
     } catch (error) {
-      console.error('Failed to start scheduler:', error);
+      logger.error('Failed to start scheduler', { error } as any);
       // Continue without scheduler if it fails to start
     }
   } else {
-    console.log('Scheduler is disabled');
+    logger.info('Scheduler is disabled' as any);
   }
 
   app.listen(PORT, () => {
-    console.log(`Hookah Tobacco Database API server is running on port ${PORT}`);
-    console.log(`Health check: http://localhost:${PORT}/health`);
-    console.log(`API v1: http://localhost:${PORT}/api/v1`);
-    console.log(`API Documentation: http://localhost:${PORT}/api-docs`);
+    logger.info(`Hookah Tobacco Database API server is running on port ${PORT}` as any);
+    logger.info(`Health check: http://localhost:${PORT}/health` as any);
+    logger.info(`API v1: http://localhost:${PORT}/api/v1` as any);
+    logger.info(`API Documentation: http://localhost:${PORT}/api-docs` as any);
     if (scheduler && schedulerConfig.enabled) {
-      console.log(`Scheduler stats: http://localhost:${PORT}/api/v1/scheduler/stats`);
-      console.log(`Scheduler jobs: http://localhost:${PORT}/api/v1/scheduler/jobs`);
+      logger.info(`Scheduler stats: http://localhost:${PORT}/api/v1/scheduler/stats` as any);
+      logger.info(`Scheduler jobs: http://localhost:${PORT}/api/v1/scheduler/jobs` as any);
     }
   });
 }
@@ -283,7 +287,7 @@ export default app;
 // Start server if this file is run directly
 if (require.main === module) {
   startServer().catch((error) => {
-    console.error('Failed to start server:', error);
+    logger.error('Failed to start server', { error } as any);
     process.exit(1);
   });
 }

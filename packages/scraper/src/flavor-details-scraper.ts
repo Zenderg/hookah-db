@@ -21,6 +21,10 @@ import {
   CheerioAPI,
 } from './html-parser';
 import { Flavor } from '@hookah-db/types';
+import { LoggerFactory } from '@hookah-db/utils';
+
+// Initialize logger
+const logger = LoggerFactory.createEnvironmentLogger('scraper');
 
 // ============================================================================
 // Tag Interface
@@ -61,7 +65,7 @@ export async function scrapeFlavorDetails(
     const htreviewsIdAttr = extractAttribute($, '.object_wrapper', 'data-id');
     const htreviewsId = htreviewsIdAttr ? parseInteger(htreviewsIdAttr) : null;
     if (htreviewsId === null) {
-      console.error(`Failed to extract HTReviews ID for flavor: ${flavorSlug}`);
+      logger.error('Failed to extract HTReviews ID for flavor', { flavorSlug } as any);
       return null;
     }
 
@@ -153,7 +157,7 @@ export async function scrapeFlavorDetails(
 
     return flavor;
   } catch (error) {
-    console.error(`Failed to scrape flavor details for ${flavorSlug}:`, error);
+    logger.error('Failed to scrape flavor details', { flavorSlug, error } as any);
     return null;
   }
 }

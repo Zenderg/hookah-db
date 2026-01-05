@@ -7,6 +7,10 @@
 
 import { Request, Response } from 'express';
 import { createCache } from '@hookah-db/cache';
+import { LoggerFactory } from '@hookah-db/utils';
+
+// Initialize logger
+const logger = LoggerFactory.createEnvironmentLogger('health-controller');
 
 // ============================================================================
 // Type Definitions
@@ -81,7 +85,7 @@ export async function healthCheck(_req: Request, res: Response): Promise<void> {
 
     res.status(200).json(response);
   } catch (error) {
-    console.error('Error in healthCheck controller:', error);
+    logger.error('Error in healthCheck controller', { error } as any);
     throw error;
   }
 }
@@ -156,7 +160,7 @@ export async function healthCheckDetailed(_req: Request, res: Response): Promise
 
     res.status(200).json(response);
   } catch (error) {
-    console.error('Error in healthCheckDetailed controller:', error);
+    logger.error('Error in healthCheckDetailed controller', { error } as any);
     throw error;
   }
 }

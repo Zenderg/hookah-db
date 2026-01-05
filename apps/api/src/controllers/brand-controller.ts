@@ -2,7 +2,7 @@
  * Brand Controller
  * 
  * Handles HTTP requests for brand-related operations.
- * Coordinates between Express routes and the BrandService.
+ * Coordinates between Express routes and BrandService.
  */
 
 import { Request, Response } from 'express';
@@ -10,6 +10,10 @@ import { BrandService } from '@hookah-db/services';
 import { Brand } from '@hookah-db/types';
 import { createCache } from '@hookah-db/cache';
 import { scrapeBrandsList, scrapeBrandDetails } from '@hookah-db/scraper';
+import { LoggerFactory } from '@hookah-db/utils';
+
+// Initialize logger
+const logger = LoggerFactory.createEnvironmentLogger('brand-controller');
 
 // ============================================================================
 // Error Classes
@@ -122,7 +126,7 @@ export async function getBrands(req: Request, res: Response): Promise<void> {
       },
     });
   } catch (error) {
-    console.error('Error in getBrands controller:', error);
+    logger.error('Error in getBrands controller', { error } as any);
     throw error;
   }
 }
@@ -156,7 +160,7 @@ export async function getBrandBySlug(req: Request, res: Response): Promise<void>
     // Send response
     res.status(200).json(brand);
   } catch (error) {
-    console.error(`Error in getBrandBySlug controller for slug '${req.params.slug}':`, error);
+    logger.error('Error in getBrandBySlug controller', { slug: req.params.slug, error } as any);
     throw error;
   }
 }
@@ -195,7 +199,7 @@ export async function refreshBrands(_req: Request, res: Response): Promise<void>
       data: brands,
     });
   } catch (error) {
-    console.error('Error in refreshBrands controller:', error);
+    logger.error('Error in refreshBrands controller', { error } as any);
     throw error;
   }
 }

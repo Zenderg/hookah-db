@@ -8,6 +8,10 @@
 import { Brand, Flavor } from '@hookah-db/types';
 import { BrandService } from './brand-service';
 import { FlavorService } from './flavor-service';
+import { LoggerFactory } from '@hookah-db/utils';
+
+// Initialize logger
+const logger = LoggerFactory.createEnvironmentLogger('data-service');
 
 // ============================================================================
 // Data Service Implementation
@@ -17,9 +21,9 @@ import { FlavorService } from './flavor-service';
  * DataService acts as a facade for all data operations.
  * 
  * This service provides a unified entry point for API controllers,
- * delegating to the appropriate service (BrandService or FlavorService)
+ * delegating to appropriate service (BrandService or FlavorService)
  * for each operation. It implements the Facade pattern to simplify
- * the interface and hide the complexity of the underlying services.
+ * interface and hide complexity of underlying services.
  */
 export class DataService {
   private brandService: BrandService;
@@ -53,7 +57,7 @@ export class DataService {
     try {
       return await this.brandService.getAllBrands(forceRefresh);
     } catch (error) {
-      console.error('Failed to get all brands:', error);
+      logger.error('Failed to get all brands', { error } as any);
       return [];
     }
   }
@@ -69,7 +73,7 @@ export class DataService {
     try {
       return await this.brandService.getBrandBySlug(slug, forceRefresh);
     } catch (error) {
-      console.error(`Failed to get brand by slug: ${slug}`, error);
+      logger.error('Failed to get brand by slug', { slug, error } as any);
       return null;
     }
   }
@@ -78,13 +82,13 @@ export class DataService {
    * Get brands filtered by country
    * 
    * @param country Country name to filter by (e.g., "Россия", "USA")
-   * @returns Promise resolving to array of Brand objects matching the country
+   * @returns Promise resolving to array of Brand objects matching country
    */
   async getBrandsByCountry(country: string): Promise<Brand[]> {
     try {
       return await this.brandService.getBrandsByCountry(country);
     } catch (error) {
-      console.error(`Failed to get brands by country: ${country}`, error);
+      logger.error('Failed to get brands by country', { country, error } as any);
       return [];
     }
   }
@@ -103,7 +107,7 @@ export class DataService {
     try {
       return await this.flavorService.getAllFlavors(forceRefresh);
     } catch (error) {
-      console.error('Failed to get all flavors:', error);
+      logger.error('Failed to get all flavors', { error } as any);
       return [];
     }
   }
@@ -119,7 +123,7 @@ export class DataService {
     try {
       return await this.flavorService.getFlavorBySlug(slug, forceRefresh);
     } catch (error) {
-      console.error(`Failed to get flavor by slug: ${slug}`, error);
+      logger.error('Failed to get flavor by slug', { slug, error } as any);
       return null;
     }
   }
@@ -128,13 +132,13 @@ export class DataService {
    * Get flavors filtered by brand
    * 
    * @param brandSlug Brand slug to filter by (e.g., "sarma")
-   * @returns Promise resolving to array of Flavor objects matching the brand
+   * @returns Promise resolving to array of Flavor objects matching brand
    */
   async getFlavorsByBrand(brandSlug: string): Promise<Flavor[]> {
     try {
       return await this.flavorService.getFlavorsByBrand(brandSlug);
     } catch (error) {
-      console.error(`Failed to get flavors by brand: ${brandSlug}`, error);
+      logger.error('Failed to get flavors by brand', { brandSlug, error } as any);
       return [];
     }
   }
@@ -143,13 +147,13 @@ export class DataService {
    * Get flavors filtered by line
    * 
    * @param lineSlug Line slug to filter by (e.g., "klassicheskaya")
-   * @returns Promise resolving to array of Flavor objects matching the line
+   * @returns Promise resolving to array of Flavor objects matching line
    */
   async getFlavorsByLine(lineSlug: string): Promise<Flavor[]> {
     try {
       return await this.flavorService.getFlavorsByLine(lineSlug);
     } catch (error) {
-      console.error(`Failed to get flavors by line: ${lineSlug}`, error);
+      logger.error('Failed to get flavors by line', { lineSlug, error } as any);
       return [];
     }
   }
@@ -158,13 +162,13 @@ export class DataService {
    * Get flavors filtered by tag
    * 
    * @param tag Tag name to filter by (e.g., "Холодок")
-   * @returns Promise resolving to array of Flavor objects containing the tag
+   * @returns Promise resolving to array of Flavor objects containing tag
    */
   async getFlavorsByTag(tag: string): Promise<Flavor[]> {
     try {
       return await this.flavorService.getFlavorsByTag(tag);
     } catch (error) {
-      console.error(`Failed to get flavors by tag: ${tag}`, error);
+      logger.error('Failed to get flavors by tag', { tag, error } as any);
       return [];
     }
   }
@@ -197,7 +201,7 @@ export class DataService {
       
       return { brand, flavors };
     } catch (error) {
-      console.error(`Failed to get brand with flavors: ${brandSlug}`, error);
+      logger.error('Failed to get brand with flavors', { brandSlug, error } as any);
       return { brand: null, flavors: [] };
     }
   }
@@ -206,7 +210,7 @@ export class DataService {
    * Search flavors by query string
    * 
    * Searches flavors where name, nameAlt, description, or any tag
-   * contains the query string (case-insensitive).
+   * contains query string (case-insensitive).
    * 
    * @param query Search query string
    * @returns Promise resolving to array of matching Flavor objects
@@ -242,7 +246,7 @@ export class DataService {
       
       return filteredFlavors;
     } catch (error) {
-      console.error(`Failed to search flavors with query: ${query}`, error);
+      logger.error('Failed to search flavors', { query, error } as any);
       return [];
     }
   }
@@ -255,7 +259,7 @@ export class DataService {
    * Refresh all cached data
    * 
    * Forces a refresh of both brand and flavor caches by scraping fresh data.
-   * This updates the cache with the latest data from htreviews.org.
+   * This updates the cache with latest data from htreviews.org.
    * 
    * @returns Promise that resolves when cache refresh is complete
    */
@@ -266,7 +270,7 @@ export class DataService {
         this.flavorService.refreshFlavorCache()
       ]);
     } catch (error) {
-      console.error('Failed to refresh all cache:', error);
+      logger.error('Failed to refresh all cache', { error } as any);
       throw error;
     }
   }
@@ -275,7 +279,7 @@ export class DataService {
    * Clear all cached data
    * 
    * Clears both brand and flavor data from the cache.
-   * Note: This will force a full scrape on the next data access.
+   * Note: This will force a full scrape on next data access.
    * 
    * @returns Promise that resolves when cache clearing is complete
    */
@@ -286,7 +290,7 @@ export class DataService {
       // This will repopulate the cache with fresh data
       await this.refreshAllCache();
     } catch (error) {
-      console.error('Failed to clear all cache:', error);
+      logger.error('Failed to clear all cache', { error } as any);
       throw error;
     }
   }
@@ -322,7 +326,7 @@ export class DataService {
         }
       };
     } catch (error) {
-      console.error('Failed to get health status:', error);
+      logger.error('Failed to get health status', { error } as any);
       return {
         brands: { cached: false, count: 0 },
         flavors: { cached: false, count: 0 }

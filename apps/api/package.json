@@ -19,9 +19,9 @@
   "license": "ISC",
   "dependencies": {
     "@hookah-db/cache": "workspace:*",
+    "@hookah-db/scheduler": "workspace:*",
     "@hookah-db/scraper": "workspace:*",
     "@hookah-db/services": "workspace:*",
-    "@hookah-db/scheduler": "workspace:*",
     "@hookah-db/types": "workspace:*",
     "@hookah-db/utils": "workspace:*",
     "@types/dotenv": "^8.2.3",
@@ -29,7 +29,8 @@
     "express": "^5.2.1",
     "express-rate-limit": "^8.2.1",
     "swagger-jsdoc": "^6.2.8",
-    "swagger-ui-express": "^5.0.1"
+    "swagger-ui-express": "^5.0.1",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
@@ -37,6 +38,7 @@
     "@types/supertest": "^6.0.3",
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.8",
+    "@types/uuid": "^11.0.0",
     "jest": "^30.2.0",
     "nodemon": "^3.1.11",
     "supertest": "^7.1.4",

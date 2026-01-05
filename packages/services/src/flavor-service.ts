@@ -8,6 +8,10 @@
 import { Flavor } from '@hookah-db/types';
 import { scrapeFlavorDetails } from '@hookah-db/scraper';
 import { ICache } from '@hookah-db/cache';
+import { LoggerFactory } from '@hookah-db/utils';
+
+// Initialize logger
+const logger = LoggerFactory.createEnvironmentLogger('flavor-service');
 
 // ============================================================================
 // Constants
@@ -83,7 +87,7 @@ export class FlavorService {
       // 4. Store all flavors in cache
       
       // For now, return empty array - this will be populated by individual flavor scrapes
-      console.warn('getAllFlavors: Cannot scrape all flavors without BrandService. Use getFlavorBySlug for individual flavors.');
+      logger.warn('Cannot scrape all flavors without BrandService. Use getFlavorBySlug for individual flavors.' as any);
       
       // Check if we have any cached flavors to return
       const cachedFlavors = this.cache.getFlavors();
@@ -93,12 +97,12 @@ export class FlavorService {
       
       return [];
     } catch (error) {
-      console.error('Failed to scrape all flavors:', error);
+      logger.error('Failed to scrape all flavors', { error } as any);
       
       // Fall back to cached data if available
       const cachedFlavors = this.cache.getFlavors();
       if (cachedFlavors && cachedFlavors.length > 0) {
-        console.warn('Returning stale cached flavors data');
+        logger.warn('Returning stale cached flavors data' as any);
         return cachedFlavors;
       }
       
@@ -148,12 +152,12 @@ export class FlavorService {
       // Flavor not found
       return null;
     } catch (error) {
-      console.error(`Failed to scrape flavor details for slug: ${slug}`, error);
+      logger.error('Failed to scrape flavor details', { slug, error } as any);
       
       // Fall back to cached data if available
       const cachedFlavor = this.cache.getFlavor(slug);
       if (cachedFlavor) {
-        console.warn(`Returning stale cached flavor data for slug: ${slug}`);
+        logger.warn('Returning stale cached flavor data', { slug } as any);
         return cachedFlavor;
       }
       
@@ -168,7 +172,7 @@ export class FlavorService {
    * Retrieves all flavors (from cache or scrape) and filters by brandSlug.
    * 
    * @param brandSlug Brand slug to filter by (e.g., "sarma")
-   * @returns Promise resolving to array of Flavor objects matching the brand
+   * @returns Promise resolving to array of Flavor objects matching brand
    */
   async getFlavorsByBrand(brandSlug: string): Promise<Flavor[]> {
     try {
@@ -181,7 +185,7 @@ export class FlavorService {
       
       return filteredFlavors;
     } catch (error) {
-      console.error(`Failed to get flavors by brand: ${brandSlug}`, error);
+      logger.error('Failed to get flavors by brand', { brandSlug, error } as any);
       
       // Try using cache's getFlavorsByBrand method as fallback
       try {
@@ -198,7 +202,7 @@ export class FlavorService {
    * Retrieves all flavors (from cache or scrape) and filters by lineSlug.
    * 
    * @param lineSlug Line slug to filter by (e.g., "klassicheskaya")
-   * @returns Promise resolving to array of Flavor objects matching the line
+   * @returns Promise resolving to array of Flavor objects matching line
    */
   async getFlavorsByLine(lineSlug: string): Promise<Flavor[]> {
     try {
@@ -211,7 +215,7 @@ export class FlavorService {
       
       return filteredFlavors;
     } catch (error) {
-      console.error(`Failed to get flavors by line: ${lineSlug}`, error);
+      logger.error('Failed to get flavors by line', { lineSlug, error } as any);
       return [];
     }
   }
@@ -223,13 +227,13 @@ export class FlavorService {
    * Tag matching is case-insensitive.
    * 
    * @param tag Tag name to filter by (e.g., "Холодок")
-   * @returns Promise resolving to array of Flavor objects containing the tag
+   * @returns Promise resolving to array of Flavor objects containing tag
    */
   async getFlavorsByTag(tag: string): Promise<Flavor[]> {
     try {
       const allFlavors = await this.getAllFlavors();
       
-      // Filter flavors that contain the tag (case-insensitive)
+      // Filter flavors that contain tag (case-insensitive)
       const filteredFlavors = allFlavors.filter(
         flavor => flavor.tags.some(
           flavorTag => flavorTag.toLowerCase() === tag.toLowerCase()
@@ -238,7 +242,7 @@ export class FlavorService {
       
       return filteredFlavors;
     } catch (error) {
-      console.error(`Failed to get flavors by tag: ${tag}`, error);
+      logger.error('Failed to get flavors by tag', { tag, error } as any);
       return [];
     }
   }
@@ -256,7 +260,7 @@ export class FlavorService {
       // Force refresh by passing true to getAllFlavors
       await this.getAllFlavors(true);
     } catch (error) {
-      console.error('Failed to refresh flavor cache:', error);
+      logger.error('Failed to refresh flavor cache', { error } as any);
       throw error;
     }
   }
