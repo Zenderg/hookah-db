@@ -84,6 +84,11 @@ pnpm type-check
 pnpm clean
 ```
 
+### Accessing API Documentation
+Once the API server is running (default: `http://localhost:3000`), you can access:
+- **Swagger UI**: Interactive API documentation at `http://localhost:3000/api-docs`
+- **OpenAPI JSON**: Raw specification at `http://localhost:3000/api-docs.json`
+
 ### TypeScript Configuration
 - **tsconfig.json**: Root TypeScript configuration
 - **packages/tsconfig/base.json**: Base TypeScript config shared across packages
@@ -266,7 +271,7 @@ Packages use the `workspace:*` protocol to reference other packages in the monor
 - Track rate limit violations
 - Monitor server resources (CPU, memory, disk)
 
-## Installed Dependencies (as of 2026-01-04)
+## Installed Dependencies (as of 2026-01-05)
 
 ### Core Dependencies
 - cheerio: 1.1.2
@@ -289,3 +294,17 @@ Packages use the `workspace:*` protocol to reference other packages in the monor
 - @types/jest: 30.0.0
 - ts-jest: 29.4.6
 - supertest: 7.1.4
+
+### API Documentation
+- swagger-jsdoc: 6.2.8
+- swagger-ui-express: 5.0.1
+- @types/swagger-jsdoc: 6.0.4
+- @types/swagger-ui-express: 4.1.7
+
+### Security & Rate Limiting
+- express-rate-limit: 7.5.0
+- @types/express-rate-limit: 7.1.0
+
+### Caching
+- node-cache: 5.1.2
+- @types/node-cache: 4.2.5

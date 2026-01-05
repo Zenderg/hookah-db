@@ -21,22 +21,23 @@ graph TB
         F[Authentication Middleware]
         G[Rate Limiting Middleware]
         H[Error Handler Middleware]
+        I[Swagger UI]
     end
     
     subgraph "Controllers"
-        I[Brand Controller]
-        J[Flavor Controller]
-        K[Health Controller]
+        J[Brand Controller]
+        K[Flavor Controller]
+        L[Health Controller]
     end
     
     subgraph "Routes"
-        L[Brand Routes]
-        M[Flavor Routes]
-        N[Health Routes]
+        M[Brand Routes]
+        N[Flavor Routes]
+        O[Health Routes]
     end
     
     subgraph "Clients"
-        O[Authorized API Clients]
+        P[Authorized API Clients]
     end
     
     A --> B
@@ -46,16 +47,17 @@ graph TB
     F --> E
     G --> E
     H --> E
-    I --> L
+    I --> E
     J --> M
     K --> N
-    L --> E
+    L --> O
     M --> E
     N --> E
-    E --> O
+    O --> E
+    E --> P
     
     style A fill:#e1f5ff
-    style O fill:#c8e6c9
+    style P fill:#c8e6c9
 ```
 
 ## Source Code Structure
@@ -66,6 +68,7 @@ hookah-db/
 │   ├── api/               # REST API server
 │   │   ├── src/
 │   │   │   ├── server.ts  # Express server setup
+│   │   │   ├── swagger.ts # Swagger/OpenAPI configuration
 │   │   │   ├── routes/    # API route definitions
 │   │   │   │   ├── index.ts
 │   │   │   │   ├── brand-routes.ts
@@ -248,6 +251,12 @@ GET /health
 GET /health/detailed
   Returns: Detailed health check with cache stats
 
+GET /api-docs
+  Returns: Interactive Swagger UI for API documentation
+
+GET /api-docs.json
+  Returns: Raw OpenAPI specification JSON
+
 GET /api/v1/brands
   Query params: page, limit, country, sort
   Returns: List of brands with pagination
@@ -272,6 +281,43 @@ GET /api/v1/flavors/:slug
 POST /api/v1/flavors/refresh
   Returns: Refreshed flavor data
 ```
+
+### API Documentation
+
+The API includes comprehensive Swagger/OpenAPI documentation:
+
+- **Swagger UI Endpoint**: `GET /api-docs`
+  - Interactive web interface for exploring the API
+  - Test endpoints directly from the browser
+  - View request/response schemas and examples
+  - Accessible at `http://localhost:3000/api-docs` when server is running
+
+- **OpenAPI JSON Endpoint**: `GET /api-docs.json`
+  - Raw OpenAPI 3.0 specification in JSON format
+  - Can be used by API documentation generators
+  - Accessible at `http://localhost:3000/api-docs.json` when server is running
+
+- **Component Schemas** (6 defined):
+  - Brand: Complete brand data structure
+  - Flavor: Complete flavor data structure
+  - Line: Product line data structure
+  - RatingDistribution: Rating statistics distribution
+  - Error: Standard error response format
+  - Pagination: Pagination metadata
+
+- **Security Scheme**:
+  - ApiKeyAuth: API key authentication via X-API-Key header
+  - Required for all API v1 endpoints (except health checks)
+
+- **Tags** (3 categories):
+  - Brands: Brand-related endpoints
+  - Flavors: Flavor-related endpoints
+  - Health: Health check and monitoring endpoints
+
+- **Total Endpoints Documented**: 9
+  - 4 brand endpoints
+  - 3 flavor endpoints
+  - 2 health endpoints
 
 ### API Layer Implementation
 
@@ -339,7 +385,16 @@ POST /api/v1/flavors/refresh
   6. Error handler middleware
 - Health check endpoints (no auth required)
 - API v1 routes (auth required)
+- Swagger UI documentation endpoints (no auth required)
 - 404 handler for undefined routes
+
+**Swagger Configuration** ([`swagger.ts`](apps/api/src/swagger.ts:1)):
+- OpenAPI 3.0 specification
+- API metadata (title, version, description, license)
+- Component schemas for data models
+- Security scheme definition
+- Tags for endpoint organization
+- JSDoc comment integration for automatic spec generation
 
 ### Authentication
 
@@ -363,6 +418,7 @@ graph LR
     Auth[Auth Middleware] --> Server
     RateLimit[Rate Limit Middleware] --> Server
     ErrorHandler[Error Handler Middleware] --> Server
+    Swagger[Swagger UI] --> Server
 ```
 
 ## Critical Implementation Paths
@@ -371,6 +427,7 @@ graph LR
 2. **API Request Path**: Auth check → Rate limit check → Cache lookup → Return data or 404
 3. **Cache Update Path**: Scrape complete data → Validate → Update cache → Set TTL
 4. **Error Handling Path**: Controller throws error → Error handler middleware catches → Log error → Return JSON error response
+5. **Documentation Path**: JSDoc comments → swagger-jsdoc → OpenAPI spec → Swagger UI
 
 ## Design Patterns
 
@@ -381,12 +438,13 @@ graph LR
 - **Monorepo Pattern**: Shared packages organized by dependency layer
 - **Controller Pattern**: Request handlers separate from business logic
 - **Route Handler Pattern**: Route definitions separate from controller logic
+- **Documentation-First Pattern**: JSDoc comments drive API specification generation
 
 ## Package Dependency Layers
 
 ```
 Application Layer
-├── @hookah-db/api (depends on: services, utils, config, express-rate-limit)
+├── @hookah-db/api (depends on: services, utils, config, express-rate-limit, swagger-ui-express)
 └── @hookah-db/cli (depends on: services, utils, config)
 
 Business Layer

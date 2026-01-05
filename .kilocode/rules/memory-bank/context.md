@@ -31,9 +31,28 @@ The project has been restructured as a monorepo using pnpm workspaces and Turbor
   - Brand routes with 4 endpoints
   - Flavor routes with 4 endpoints
   - Server setup with proper middleware order
+  - Swagger/OpenAPI documentation with interactive UI
 - **Comprehensive test suite** with 874 unit tests and 20+ integration tests
 
 ## Recent Changes
+
+- **Swagger/OpenAPI Documentation Implementation** (2026-01-05):
+  - Installed swagger-jsdoc and swagger-ui-express dependencies
+  - Added comprehensive JSDoc comments to all API routes (9 endpoints total):
+    - Brand routes in [`apps/api/src/routes/brand-routes.ts`](apps/api/src/routes/brand-routes.ts:1) (4 endpoints)
+    - Flavor routes in [`apps/api/src/routes/flavor-routes.ts`](apps/api/src/routes/flavor-routes.ts:1) (3 endpoints)
+    - Health routes in [`apps/api/src/server.ts`](apps/api/src/server.ts:1) (2 endpoints)
+  - Created Swagger configuration file [`apps/api/src/swagger.ts`](apps/api/src/swagger.ts:1) with:
+    - OpenAPI 3.0 specification
+    - API metadata (title, version, description, license)
+    - 6 component schemas: Brand, Flavor, Line, RatingDistribution, Error, Pagination
+    - Security scheme: ApiKeyAuth (X-API-Key header)
+    - Tags: Brands, Flavors, Health
+  - Integrated Swagger UI into Express server:
+    - GET /api-docs - Interactive Swagger UI for API exploration
+    - GET /api-docs.json - Raw OpenAPI specification JSON
+  - All endpoints tested and working correctly
+  - Dependencies installed: swagger-jsdoc@6.2.8, swagger-ui-express@5.0.1, @types/swagger-jsdoc@6.0.4, @types/swagger-ui-express@4.1.7
 
 - **API Server Implementation** (2026-01-05):
   - Implemented authentication middleware in [`apps/api/src/middleware/auth-middleware.ts`](apps/api/src/middleware/auth-middleware.ts:1):
@@ -180,10 +199,9 @@ The project has been restructured as a monorepo using pnpm workspaces and Turbor
 
 ## Next Steps
 
-1. **Write API documentation**: Create Swagger/OpenAPI documentation for API endpoints
-2. **Deploy API server**: Set up production deployment with process manager
-3. **Set up monitoring**: Implement logging and monitoring for production
-4. **Implement data refresh scheduler**: Automated cache refresh on schedule
+1. **Deploy API server**: Set up production deployment with process manager
+2. **Set up monitoring**: Implement logging and monitoring for production
+3. **Implement data refresh scheduler**: Automated cache refresh on schedule
 
 ## Technical Decisions Made
 
@@ -199,6 +217,7 @@ The project has been restructured as a monorepo using pnpm workspaces and Turbor
 - **API Authentication**: API key-based authentication via X-API-Key header
 - **Rate Limiting**: express-rate-limit for IP-based rate limiting
 - **Error Handling**: Centralized error handling middleware with consistent JSON responses
+- **API Documentation**: Swagger/OpenAPI with swagger-jsdoc and swagger-ui-express for interactive documentation
 
 ## Technical Decisions Pending
 
@@ -222,4 +241,5 @@ The project has been restructured as a monorepo using pnpm workspaces and Turbor
 - Cache layer implemented with in-memory storage using node-cache, with interface designed for future Redis implementation
 - Services layer implements cache-first strategy with fallback to scraper for data retrieval
 - Business logic layer is now complete with comprehensive orchestration of scraper and cache
-- API layer is now complete with authentication, rate limiting, error handling, and comprehensive test coverage
+- API layer is now complete with authentication, rate limiting, error handling, Swagger/OpenAPI documentation, and comprehensive test coverage
+- API documentation available at /api-docs (Swagger UI) and /api-docs.json (OpenAPI spec)

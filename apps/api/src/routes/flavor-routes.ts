@@ -21,13 +21,253 @@ const router = Router();
 // Apply rate limiting to all flavor routes
 router.use(rateLimitMiddleware);
 
+/**
+ * @swagger
+ * /api/v1/flavors:
+ *   get:
+ *     summary: List all flavors
+ *     description: Retrieve a paginated list of all hookah tobacco flavors with optional filtering by brand, line, strength, tags, and sorting
+ *     tags:
+ *       - Flavors
+ *     security:
+ *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *           minimum: 1
+ *         description: Page number for pagination
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *           minimum: 1
+ *           maximum: 100
+ *         description: Number of items per page (max 100)
+ *       - in: query
+ *         name: brandSlug
+ *         schema:
+ *           type: string
+ *         description: Filter flavors by brand slug (unique identifier)
+ *         example: sarma
+ *       - in: query
+ *         name: lineSlug
+ *         schema:
+ *           type: string
+ *         description: Filter flavors by line slug (unique identifier)
+ *         example: klassicheskaya
+ *       - in: query
+ *         name: strength
+ *         schema:
+ *           type: string
+ *         description: Filter flavors by strength level (case-insensitive, matches official or user strength)
+ *         example: Средняя
+ *       - in: query
+ *         name: tags
+ *         schema:
+ *           type: string
+ *         description: Filter flavors by tags (comma-separated, case-insensitive)
+ *         example: Холодок,Цитрус
+ *       - in: query
+ *         name: sort
+ *         schema:
+ *           type: string
+ *           enum: ['name', '-name', 'rating', '-rating']
+ *         description: Sort field. Prefix with '-' for descending order
+ *         example: name
+ *     responses:
+ *       200:
+ *         description: List of flavors retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Flavor'
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     page:
+ *                       type: integer
+ *                       example: 1
+ *                     limit:
+ *                       type: integer
+ *                       example: 20
+ *                     total:
+ *                       type: integer
+ *                       example: 100
+ *                     totalPages:
+ *                       type: integer
+ *                       example: 5
+ *       401:
+ *         description: Unauthorized - Invalid or missing API key
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Invalid or missing API key
+ *       429:
+ *         description: Too Many Requests - Rate limit exceeded
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Too many requests, please try again later
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Internal server error
+ */
 // GET /api/v1/flavors - Get paginated list of flavors
 // Query params: page, limit, brandSlug, lineSlug, strength, tags, sort
 router.get('/', getFlavors);
 
+/**
+ * @swagger
+ * /api/v1/flavors/{slug}:
+ *   get:
+ *     summary: Get flavor by slug
+ *     description: Retrieve detailed information about a specific hookah tobacco flavor including rating distribution and metadata
+ *     tags:
+ *       - Flavors
+ *     security:
+ *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: slug
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Flavor slug (unique identifier, typically in format "brand/line/flavor")
+ *         example: sarma/klassicheskaya/zima
+ *     responses:
+ *       200:
+ *         description: Flavor details retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Flavor'
+ *       401:
+ *         description: Unauthorized - Invalid or missing API key
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Invalid or missing API key
+ *       404:
+ *         description: Flavor not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Flavor with slug 'sarma/klassicheskaya/zima' not found
+ *       429:
+ *         description: Too Many Requests - Rate limit exceeded
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Too many requests, please try again later
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Internal server error
+ */
 // GET /api/v1/flavors/:slug - Get a single flavor by slug
 router.get('/:slug', getFlavorBySlug);
 
+/**
+ * @swagger
+ * /api/v1/flavors/refresh:
+ *   post:
+ *     summary: Refresh flavor data
+ *     description: Force a refresh of all flavor data by bypassing cache and scraping fresh data from htreviews.org. This operation may take some time to complete.
+ *     tags:
+ *       - Flavors
+ *     security:
+ *       - ApiKeyAuth: []
+ *     responses:
+ *       200:
+ *         description: Flavor data refreshed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Flavor data refreshed successfully
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Flavor'
+ *       401:
+ *         description: Unauthorized - Invalid or missing API key
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Invalid or missing API key
+ *       429:
+ *         description: Too Many Requests - Rate limit exceeded
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Too many requests, please try again later
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Internal server error
+ */
 // POST /api/v1/flavors/refresh - Refresh flavor data (requires authentication)
 router.post('/refresh', authMiddleware, refreshFlavors);
 
