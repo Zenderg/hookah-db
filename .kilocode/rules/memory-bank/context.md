@@ -36,6 +36,20 @@ The project has been restructured as a monorepo using pnpm workspaces and Turbor
 
 ## Recent Changes
 
+- **API Testing and Security Fix** (2026-01-05):
+  - Created comprehensive API test suite covering all endpoints
+  - Created [`.env`](.env:1) file with proper configuration (PORT, API_KEY_TEST, CACHE_TTL, etc.)
+  - Tested health endpoints, brands endpoint, flavors endpoint, Swagger UI, and OpenAPI JSON
+  - **Critical Security Issue Discovered**: Authentication middleware was not enforcing API key requirements on GET endpoints
+  - **Root Cause**: Authentication middleware was only applied to POST refresh endpoints, not GET endpoints
+  - **Fix Applied**:
+    - Added `router.use(authMiddleware);` to [`brand-routes.ts`](apps/api/src/routes/brand-routes.ts:1) and [`flavor-routes.ts`](apps/api/src/routes/flavor-routes.ts:1)
+    - Added dotenv package to [`apps/api/package.json`](apps/api/package.json:1)
+    - Configured [`apps/api/src/server.ts`](apps/api/src/server.ts:1) to load `.env` file from project root
+    - Updated Swagger documentation with proper 401/403 error responses
+  - **Verification**: All authentication scenarios now working correctly (no key → 401, valid key → 200, invalid key → 403)
+  - Dependencies installed: dotenv@latest
+
 - **Swagger/OpenAPI Documentation Implementation** (2026-01-05):
   - Installed swagger-jsdoc and swagger-ui-express dependencies
   - Added comprehensive JSDoc comments to all API routes (9 endpoints total):
@@ -199,9 +213,10 @@ The project has been restructured as a monorepo using pnpm workspaces and Turbor
 
 ## Next Steps
 
-1. **Deploy API server**: Set up production deployment with process manager
-2. **Set up monitoring**: Implement logging and monitoring for production
-3. **Implement data refresh scheduler**: Automated cache refresh on schedule
+1. **Implement data refresh scheduler**: Automated cache refresh on schedule (node-cron, bull, or agenda)
+2. **Set up monitoring**: Implement structured logging (winston or pino) for production
+3. **Add persistent storage**: Consider Redis for distributed caching or database for structured data
+4. **Deploy API server**: Set up production deployment with process manager (PM2, systemd)
 
 ## Technical Decisions Made
 

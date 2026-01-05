@@ -5,21 +5,27 @@ import {
   refreshBrands,
   getFlavorsByBrand,
 } from '../controllers';
-import { rateLimitMiddleware, authMiddleware } from '../middleware';
+import rateLimitMiddleware from '../middleware/rate-limit-middleware';
+import authMiddleware from '../middleware/auth-middleware';
 
 /**
- * Brand routes for the Hookah Tobacco Database API.
+ * Brand routes for Hookah Tobacco Database API.
  * 
  * Routes:
  * - GET /api/v1/brands - Get paginated list of brands
  * - GET /api/v1/brands/:slug - Get a single brand by slug
  * - GET /api/v1/brands/:brandSlug/flavors - Get flavors for a specific brand
  * - POST /api/v1/brands/refresh - Refresh brand data (requires authentication)
+ * 
+ * All routes require authentication via X-API-Key header.
  */
 const router = Router();
 
 // Apply rate limiting to all brand routes
 router.use(rateLimitMiddleware);
+
+// Apply authentication to all brand routes
+router.use(authMiddleware);
 
 /**
  * @swagger
@@ -94,9 +100,19 @@ router.use(rateLimitMiddleware);
  *             schema:
  *               type: object
  *               properties:
- *                 message:
+ *                 error:
  *                   type: string
- *                   example: Invalid or missing API key
+ *                   example: API key is required
+ *       403:
+ *         description: Forbidden - Invalid API key
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: Invalid API key
  *       429:
  *         description: Too Many Requests - Rate limit exceeded
  *         content:
@@ -154,9 +170,19 @@ router.get('/', getBrands);
  *             schema:
  *               type: object
  *               properties:
- *                 message:
+ *                 error:
  *                   type: string
- *                   example: Invalid or missing API key
+ *                   example: API key is required
+ *       403:
+ *         description: Forbidden - Invalid API key
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: Invalid API key
  *       404:
  *         description: Brand not found
  *         content:
@@ -272,9 +298,19 @@ router.get('/:slug', getBrandBySlug);
  *             schema:
  *               type: object
  *               properties:
- *                 message:
+ *                 error:
  *                   type: string
- *                   example: Invalid or missing API key
+ *                   example: API key is required
+ *       403:
+ *         description: Forbidden - Invalid API key
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: Invalid API key
  *       404:
  *         description: Brand not found or no flavors available
  *         content:
@@ -345,9 +381,19 @@ router.get('/:brandSlug/flavors', getFlavorsByBrand);
  *             schema:
  *               type: object
  *               properties:
- *                 message:
+ *                 error:
  *                   type: string
- *                   example: Invalid or missing API key
+ *                   example: API key is required
+ *       403:
+ *         description: Forbidden - Invalid API key
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: Invalid API key
  *       429:
  *         description: Too Many Requests - Rate limit exceeded
  *         content:
@@ -370,6 +416,6 @@ router.get('/:brandSlug/flavors', getFlavorsByBrand);
  *                   example: Internal server error
  */
 // POST /api/v1/brands/refresh - Refresh brand data (requires authentication)
-router.post('/refresh', authMiddleware, refreshBrands);
+router.post('/refresh', refreshBrands);
 
 export default router;

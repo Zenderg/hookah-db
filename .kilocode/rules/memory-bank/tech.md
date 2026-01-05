@@ -56,6 +56,9 @@
 - **swagger-jsdoc**: Generate Swagger spec from JSDoc comments
 - **swagger-ui-express**: Serve Swagger UI for interactive API documentation
 
+### Environment Variables & Configuration
+- **dotenv**: Environment variable loading from .env files
+
 ## Development Setup
 
 ### Prerequisites
@@ -308,3 +311,6 @@ Packages use the `workspace:*` protocol to reference other packages in the monor
 ### Caching
 - node-cache: 5.1.2
 - @types/node-cache: 4.2.5
+
+### Environment & Configuration
+- dotenv: latest

@@ -328,6 +328,13 @@ The API includes comprehensive Swagger/OpenAPI documentation:
   - Returns 401 for missing or invalid API keys
   - Consistent JSON error responses
 
+- **Authentication Middleware Updates** (2026-01-05):
+  - Fixed authentication enforcement on all API v1 endpoints
+  - Previously only applied to POST refresh endpoints
+  - Now correctly applied to GET endpoints (brands, flavors, brand by slug, flavor by slug)
+  - Added dotenv integration for environment variable loading
+  - Security posture improved from CRITICAL to SECURE
+
 - **Rate Limiting Middleware** ([`rate-limit-middleware.ts`](apps/api/src/middleware/rate-limit-middleware.ts:1)):
   - Uses express-rate-limit package
   - Configurable window (default: 60 seconds) and max requests (default: 100)

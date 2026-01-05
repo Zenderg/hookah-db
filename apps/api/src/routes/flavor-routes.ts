@@ -15,11 +15,16 @@ import { rateLimitMiddleware, authMiddleware } from '../middleware';
  * - POST /api/v1/flavors/refresh - Refresh flavor data (requires authentication)
  * 
  * Note: GET /api/v1/brands/:brandSlug/flavors is defined in brand-routes.ts
+ * 
+ * All routes require authentication via X-API-Key header.
  */
 const router = Router();
 
 // Apply rate limiting to all flavor routes
 router.use(rateLimitMiddleware);
+
+// Apply authentication to all flavor routes
+router.use(authMiddleware);
 
 /**
  * @swagger
@@ -112,9 +117,19 @@ router.use(rateLimitMiddleware);
  *             schema:
  *               type: object
  *               properties:
- *                 message:
+ *                 error:
  *                   type: string
- *                   example: Invalid or missing API key
+ *                   example: API key is required
+ *       403:
+ *         description: Forbidden - Invalid API key
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: Invalid API key
  *       429:
  *         description: Too Many Requests - Rate limit exceeded
  *         content:
@@ -172,9 +187,19 @@ router.get('/', getFlavors);
  *             schema:
  *               type: object
  *               properties:
- *                 message:
+ *                 error:
  *                   type: string
- *                   example: Invalid or missing API key
+ *                   example: API key is required
+ *       403:
+ *         description: Forbidden - Invalid API key
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: Invalid API key
  *       404:
  *         description: Flavor not found
  *         content:
@@ -244,9 +269,19 @@ router.get('/:slug', getFlavorBySlug);
  *             schema:
  *               type: object
  *               properties:
- *                 message:
+ *                 error:
  *                   type: string
- *                   example: Invalid or missing API key
+ *                   example: API key is required
+ *       403:
+ *         description: Forbidden - Invalid API key
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: Invalid API key
  *       429:
  *         description: Too Many Requests - Rate limit exceeded
  *         content:
@@ -269,6 +304,6 @@ router.get('/:slug', getFlavorBySlug);
  *                   example: Internal server error
  */
 // POST /api/v1/flavors/refresh - Refresh flavor data (requires authentication)
-router.post('/refresh', authMiddleware, refreshFlavors);
+router.post('/refresh', refreshFlavors);
 
 export default router;

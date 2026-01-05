@@ -1,3 +1,5 @@
+import dotenv from 'dotenv';
+import path from 'path';
 import express, { Express, Request, Response, NextFunction } from 'express';
 import { brandRoutes, flavorRoutes } from './routes';
 import {
@@ -8,6 +10,10 @@ import { errorHandler } from './middleware';
 import swaggerJsdoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
 import swaggerOptions from './swagger';
+
+// Load environment variables from .env file in root directory
+// __dirname is apps/api/src, so we need to go up 3 levels to reach root
+dotenv.config({ path: path.join(__dirname, '../../../.env') });
 
 // Create Express app
 const app: Express = express();

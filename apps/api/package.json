@@ -23,6 +23,8 @@
     "@hookah-db/services": "workspace:*",
     "@hookah-db/types": "workspace:*",
     "@hookah-db/utils": "workspace:*",
+    "@types/dotenv": "^8.2.3",
+    "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "express-rate-limit": "^8.2.1",
     "swagger-jsdoc": "^6.2.8",
