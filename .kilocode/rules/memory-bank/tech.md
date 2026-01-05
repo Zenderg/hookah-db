@@ -28,16 +28,16 @@
 
 ### Authentication & Security
 - **API Key Middleware**: Custom middleware for X-API-Key header validation
-- **Helmet**: Security headers for Express.js
-- **Rate Limiting**: express-rate-limit (if using Express)
+- **dotenv**: Environment variable loading from .env files
+- **Rate Limiting**: express-rate-limit for IP-based rate limiting
 
 ### Caching
 **Primary (In-Memory)**:
-- **Node-cache** or **lru-cache**: Simple in-memory caching for development/small deployments
+- **node-cache**: Simple in-memory caching for development/small deployments
 
 **Optional (Production)**:
 - **Redis**: Distributed caching for production environments with multiple instances
-- **ioredis**: High-performance Redis client for Node.js
+- Redis 7 Alpine with AOF persistence and LRU eviction policy
 
 ### Scheduler
 - **node-cron**: Cron job scheduler for automated task execution
@@ -57,11 +57,11 @@
 - **Express middleware**: Automatic HTTP request/response logging
 
 ### Data Validation
-- **Zod**: TypeScript-first schema validation for API requests/responses
-- **Joi** (alternative): Object schema validation
+- **Zod**: TypeScript-first schema validation for API requests/responses (planned)
+- **Joi** (alternative): Object schema validation (planned)
 
 ### Utilities
-- **date-fns**: Modern date utility library
+- **date-fns**: Modern date utility library (planned)
 - **lodash**: Utility library for data manipulation (optional, may use native JS methods)
 
 ### Testing
@@ -72,8 +72,8 @@
 ### Development Tools
 - **ts-node**: TypeScript execution and REPL
 - **nodemon**: Automatically restart server on file changes during development
-- **eslint**: Linting utility for JavaScript/TypeScript
-- **prettier**: Code formatter
+- **eslint**: Linting utility for JavaScript/TypeScript (planned)
+- **prettier**: Code formatter (planned)
 
 ### Documentation
 - **Swagger/OpenAPI**: API specification and documentation
@@ -473,21 +473,26 @@ Packages use the `workspace:*` protocol to reference other packages in the monor
 - cheerio: 1.1.2
 - axios: 1.13.2
 - express: 5.2.1
+- tslib: 2.8.1
+- winston: 3.19.0
+- winston-daily-rotate-file: 5.0.0
 
 ### Build & Workspace Tools
-- turbo: 2.0+
-- @changesets/cli: Latest
+- turbo: 2.4.4
+- @changesets/cli: 2.27.1
 
 ### TypeScript & Type Definitions
 - typescript: 5.9.3
 - @types/node: 25.0.3
 - @types/express: 5.0.6
+- @types/jest: 30.0.0
+- @types/supertest: 6.0.3
+- @types/winston: 2.4.4
 
 ### Development Tools
 - nodemon: 3.1.11
 - ts-node: 10.9.2
 - jest: 30.2.0
-- @types/jest: 30.0.0
 - ts-jest: 29.4.6
 - supertest: 7.1.4
 
@@ -510,9 +515,9 @@ Packages use the `workspace:*` protocol to reference other packages in the monor
 - @types/node-cron: 3.0.11
 
 ### Logging
-- winston: 3.11.0
-- winston-daily-rotate-file: 4.7.1
-- @types/winston: 4.4.0
+- winston: 3.19.0
+- winston-daily-rotate-file: 5.0.0
+- @types/winston: 2.4.4
 - uuid: 9.0.1
 - @types/uuid: 9.0.8
 
