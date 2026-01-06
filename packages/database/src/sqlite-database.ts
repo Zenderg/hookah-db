@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
-import fs from 'fs';
-import path from 'path';
+import * as fs from 'fs';
+import * as path from 'path';
 import type { Brand, Flavor } from '@hookah-db/types';
 import { LoggerFactory } from '@hookah-db/utils';
 import type { DatabaseStats } from './types';
@@ -15,7 +15,7 @@ export class SQLiteDatabase {
 
   /**
    * Create a new SQLiteDatabase instance
-   * @param dbPath - Path to the SQLite database file (default: './hookah-db.db')
+   * @param dbPath - Path to SQLite database file (default: './hookah-db.db')
    */
   constructor(dbPath: string = './hookah-db.db') {
     this.logger = LoggerFactory.createDevelopmentLogger('SQLiteDatabase');
@@ -318,8 +318,8 @@ export class SQLiteDatabase {
   }
 
   /**
-   * Create a backup of the database
-   * @param backupPath - Path where the backup should be saved
+   * Create a backup of database
+   * @param backupPath - Path where backup should be saved
    */
   backup(backupPath: string): void {
     try {
@@ -329,14 +329,14 @@ export class SQLiteDatabase {
         fs.mkdirSync(backupDir, { recursive: true });
       }
 
-      // Close the database to ensure all data is flushed
+      // Close database to ensure all data is flushed
       this.db.close();
 
-      // Copy the database file
+      // Copy database file
       const dbPath = this.db.name;
       fs.copyFileSync(dbPath, backupPath);
 
-      // Reopen the database
+      // Reopen database
       this.db = new Database(dbPath);
       this.db.pragma('journal_mode = WAL');
 
@@ -348,7 +348,7 @@ export class SQLiteDatabase {
   }
 
   /**
-   * Close the database connection
+   * Close database connection
    */
   close(): void {
     try {
