@@ -7,7 +7,7 @@
 
 import { Request, Response } from 'express';
 import { FlavorService } from '@hookah-db/services';
-import { Flavor } from '@hookah-db/types';
+import { Flavor, FlavorQueryParams } from '@hookah-db/types';
 import { LoggerFactory } from '@hookah-db/utils';
 
 // Initialize logger
@@ -37,9 +37,10 @@ export function setFlavorService(service: FlavorService): void {
 /**
  * Get paginated list of flavors.
  * 
- * Supports pagination, filtering by brand, line, strength, tags, and sorting.
+ * Supports pagination, search, filtering by brand, line, strength, tags, and sorting.
  * 
  * Query params:
+ * - search: Search term to filter flavor names (name, nameAlt)
  * - page: Page number (default: 1)
  * - limit: Items per page (default: 20, max: 100)
  * - brandSlug: Filter by brand slug (optional)
@@ -69,7 +70,11 @@ export async function getFlavors(req: Request, res: Response): Promise<void> {
   }
 
   try {
-    // Parse query parameters
+    // Extract search parameter for service
+    const search = req.query.search as string | undefined;
+    const params: FlavorQueryParams = search ? { search } : {};
+
+    // Parse pagination and filtering parameters
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
     const brandSlug = req.query.brandSlug as string | undefined;
@@ -78,7 +83,7 @@ export async function getFlavors(req: Request, res: Response): Promise<void> {
     const tags = req.query.tags as string | undefined;
     const sort = req.query.sort as string | undefined;
 
-    // Get flavors based on filters
+    // Get flavors from service with search parameter
     let flavors: Flavor[];
     
     if (brandSlug) {
@@ -88,8 +93,8 @@ export async function getFlavors(req: Request, res: Response): Promise<void> {
       // Filter by line
       flavors = await flavorService.getFlavorsByLine(lineSlug);
     } else {
-      // Get all flavors
-      flavors = await flavorService.getAllFlavors();
+      // Get flavors with optional search
+      flavors = await flavorService.getFlavors(params);
     }
 
     // Apply additional filters

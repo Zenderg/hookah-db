@@ -59,6 +59,12 @@ router.use(authMiddleware);
  *           maximum: 100
  *         description: Number of items per page (max 100)
  *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search flavors by name (searches both name and nameAlt fields, case-insensitive)
+ *         example: Зима
+ *       - in: query
  *         name: brandSlug
  *         schema:
  *           type: string
@@ -158,7 +164,7 @@ router.use(authMiddleware);
  *                   example: Internal server error
  */
 // GET /api/v1/flavors - Get paginated list of flavors
-// Query params: page, limit, brandSlug, lineSlug, strength, tags, sort
+// Query params: page, limit, search, brandSlug, lineSlug, strength, tags, sort
 router.get('/', getFlavors);
 
 /**
@@ -231,7 +237,7 @@ router.get('/', getFlavors);
  *                   example: Internal server error
  */
 // POST /api/v1/flavors/refresh - Refresh flavor data (requires authentication)
-// Must be placed before the slug route to avoid matching "refresh" as a slug
+// Must be placed before slug route to avoid matching "refresh" as a slug
 router.post('/refresh', refreshFlavors);
 
 /**
@@ -315,7 +321,7 @@ router.post('/refresh', refreshFlavors);
 //   - Simple slug: /api/v1/flavors/zima
 //   - Slug with slashes: /api/v1/flavors/afzal%2Fafzal-main%2Forange
 //   - Slug with slashes: /api/v1/flavors/sarma%2Fklassicheskaya%2Fzima
-// The controller will decode the URL-encoded slug automatically
+// The controller will decode URL-encoded slug automatically
 router.get('/:slug', getFlavorBySlug);
 
 export default router;

@@ -54,6 +54,12 @@ router.use(authMiddleware);
  *           maximum: 100
  *         description: Number of items per page (max 100)
  *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search brands by name (searches both name and nameEn fields, case-insensitive)
+ *         example: Sarma
+ *       - in: query
  *         name: country
  *         schema:
  *           type: string
@@ -135,7 +141,7 @@ router.use(authMiddleware);
  *                   example: Internal server error
  */
 // GET /api/v1/brands - Get paginated list of brands
-// Query params: page, limit, country, sort
+// Query params: page, limit, search, country, sort
 router.get('/', getBrands);
 
 /**

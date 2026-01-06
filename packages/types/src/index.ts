@@ -3,6 +3,13 @@ export type { Flavor } from './flavor';
 export type { Line } from './line';
 export type { RatingDistribution } from './rating';
 
+// Query parameter types
+export type {
+  SearchQueryParams,
+  BrandQueryParams,
+  FlavorQueryParams,
+} from './query-params';
+
 // Logging types
 export { LogLevel, type LogLevelType } from './log-levels';
 export type {

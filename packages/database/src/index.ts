@@ -7,4 +7,4 @@
  */
 
 export { SQLiteDatabase } from './sqlite-database';
-export type { DatabaseStats } from './types';
+export type { DatabaseStats, IDatabase } from './types';

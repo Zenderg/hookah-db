@@ -189,6 +189,7 @@ hookah-db/
 │   │   │   ├── flavor.ts  # Flavor interface
 │   │   │   ├── line.ts    # Line interface
 │   │   │   ├── rating.ts  # RatingDistribution interface
+│   │   │   ├── query-params.ts # Query parameter interfaces (search, pagination, filters)
 │   │   │   └── index.ts   # Type exports
 │   │   ├── package.json
 │   │   └── tsconfig.json
@@ -509,6 +510,7 @@ ENABLE_API_FALLBACK=true
 - **In-Memory Cache**: Cache frequently accessed data in memory for fast access
 - **Cache-First Strategy**: Check cache first, fallback to database if needed
 - **Database Update**: Scrape complete data → Validate → Update database → Clear cache
+- **Search Functionality**: LIKE-based search for brands and flavors with cache-first strategy
 
 ### API Design
 
@@ -528,8 +530,8 @@ GET /api-docs.json
   Returns: Raw OpenAPI specification JSON
 
 GET /api/v1/brands
-  Query params: page, limit, country, sort
-  Returns: List of brands with pagination
+  Query params: page, limit, country, sort, search
+  Returns: List of brands with pagination and optional search
 
 GET /api/v1/brands/:slug
   Returns: Full brand details with lines and flavors
@@ -542,8 +544,8 @@ GET /api/v1/brands/:brandSlug/flavors
   Returns: Flavors for specific brand
 
 GET /api/v1/flavors
-  Query params: page, limit, brandSlug, lineSlug, strength, tags, sort
-  Returns: List of flavors with filtering
+  Query params: page, limit, brandSlug, lineSlug, strength, tags, sort, search
+  Returns: List of flavors with filtering and optional search
 
 GET /api/v1/flavors/:slug
   Returns: Full flavor details with reviews
@@ -557,6 +559,35 @@ GET /api/v1/scheduler/stats
 GET /api/v1/scheduler/jobs
   Returns: List of all scheduled jobs with status
 ```
+
+### Search Functionality
+
+**Implementation**: SQL LIKE queries with pattern `%searchQuery%`
+
+**Search Fields**:
+- **Brands**: `name` (Russian) and `nameEn` (English)
+- **Flavors**: `name` (Russian) and `nameAlt` (English)
+
+**Cache Strategy**:
+- **With Search**: Bypasses cache, queries database directly
+- **Without Search**: Uses cache-first strategy for optimal performance
+
+**API Usage**:
+```bash
+# Search brands by name
+GET /api/v1/brands?search=Sarma
+GET /api/v1/brands?search=sarma&page=1&limit=10
+
+# Search flavors by name
+GET /api/v1/flavors?search=Зима
+GET /api/v1/flavors?search=Зима&brandSlug=sarma&page=1&limit=10
+```
+
+**Technical Details**:
+- **Case Sensitivity**: Case-insensitive (SQLite default)
+- **Security**: Parameterized queries prevent SQL injection
+- **Error Handling**: Returns empty array on errors, logs appropriately
+- **Backward Compatibility**: All existing functionality maintained
 
 ### API Documentation
 
@@ -628,12 +659,12 @@ The API includes comprehensive Swagger/OpenAPI documentation:
 
 **Controllers**:
 - **Brand Controller** ([`brand-controller.ts`](apps/api/src/controllers/brand-controller.ts:1)):
-  - `getBrands()`: List all brands with pagination support
+  - `getBrands()`: List all brands with pagination and search support
   - `getBrandBySlug()`: Get detailed brand information by slug
   - `refreshBrands()`: Trigger brand data refresh from scraper
 
 - **Flavor Controller** ([`flavor-controller.ts`](apps/api/src/controllers/flavor-controller.ts:1)):
-  - `getFlavors()`: List all flavors with filtering and pagination
+  - `getFlavors()`: List all flavors with filtering, pagination, and search support
   - `getFlavorBySlug()`: Get detailed flavor information by slug
   - `getFlavorsByBrand()`: Get all flavors for a specific brand
   - `refreshFlavors()`: Trigger flavor data refresh from scraper
@@ -644,13 +675,13 @@ The API includes comprehensive Swagger/OpenAPI documentation:
 
 **Routes**:
 - **Brand Routes** ([`brand-routes.ts`](apps/api/src/routes/brand-routes.ts:1)):
-  - GET /api/v1/brands - List brands
+  - GET /api/v1/brands - List brands (with search parameter)
   - GET /api/v1/brands/:slug - Get brand by slug
   - POST /api/v1/brands/refresh - Refresh brand data
   - GET /api/v1/brands/:brandSlug/flavors - Get brand flavors
 
 - **Flavor Routes** ([`flavor-routes.ts`](apps/api/src/routes/flavor-routes.ts:1)):
-  - GET /api/v1/flavors - List flavors
+  - GET /api/v1/flavors - List flavors (with search parameter)
   - GET /api/v1/flavors/:slug - Get flavor by slug
   - POST /api/v1/flavors/refresh - Refresh flavor data
 
@@ -736,7 +767,7 @@ The API includes comprehensive Swagger/OpenAPI documentation:
 - Environment configuration via `.env.dev`
 
 **Docker Compose - Production** ([`docker-compose.prod.yml`](docker-compose.prod.yml:1)):
-- Optimized API service with health checks and log rotation
+- Optimized API service with health checks and logging configuration
 - SQLite database file mounted for persistence
 - Health checks for API service
 - Log rotation with size limits
@@ -745,7 +776,7 @@ The API includes comprehensive Swagger/OpenAPI documentation:
 **Docker-Specific TypeScript Configuration** ([`tsconfig.docker.json`](tsconfig.docker.json:1)):
 - Extends base TypeScript config
 - Configured for CommonJS modules and ES2022 target
-- ts-node configuration with transpileOnly mode
+- ts-node configuration with transpileOnly mode for faster execution
 - Experimental specifier resolution for workspace compatibility
 
 **Runtime Decisions**:
@@ -786,6 +817,7 @@ graph LR
 7. **Scheduler Path**: Cron trigger → Execute job → Call DataService → Update database → Clear cache → Log execution
 8. **Docker Build Path**: Dockerfile stages (dependencies → development/production) → Container images → Docker Compose orchestration
 9. **Docker Deployment Path**: Build images → Create network → Start containers → Health checks → Volume mounts → Service communication
+10. **Search Path**: Extract search parameter → Check if search provided → If search: Query database with LIKE → If no search: Use cache → Return results
 
 ## Design Patterns
 
@@ -801,6 +833,7 @@ graph LR
 - **Container Pattern**: Multi-stage Docker builds for development and production
 - **Orchestration Pattern**: Docker Compose for single-container deployment (API + SQLite)
 - **API Extraction Pattern**: Direct API calls with pagination and retry logic for complete data retrieval
+- **Search Pattern**: LIKE-based queries with cache-first strategy for optimal performance
 
 ## Package Dependency Layers
 

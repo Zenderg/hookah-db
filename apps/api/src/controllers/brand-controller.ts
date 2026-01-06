@@ -7,7 +7,7 @@
 
 import { Request, Response } from 'express';
 import { BrandService } from '@hookah-db/services';
-import { Brand } from '@hookah-db/types';
+import { Brand, BrandQueryParams } from '@hookah-db/types';
 import { LoggerFactory } from '@hookah-db/utils';
 
 // Initialize logger
@@ -56,9 +56,10 @@ export function setBrandService(service: BrandService): void {
 /**
  * Get paginated list of brands.
  * 
- * Supports pagination, country filtering, and sorting.
+ * Supports pagination, search, country filtering, and sorting.
  * 
  * Query params:
+ * - search: Search term to filter brand names (name, nameEn)
  * - page: Page number (default: 1)
  * - limit: Items per page (default: 20, max: 100)
  * - country: Filter by country (optional, case-insensitive)
@@ -85,18 +86,25 @@ export async function getBrands(req: Request, res: Response): Promise<void> {
   }
 
   try {
-    // Parse query parameters
+    // Extract search parameter for service
+    const search = req.query.search as string | undefined;
+    const params: BrandQueryParams = search ? { search } : {};
+
+    // Parse pagination and filtering parameters
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
     const country = req.query.country as string | undefined;
     const sort = req.query.sort as string | undefined;
 
-    // Get brands (filter by country if specified)
+    // Get brands from service with search parameter
     let brands: Brand[];
+    
     if (country) {
+      // Country filtering takes precedence
       brands = await brandService.getBrandsByCountry(country);
     } else {
-      brands = await brandService.getAllBrands();
+      // Get brands with optional search
+      brands = await brandService.getBrands(params);
     }
 
     // Apply sorting if specified

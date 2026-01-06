@@ -178,6 +178,36 @@ export class SQLiteDatabase {
   }
 
   /**
+   * Search brands by name or English name
+   * @param searchQuery - Optional search query string
+   * @returns Array of brands matching the search query
+   */
+  async searchBrands(searchQuery?: string): Promise<Brand[]> {
+    try {
+      // If no search query provided, return all brands
+      if (!searchQuery || searchQuery.trim() === '') {
+        return this.getAllBrands();
+      }
+
+      // Use LIKE operator to search in both name and nameEn fields
+      const stmt = this.db.prepare(`
+        SELECT data FROM brands 
+        WHERE json_extract(data, '$.name') LIKE ? 
+           OR json_extract(data, '$.nameEn') LIKE ?
+        ORDER BY json_extract(data, '$.name') ASC
+      `);
+
+      const searchPattern = `%${searchQuery}%`;
+      const rows = stmt.all(searchPattern, searchPattern) as { data: string }[];
+
+      return rows.map(row => JSON.parse(row.data, dateReviver) as Brand);
+    } catch (error) {
+      this.logger.error(`Failed to search brands: ${searchQuery}`);
+      return [];
+    }
+  }
+
+  /**
    * Delete a brand by slug
    * @param slug - Brand slug to delete
    */
@@ -263,6 +293,36 @@ export class SQLiteDatabase {
       return rows.map(row => JSON.parse(row.data, dateReviver) as Flavor);
     } catch (error) {
       this.logger.error('Failed to get all flavors');
+      return [];
+    }
+  }
+
+  /**
+   * Search flavors by name or alternative name
+   * @param searchQuery - Optional search query string
+   * @returns Array of flavors matching the search query
+   */
+  async searchFlavors(searchQuery?: string): Promise<Flavor[]> {
+    try {
+      // If no search query provided, return all flavors
+      if (!searchQuery || searchQuery.trim() === '') {
+        return this.getAllFlavors();
+      }
+
+      // Use LIKE operator to search in both name and nameAlt fields
+      const stmt = this.db.prepare(`
+        SELECT data FROM flavors 
+        WHERE json_extract(data, '$.name') LIKE ? 
+           OR json_extract(data, '$.nameAlt') LIKE ?
+        ORDER BY json_extract(data, '$.name') ASC
+      `);
+
+      const searchPattern = `%${searchQuery}%`;
+      const rows = stmt.all(searchPattern, searchPattern) as { data: string }[];
+
+      return rows.map(row => JSON.parse(row.data, dateReviver) as Flavor);
+    } catch (error) {
+      this.logger.error(`Failed to search flavors: ${searchQuery}`);
       return [];
     }
   }

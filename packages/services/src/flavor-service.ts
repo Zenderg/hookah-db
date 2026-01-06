@@ -5,7 +5,7 @@
  * Coordinates between database and data service for flavor-related operations.
  */
 
-import { Flavor } from '@hookah-db/types';
+import { Flavor, FlavorQueryParams } from '@hookah-db/types';
 import { SQLiteDatabase } from '@hookah-db/database';
 import { DataService } from './data-service';
 import { LoggerFactory } from '@hookah-db/utils';
@@ -79,11 +79,27 @@ export class FlavorService {
    * Get all flavors
    * 
    * Retrieves all flavors from SQLite database.
+   * Supports optional search parameter to filter flavors by name or alternative name.
    * 
+   * @param params Optional query parameters including search term
    * @returns Promise resolving to array of Flavor objects
    */
-  async getFlavors(): Promise<Flavor[]> {
+  async getFlavors(params?: FlavorQueryParams): Promise<Flavor[]> {
     try {
+      const { search } = params || {};
+
+      // If search parameter is provided, use database search directly (bypass cache)
+      if (search) {
+        logger.info('Searching flavors', { search } as any);
+        const flavors = await this.db.searchFlavors(search);
+        logger.debug('Flavor search completed', { 
+          search, 
+          count: flavors.length 
+        } as any);
+        return flavors;
+      }
+
+      // Otherwise, use existing logic with cache
       logger.debug('Getting all flavors from database');
       
       const flavors = this.db.getAllFlavors();

@@ -6,6 +6,7 @@ A centralized data service that aggregates and provides structured information a
 
 - **Web Scraping**: Automated parsing of htreviews.org to extract brand and flavor data
 - **API-Based Flavor Extraction**: Direct API calls to htreviews.org for complete flavor data (5-6x faster)
+- **Search Functionality**: LIKE-based search for brands and flavors with cache-first strategy
 - **Secure API Access**: API key-based authentication for up to 10 authorized clients
 - **Comprehensive Data Model**: Brands, flavors, ratings, reviews, and metadata
 - **RESTful API**: Clean, documented endpoints for data retrieval
@@ -124,7 +125,7 @@ All tests cover:
 
 ### Migration from HTML Scraping
 
-The API-based extraction is backward compatible with the existing HTML scraping implementation:
+The API-based extraction is backward compatible with existing HTML scraping implementation:
 
 - **Enabled by default**: Set `ENABLE_API_EXTRACTION=false` to use HTML scraping
 - **Automatic fallback**: If API fails, automatically falls back to HTML scraping
@@ -166,6 +167,78 @@ The API-based extraction is backward compatible with the existing HTML scraping 
    # Fallback to HTML scraping if API fails
    ENABLE_API_FALLBACK=true
    ```
+
+## Search Functionality
+
+The API provides search functionality for brands and flavors using SQL LIKE queries with a cache-first strategy.
+
+### How It Works
+
+- **Search Method**: SQL LIKE operator with pattern `%searchQuery%`
+- **Case Sensitivity**: Case-insensitive (SQLite default)
+- **Search Fields**:
+  - **Brands**: `name` (Russian) and `nameEn` (English)
+  - **Flavors**: `name` (Russian) and `nameAlt` (English)
+- **Cache Strategy**: 
+  - **With Search**: Bypasses cache, queries database directly
+  - **Without Search**: Uses cache-first strategy for optimal performance
+
+### API Usage
+
+**Search Brands:**
+```bash
+# Search brands by name
+GET /api/v1/brands?search=Sarma
+
+# Search brands with pagination
+GET /api/v1/brands?search=sarma&page=1&limit=10
+
+# Example with curl
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:3000/api/v1/brands?search=Sarma"
+```
+
+**Search Flavors:**
+```bash
+# Search flavors by name
+GET /api/v1/flavors?search=Зима
+
+# Search flavors with pagination and brand filter
+GET /api/v1/flavors?search=Зима&brandSlug=sarma&page=1&limit=10
+
+# Example with curl
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:3000/api/v1/flavors?search=Зима"
+```
+
+### Technical Details
+
+- **Search Method**: SQL LIKE operator with pattern `%searchQuery%`
+- **Security**: Parameterized queries prevent SQL injection
+- **Error Handling**: Returns empty array on errors, logs appropriately
+- **Backward Compatibility**: All existing functionality maintained (pagination, filters, sorting)
+
+### Benefits
+
+- ✅ **Simple Implementation**: Uses LIKE queries, easy to understand and maintain
+- ✅ **Fast Performance**: Database-level filtering is efficient
+- ✅ **Flexible**: Works with both Russian and English names
+- ✅ **Cache-First Strategy**: Bypasses cache for search, uses cache for non-search queries
+- ✅ **Backward Compatible**: All existing functionality maintained
+
+### Limitations
+
+- **No Fuzzy Search**: Only exact/partial matches (LIKE pattern)
+- **No Transliteration**: Doesn't automatically search across languages (user must search in appropriate language)
+- **No Ranking**: Results ordered alphabetically, not by relevance
+
+### Future Enhancements (Optional)
+
+- Consider implementing fuzzy search for approximate matches
+- Add transliteration support for cross-language search
+- Implement result ranking by relevance
+- Add search analytics to track popular queries
+- Add autocomplete/suggestion functionality
 
 ## Monorepo Structure
 
@@ -300,6 +373,10 @@ open http://localhost:3000/api-docs
 
 # Test API with authentication
 curl -H "X-API-Key: your-api-key" http://localhost:3000/api/v1/brands
+
+# Test search functionality
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:3000/api/v1/brands?search=Sarma"
 ```
 
 #### Viewing Logs
@@ -729,11 +806,19 @@ curl http://localhost:3000/health/detailed
 # Get brands (requires API key)
 curl -H "X-API-Key: your-api-key" http://localhost:3000/api/v1/brands
 
+# Search brands (requires API key)
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:3000/api/v1/brands?search=Sarma"
+
 # Get specific brand
 curl -H "X-API-Key: your-api-key" http://localhost:3000/api/v1/brands/sarma
 
-# Get flavors
+# Get flavors (requires API key)
 curl -H "X-API-Key: your-api-key" http://localhost:3000/api/v1/flavors
+
+# Search flavors (requires API key)
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:3000/api/v1/flavors?search=Зима"
 
 # Get scheduler stats
 curl -H "X-API-Key: your-api-key" http://localhost:3000/api/v1/scheduler/stats
@@ -883,8 +968,8 @@ GET /api-docs.json
   Returns: Raw OpenAPI specification JSON
 
 GET /api/v1/brands
-  Query params: page, limit, country, sort
-  Returns: List of brands with pagination
+  Query params: page, limit, country, sort, search
+  Returns: List of brands with pagination and optional search
 
 GET /api/v1/brands/:slug
   Returns: Full brand details with lines and flavors
@@ -897,8 +982,8 @@ GET /api/v1/brands/:brandSlug/flavors
   Returns: Flavors for specific brand
 
 GET /api/v1/flavors
-  Query params: page, limit, brandSlug, lineSlug, strength, tags, sort
-  Returns: List of flavors with filtering
+  Query params: page, limit, brandSlug, lineSlug, strength, tags, sort, search
+  Returns: List of flavors with filtering and optional search
 
 GET /api/v1/flavors/:slug
   Returns: Full flavor details with reviews

@@ -5,7 +5,7 @@
  * Coordinates between database and data service for brand-related operations.
  */
 
-import { Brand } from '@hookah-db/types';
+import { Brand, BrandQueryParams } from '@hookah-db/types';
 import { SQLiteDatabase } from '@hookah-db/database';
 import { DataService } from './data-service';
 import { LoggerFactory } from '@hookah-db/utils';
@@ -79,11 +79,27 @@ export class BrandService {
    * Get all brands
    * 
    * Retrieves all brands from SQLite database.
+   * Supports optional search parameter to filter brands by name or English name.
    * 
+   * @param params Optional query parameters including search term
    * @returns Promise resolving to array of Brand objects
    */
-  async getBrands(): Promise<Brand[]> {
+  async getBrands(params?: BrandQueryParams): Promise<Brand[]> {
     try {
+      const { search } = params || {};
+
+      // If search parameter is provided, use database search directly (bypass cache)
+      if (search) {
+        logger.info('Searching brands', { search } as any);
+        const brands = await this.db.searchBrands(search);
+        logger.debug('Brand search completed', { 
+          search, 
+          count: brands.length 
+        } as any);
+        return brands;
+      }
+
+      // Otherwise, use existing logic with cache
       logger.debug('Getting all brands from database');
       
       const brands = this.db.getAllBrands();
