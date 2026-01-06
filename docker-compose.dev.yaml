@@ -22,10 +22,12 @@ services:
       - ./packages:/app/packages
       # Mount TypeScript config files
       - ./tsconfig.json:/app/tsconfig.json
+      - ./tsconfig.docker.json:/app/tsconfig.docker.json
       - ./turbo.json:/app/turbo.json
       # Mount SQLite database for persistence
       - ./hookah-db.db:/app/hookah-db.db
-    command: npx nodemon --watch src --ext ts --exec npx ts-node --project /app/tsconfig.dev.json src/server.ts
+    # Override command to run from correct directory with tsx
+    command: npx nodemon --watch src --ext ts --exec npx tsx src/server.ts
     restart: unless-stopped
     networks:
       - hookah-db-network
