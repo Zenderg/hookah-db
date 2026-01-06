@@ -201,6 +201,104 @@ describe('SQLiteDatabase', () => {
     });
   });
 
+  describe('Date deserialization', () => {
+    test('should deserialize dateAdded as Date object', () => {
+      const testDate = new Date('2024-01-15T10:30:00.000Z');
+      const flavorWithDate: Flavor = {
+        ...mockFlavor,
+        slug: 'test-flavor-date',
+        dateAdded: testDate,
+      };
+
+      db.setFlavor(flavorWithDate);
+      const retrieved = db.getFlavor('test-flavor-date');
+
+      expect(retrieved).not.toBeNull();
+      expect(retrieved?.dateAdded).toBeInstanceOf(Date);
+      expect(retrieved?.dateAdded.getTime()).toBe(testDate.getTime());
+    });
+
+    test('should preserve date value through getAllFlavors', () => {
+      const testDate = new Date('2024-01-15T10:30:00.000Z');
+      const flavorWithDate: Flavor = {
+        ...mockFlavor,
+        slug: 'test-flavor-date-all',
+        dateAdded: testDate,
+      };
+
+      db.setFlavor(flavorWithDate);
+      const allFlavors = db.getAllFlavors();
+      const retrieved = allFlavors.find(f => f.slug === 'test-flavor-date-all');
+
+      expect(retrieved).toBeDefined();
+      expect(retrieved?.dateAdded).toBeInstanceOf(Date);
+      expect(retrieved?.dateAdded.getTime()).toBe(testDate.getTime());
+    });
+
+    test('should preserve date value through getFlavorsByBrand', () => {
+      const testDate = new Date('2024-01-15T10:30:00.000Z');
+      const flavorWithDate: Flavor = {
+        ...mockFlavor,
+        slug: 'test-flavor-date-brand',
+        dateAdded: testDate,
+      };
+
+      db.setFlavor(flavorWithDate);
+      const brandFlavors = db.getFlavorsByBrand('test-brand');
+      const retrieved = brandFlavors.find(f => f.slug === 'test-flavor-date-brand');
+
+      expect(retrieved).toBeDefined();
+      expect(retrieved?.dateAdded).toBeInstanceOf(Date);
+      expect(retrieved?.dateAdded.getTime()).toBe(testDate.getTime());
+    });
+
+    test('should support date formatting after deserialization', () => {
+      const testDate = new Date('2024-01-15T10:30:00.000Z');
+      const flavorWithDate: Flavor = {
+        ...mockFlavor,
+        slug: 'test-flavor-date-format',
+        dateAdded: testDate,
+      };
+
+      db.setFlavor(flavorWithDate);
+      const retrieved = db.getFlavor('test-flavor-date-format');
+
+      expect(retrieved).not.toBeNull();
+      expect(retrieved?.dateAdded).toBeInstanceOf(Date);
+      
+      // Test date formatting
+      const isoString = retrieved?.dateAdded.toISOString();
+      expect(isoString).toBe('2024-01-15T10:30:00.000Z');
+    });
+
+    test('should support date comparison after deserialization', () => {
+      const pastDate = new Date('2024-01-01');
+      const futureDate = new Date('2025-01-01');
+      
+      const flavorPast: Flavor = {
+        ...mockFlavor,
+        slug: 'test-flavor-past',
+        dateAdded: pastDate,
+      };
+
+      const flavorFuture: Flavor = {
+        ...mockFlavor,
+        slug: 'test-flavor-future',
+        dateAdded: futureDate,
+      };
+
+      db.setFlavor(flavorPast);
+      db.setFlavor(flavorFuture);
+
+      const retrievedPast = db.getFlavor('test-flavor-past');
+      const retrievedFuture = db.getFlavor('test-flavor-future');
+
+      expect(retrievedPast?.dateAdded).toBeInstanceOf(Date);
+      expect(retrievedFuture?.dateAdded).toBeInstanceOf(Date);
+      expect(retrievedPast?.dateAdded < retrievedFuture!.dateAdded).toBe(true);
+    });
+  });
+
   describe('Database statistics', () => {
     test('should get database stats', () => {
       db.setBrand(mockBrand);

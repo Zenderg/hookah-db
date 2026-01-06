@@ -62,3 +62,8 @@ scripts/*.md
 scripts/*.txt
 scripts/*.ts
 scripts/*.sh
+
+# Temporary test files in project root
+test-*.ts
+test-*.db
+test-*.log

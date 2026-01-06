@@ -212,7 +212,7 @@ describe('extractAttributeArray', () => {
     expect(extractAttributeArray($, '.test', 'href')).toEqual([]);
   });
 
-  it('should skip elements without the attribute', () => {
+  it('should skip elements without attribute', () => {
     const html = '<a class="test" href="/link1">Link 1</a><a class="test">Link 2</a>';
     const $ = cheerio.load(html);
     expect(extractAttributeArray($, '.test', 'href')).toEqual(['/link1']);
@@ -819,22 +819,55 @@ describe('extractImageUrl', () => {
 // ============================================================================
 
 describe('extractSlugFromUrl', () => {
-  it('should extract slug from simple path', () => {
-    expect(extractSlugFromUrl('/tobaccos/sarma')).toBe('tobaccos/sarma');
+  // Test removing "tobaccos/" prefix
+  it('should remove "tobaccos/" prefix from simple path', () => {
+    expect(extractSlugFromUrl('/tobaccos/sarma')).toBe('sarma');
   });
 
-  it('should extract multi-level slug', () => {
-    expect(extractSlugFromUrl('/tobaccos/sarma/klassicheskaya/zima')).toBe('tobaccos/sarma/klassicheskaya/zima');
+  it('should remove "tobaccos/" prefix from multi-level slug', () => {
+    expect(extractSlugFromUrl('/tobaccos/sarma/klassicheskaya/zima')).toBe('sarma/klassicheskaya/zima');
   });
 
-  it('should extract slug from full URL', () => {
-    expect(extractSlugFromUrl('https://htreviews.org/tobaccos/sarma')).toBe('tobaccos/sarma');
+  it('should remove "tobaccos/" prefix from full URL', () => {
+    expect(extractSlugFromUrl('https://htreviews.org/tobaccos/sarma')).toBe('sarma');
   });
 
-  it('should extract slug from URL with query parameters', () => {
-    expect(extractSlugFromUrl('https://htreviews.org/tobaccos/sarma?page=1')).toBe('tobaccos/sarma');
+  it('should remove "tobaccos/" prefix from URL with query parameters', () => {
+    expect(extractSlugFromUrl('https://htreviews.org/tobaccos/sarma?page=1')).toBe('sarma');
   });
 
+  // Test with example URLs from task
+  it('should handle example URL 1: https://htreviews.org/tobaccos/sarma/klassicheskaya/zima', () => {
+    expect(extractSlugFromUrl('https://htreviews.org/tobaccos/sarma/klassicheskaya/zima')).toBe('sarma/klassicheskaya/zima');
+  });
+
+  it('should handle example URL 2: /tobaccos/dogma/sigarnyy-monosort/san-andres', () => {
+    expect(extractSlugFromUrl('/tobaccos/dogma/sigarnyy-monosort/san-andres')).toBe('dogma/sigarnyy-monosort/san-andres');
+  });
+
+  it('should handle example URL 3: https://htreviews.org/tobaccos/tangiers/noir/cola', () => {
+    expect(extractSlugFromUrl('https://htreviews.org/tobaccos/tangiers/noir/cola')).toBe('tangiers/noir/cola');
+  });
+
+  // Test case-insensitive "tobaccos" prefix
+  it('should remove "TOBACCOS/" prefix (uppercase)', () => {
+    expect(extractSlugFromUrl('/TOBACCOS/sarma')).toBe('sarma');
+  });
+
+  it('should remove "Tobaccos/" prefix (mixed case)', () => {
+    expect(extractSlugFromUrl('/Tobaccos/sarma')).toBe('sarma');
+  });
+
+  // Test URLs without "tobaccos" prefix (should work as before)
+  it('should handle path without "tobaccos" prefix', () => {
+    expect(extractSlugFromUrl('/sarma')).toBe('sarma');
+  });
+
+  it('should handle multi-level path without "tobaccos" prefix', () => {
+    expect(extractSlugFromUrl('/sarma/klassicheskaya/zima')).toBe('sarma/klassicheskaya/zima');
+  });
+
+  // Test edge cases
   it('should return null for empty string', () => {
     expect(extractSlugFromUrl('')).toBeNull();
   });
@@ -851,16 +884,24 @@ describe('extractSlugFromUrl', () => {
     expect(extractSlugFromUrl('///')).toBeNull();
   });
 
+  it('should return null for path with only "tobaccos"', () => {
+    expect(extractSlugFromUrl('/tobaccos')).toBeNull();
+  });
+
+  it('should return null for path with only "tobaccos/"', () => {
+    expect(extractSlugFromUrl('/tobaccos/')).toBeNull();
+  });
+
   it('should handle path without leading slash', () => {
-    expect(extractSlugFromUrl('tobaccos/sarma')).toBe('tobaccos/sarma');
+    expect(extractSlugFromUrl('tobaccos/sarma')).toBe('sarma');
   });
 
   it('should handle trailing slash', () => {
-    expect(extractSlugFromUrl('/tobaccos/sarma/')).toBe('tobaccos/sarma');
+    expect(extractSlugFromUrl('/tobaccos/sarma/')).toBe('sarma');
   });
 
   it('should handle multiple slashes', () => {
-    expect(extractSlugFromUrl('///tobaccos///sarma///')).toBe('tobaccos/sarma');
+    expect(extractSlugFromUrl('///tobaccos///sarma///')).toBe('sarma');
   });
 
   it('should handle root path', () => {
@@ -868,7 +909,15 @@ describe('extractSlugFromUrl', () => {
   });
 
   it('should handle URL with port', () => {
-    expect(extractSlugFromUrl('http://localhost:3000/tobaccos/sarma')).toBe('tobaccos/sarma');
+    expect(extractSlugFromUrl('http://localhost:3000/tobaccos/sarma')).toBe('sarma');
+  });
+
+  it('should handle URL with fragment', () => {
+    expect(extractSlugFromUrl('https://htreviews.org/tobaccos/sarma#section')).toBe('sarma');
+  });
+
+  it('should handle URL with multiple query parameters', () => {
+    expect(extractSlugFromUrl('https://htreviews.org/tobaccos/sarma?page=1&sort=name')).toBe('sarma');
   });
 });
 

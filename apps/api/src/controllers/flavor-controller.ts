@@ -156,7 +156,7 @@ export async function getFlavors(req: Request, res: Response): Promise<void> {
  * Returns full flavor details including rating distribution.
  * 
  * Route params:
- * - slug: Flavor slug (e.g., "sarma/klassicheskaya/zima")
+ * - slug: Flavor slug (e.g., "sarma/klassicheskaya/zima" or URL-encoded "sarma%2Fklassicheskaya%2Fzima")
  * 
  * Response format:
  * Flavor object with all properties including rating distribution
@@ -171,7 +171,13 @@ export async function getFlavorBySlug(req: Request, res: Response): Promise<void
   }
 
   try {
-    const { slug } = req.params;
+    // Get slug from request params and decode URL encoding
+    // Express automatically decodes URL-encoded parameters, so "sarma%2Fklassicheskaya%2Fzima"
+    // becomes "sarma/klassicheskaya/zima" in req.params.slug
+    const slug = req.params.slug;
+
+    // Log the slug for debugging
+    logger.debug('Fetching flavor by slug', { slug } as any);
 
     // Get flavor from service
     const flavor = await flavorService.getFlavorBySlug(slug);

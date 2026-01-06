@@ -33,7 +33,7 @@ const logger = LoggerFactory.createEnvironmentLogger('scraper');
  * Scrape detailed information about a specific brand from htreviews.org
  * 
  * This function fetches brand detail page and extracts complete brand information
- * including basic info, ratings, statistics, and lines.
+ * including basic info, ratings, statistics, lines, and flavor URLs.
  * 
  * @param brandSlug The brand slug (e.g., "sarma")
  * @returns Promise resolving to complete Brand object or null if scraping fails
@@ -62,6 +62,9 @@ export async function scrapeBrandDetails(brandSlug: string): Promise<Brand | nul
     // Extract lines list
     const lines = extractLines($, brandSlug);
 
+    // Extract flavor URLs with pagination support
+    const flavorUrls = await extractFlavorUrlsWithPagination($, brandSlug, scraper);
+
     // Construct complete brand object
     const brandDetails: Brand = {
       slug: brand.slug,
@@ -78,13 +81,14 @@ export async function scrapeBrandDetails(brandSlug: string): Promise<Brand | nul
       reviewsCount: brand.reviewsCount,
       viewsCount: brand.viewsCount,
       lines,
-      flavors: [], // Flavors will be scraped separately
+      flavors: [], // Flavors will be scraped separately using extracted URLs
     };
 
     logger.info('Successfully scraped brand details', { 
       brandName: brand.name, 
       brandSlug, 
       linesCount: lines.length,
+      flavorsCount: flavorUrls.length,
       rating: brand.rating,
       ratingsCount: brand.ratingsCount 
     } as any);
@@ -93,6 +97,32 @@ export async function scrapeBrandDetails(brandSlug: string): Promise<Brand | nul
   } catch (error) {
     logger.error('Failed to scrape brand details', { brandSlug, error } as any);
     return null;
+  }
+}
+
+/**
+ * Extract all flavor URLs for a brand with pagination support
+ * 
+ * This function fetches all pages of flavors for a brand and returns
+ * complete list of flavor URLs. It handles pagination automatically.
+ * 
+ * @param brandSlug The brand slug (e.g., "sarma")
+ * @returns Promise resolving to array of flavor URLs (strings)
+ */
+export async function extractFlavorUrls(brandSlug: string): Promise<string[]> {
+  const scraper = new Scraper();
+  
+  try {
+    // Fetch and parse brand detail page
+    const $ = await scraper.fetchAndParse(`/tobaccos/${brandSlug}`);
+    
+    // Extract flavor URLs with pagination support
+    const flavorUrls = await extractFlavorUrlsWithPagination($, brandSlug, scraper);
+    
+    return flavorUrls;
+  } catch (error) {
+    logger.error('Failed to extract flavor URLs', { brandSlug, error } as any);
+    return [];
   }
 }
 
@@ -338,6 +368,155 @@ function parseLineItem(lineItem: any, brandSlug: string): Line | null {
     rating,
     brandSlug,
   };
+}
+
+/**
+ * Extract flavor URLs from brand detail page with pagination support
+ * 
+ * This function extracts all flavor URLs from .tobacco_list_items section
+ * by finding .tobacco_list_item elements and extracting href attributes from
+ * .tobacco_list_item_slug elements. It handles pagination by making additional
+ * requests with offset parameters until all flavors are extracted.
+ * 
+ * @param $ Cheerio instance from initial page
+ * @param brandSlug Brand slug for pagination requests
+ * @param scraper Scraper instance for making additional requests
+ * @returns Promise resolving to array of flavor URLs (strings)
+ */
+async function extractFlavorUrlsWithPagination(
+  $: CheerioAPI,
+  brandSlug: string,
+  scraper: Scraper
+): Promise<string[]> {
+  const allFlavorUrls: string[] = [];
+  const ITEMS_PER_PAGE = 20;
+  
+  try {
+    // Extract total count from data-count attribute
+    const tobaccoListWrapper = $('.tobacco_list_items');
+    const totalCountAttr = tobaccoListWrapper.attr('data-count');
+    const totalCount = totalCountAttr ? parseInt(totalCountAttr, 10) : 0;
+    
+    if (totalCount === 0) {
+      logger.debug('No flavors found on brand page (data-count=0)' as any);
+      return allFlavorUrls;
+    }
+    
+    logger.debug(`Brand has ${totalCount} total flavors (pagination needed)` as any);
+    
+    // Extract flavor URLs from first page
+    const firstPageUrls = extractFlavorUrlsFromPage($);
+    allFlavorUrls.push(...firstPageUrls);
+    
+    logger.debug(`Extracted ${firstPageUrls.length} flavors from first page` as any);
+    
+    // If we have all flavors on first page, return early
+    if (firstPageUrls.length >= totalCount) {
+      logger.debug(`All ${totalCount} flavors extracted from first page` as any);
+      return allFlavorUrls;
+    }
+    
+    // Calculate number of additional pages needed
+    const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
+    logger.debug(`Need to fetch ${totalPages - 1} additional pages` as any);
+    
+    // Fetch remaining pages
+    for (let page = 2; page <= totalPages; page++) {
+      const offset = (page - 1) * ITEMS_PER_PAGE;
+      
+      try {
+        logger.debug(`Fetching page ${page} with offset ${offset}` as any);
+        
+        // Fetch next page with offset parameter
+        const pageUrl = `/tobaccos/${brandSlug}?offset=${offset}`;
+        const $page = await scraper.fetchAndParse(pageUrl);
+        
+        // Extract flavor URLs from this page
+        const pageUrls = extractFlavorUrlsFromPage($page);
+        
+        if (pageUrls.length === 0) {
+          logger.warn(`No flavors found on page ${page}, stopping pagination` as any);
+          break;
+        }
+        
+        allFlavorUrls.push(...pageUrls);
+        logger.debug(`Extracted ${pageUrls.length} flavors from page ${page} (total: ${allFlavorUrls.length}/${totalCount})` as any);
+        
+        // If we've extracted all expected flavors, stop
+        if (allFlavorUrls.length >= totalCount) {
+          logger.debug(`Extracted all ${totalCount} flavors` as any);
+          break;
+        }
+        
+        // Add a small delay between page requests to be respectful
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (error) {
+        logger.error(`Failed to fetch page ${page}`, { offset, error } as any);
+        // Continue with next page even if one fails
+      }
+    }
+    
+    logger.info(`Extracted ${allFlavorUrls.length} flavor URLs from ${totalPages} page(s)` as any);
+    
+    // Remove duplicates (in case of any overlap)
+    const uniqueUrls = Array.from(new Set(allFlavorUrls));
+    
+    if (uniqueUrls.length !== allFlavorUrls.length) {
+      logger.debug(`Removed ${allFlavorUrls.length - uniqueUrls.length} duplicate URLs` as any);
+    }
+    
+    return uniqueUrls;
+  } catch (error) {
+    logger.error('Error extracting flavor URLs with pagination', { error } as any);
+    // Return what we have so far
+    return allFlavorUrls;
+  }
+}
+
+/**
+ * Extract flavor URLs from a single page
+ * 
+ * This function extracts flavor URLs from .tobacco_list_items section
+ * by finding .tobacco_list_item elements and extracting href attributes from
+ * .tobacco_list_item_slug elements.
+ * 
+ * @param $ Cheerio instance
+ * @returns Array of flavor URLs (strings)
+ */
+function extractFlavorUrlsFromPage($: CheerioAPI): string[] {
+  const flavorUrls: string[] = [];
+  
+  try {
+    // Select all flavor list items
+    const flavorItems = $('.tobacco_list_item');
+    
+    if (flavorItems.length === 0) {
+      logger.debug('No flavor items found on this page' as any);
+      return flavorUrls;
+    }
+    
+    // Extract href from each flavor item's slug element
+    for (let i = 0; i < flavorItems.length; i++) {
+      const item = flavorItems.eq(i);
+      const slugElement = item.find('.tobacco_list_item_slug');
+      
+      if (slugElement.length > 0) {
+        const href = slugElement.attr('href');
+        
+        // Only add non-empty hrefs
+        if (href && href.trim() !== '') {
+          flavorUrls.push(href.trim());
+        }
+      }
+    }
+    
+    logger.debug(`Extracted ${flavorUrls.length} flavor URLs from current page` as any);
+  } catch (error) {
+    logger.error('Error extracting flavor URLs from page', { error } as any);
+    // Return empty array on error to allow scraping to continue
+  }
+  
+  return flavorUrls;
 }
 
 // ============================================================================

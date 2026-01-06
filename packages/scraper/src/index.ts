@@ -97,6 +97,7 @@ export type {
 
 export {
   scrapeBrandDetails,
+  extractFlavorUrls,
 } from './brand-details-scraper';
 
 // ============================================================================

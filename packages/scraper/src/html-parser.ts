@@ -355,13 +355,14 @@ export function extractImageUrl(
 // ============================================================================
 
 /**
- * Extract slug from full URL path
+ * Extract slug from full URL path, removing the "tobaccos/" prefix
  * Examples:
  * - "/tobaccos/sarma" → "sarma"
  * - "/tobaccos/sarma/klassicheskaya/zima" → "sarma/klassicheskaya/zima"
  * - "https://htreviews.org/tobaccos/sarma" → "sarma"
+ * - "https://htreviews.org/tobaccos/dogma/sigarnyy-monosort/san-andres" → "dogma/sigarnyy-monosort/san-andres"
  * @param url Full URL or path
- * @returns Extracted slug or null if invalid
+ * @returns Extracted slug without "tobaccos/" prefix, or null if invalid
  */
 export function extractSlugFromUrl(url: string | null | undefined): string | null {
   if (!url) {
@@ -390,7 +391,17 @@ export function extractSlugFromUrl(url: string | null | undefined): string | nul
       return null;
     }
     
-    // Join all parts to form the slug
+    // Remove "tobaccos" prefix if it exists
+    if (nonEmptyParts[0].toLowerCase() === 'tobaccos') {
+      nonEmptyParts.shift();
+    }
+    
+    // Return null if no parts left after removing "tobaccos"
+    if (nonEmptyParts.length === 0) {
+      return null;
+    }
+    
+    // Join remaining parts to form the slug
     return nonEmptyParts.join('/');
   } catch {
     return null;

@@ -6,6 +6,40 @@ import { LoggerFactory } from '@hookah-db/utils';
 import type { DatabaseStats } from './types';
 
 /**
+ * JSON reviver function to convert date strings to Date objects
+ * @param key - The property key being parsed
+ * @param value - The property value being parsed
+ * @returns The value, converted to Date if it's a date field
+ */
+function dateReviver(key: string, value: any): any {
+  // Check if this is a date field
+  if (key === 'dateAdded') {
+    // Handle null or undefined
+    if (value === null || value === undefined) {
+      return value;
+    }
+    
+    // If it's already a Date object, return it
+    if (value instanceof Date) {
+      return value;
+    }
+    
+    // Convert string to Date object
+    const date = new Date(value);
+    
+    // Check if the date is valid
+    if (isNaN(date.getTime())) {
+      // Return original value if date is invalid
+      return value;
+    }
+    
+    return date;
+  }
+  
+  return value;
+}
+
+/**
  * SQLiteDatabase class for managing SQLite database operations
  * Provides synchronous CRUD operations for Brand and Flavor data
  */
@@ -98,7 +132,7 @@ export class SQLiteDatabase {
         return null;
       }
 
-      return JSON.parse(row.data) as Brand;
+      return JSON.parse(row.data, dateReviver) as Brand;
     } catch (error) {
       this.logger.error(`Failed to get brand: ${slug}`);
       return null;
@@ -136,7 +170,7 @@ export class SQLiteDatabase {
       const stmt = this.db.prepare('SELECT data FROM brands ORDER BY slug');
       const rows = stmt.all() as { data: string }[];
 
-      return rows.map(row => JSON.parse(row.data) as Brand);
+      return rows.map(row => JSON.parse(row.data, dateReviver) as Brand);
     } catch (error) {
       this.logger.error('Failed to get all brands');
       return [];
@@ -188,7 +222,7 @@ export class SQLiteDatabase {
         return null;
       }
 
-      return JSON.parse(row.data) as Flavor;
+      return JSON.parse(row.data, dateReviver) as Flavor;
     } catch (error) {
       this.logger.error(`Failed to get flavor: ${slug}`);
       return null;
@@ -226,7 +260,7 @@ export class SQLiteDatabase {
       const stmt = this.db.prepare('SELECT data FROM flavors ORDER BY slug');
       const rows = stmt.all() as { data: string }[];
 
-      return rows.map(row => JSON.parse(row.data) as Flavor);
+      return rows.map(row => JSON.parse(row.data, dateReviver) as Flavor);
     } catch (error) {
       this.logger.error('Failed to get all flavors');
       return [];
@@ -247,7 +281,7 @@ export class SQLiteDatabase {
       `);
       const rows = stmt.all(brandSlug) as { data: string }[];
 
-      return rows.map(row => JSON.parse(row.data) as Flavor);
+      return rows.map(row => JSON.parse(row.data, dateReviver) as Flavor);
     } catch (error) {
       this.logger.error(`Failed to get flavors for brand: ${brandSlug}`);
       return [];

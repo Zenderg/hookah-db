@@ -6,7 +6,7 @@
  */
 
 import { SQLiteDatabase } from '@hookah-db/database';
-import { scrapeBrandsList, scrapeBrandDetails, scrapeFlavorDetails } from '@hookah-db/scraper';
+import { scrapeBrandsList, scrapeBrandDetails, scrapeFlavorDetails, extractFlavorUrls } from '@hookah-db/scraper';
 import { LoggerFactory } from '@hookah-db/utils';
 
 // Initialize logger
@@ -122,8 +122,9 @@ export class DataService {
    * Refresh brand data from htreviews.org
    * 
    * Scrapes all brands from htreviews.org and stores them in SQLite database.
+   * Also scrapes all flavors for each brand and stores them in database.
    * 
-   * @returns Promise resolving to refresh result with brand count
+   * @returns Promise resolving to refresh result with brand and flavor counts
    */
   async refreshBrands(): Promise<RefreshResult> {
     logger.info('Starting brand data refresh');
@@ -135,8 +136,9 @@ export class DataService {
       
       let brandsSaved = 0;
       let brandsUpdated = 0;
+      let totalFlavorsScraped = 0;
       
-      // For each brand, scrape detailed information
+      // For each brand, scrape detailed information and its flavors
       for (const summary of brandSummaries) {
         try {
           logger.debug(`Scraping brand details: ${summary.slug}`);
@@ -148,11 +150,16 @@ export class DataService {
             continue;
           }
           
-          // Save to SQLite
+          // Save brand to SQLite
           this.db.setBrand(brand);
           brandsSaved++;
           
           logger.debug(`Brand saved: ${brand.slug} (${brand.name})`);
+          
+          // Scrape flavors for this brand using pagination-aware function
+          const flavorsScraped = await this.scrapeFlavorsForBrand(brand.slug);
+          totalFlavorsScraped += flavorsScraped;
+          
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
           logger.error(`Failed to scrape brand details: ${summary.slug}`, { error: errorMessage } as any);
@@ -163,13 +170,14 @@ export class DataService {
       logger.info('Brand data refresh completed', {
         brandsSaved,
         brandsUpdated,
-        total: brandSummaries.length
+        totalFlavorsScraped,
+        totalBrands: brandSummaries.length
       } as any);
       
       return {
         success: true,
         brandsCount: brandsSaved,
-        flavorsCount: 0
+        flavorsCount: totalFlavorsScraped
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -185,6 +193,134 @@ export class DataService {
         error: errorMessage
       };
     }
+  }
+
+  /**
+   * Scrape all flavors for a specific brand
+   * 
+   * This private method uses the pagination-aware extractFlavorUrls function
+   * to get all flavor URLs, then iterates through each URL to scrape
+   * complete flavor data.
+   * 
+   * @param brandSlug The brand slug (e.g., "sarma")
+   * @returns Promise resolving to count of flavors successfully scraped
+   */
+  private async scrapeFlavorsForBrand(brandSlug: string): Promise<number> {
+    logger.info(`Starting flavor scraping for brand: ${brandSlug}`);
+    
+    try {
+      // Extract all flavor URLs with pagination support
+      logger.info(`Extracting flavor URLs with pagination for brand: ${brandSlug}`);
+      const flavorUrls = await extractFlavorUrls(brandSlug);
+      
+      if (flavorUrls.length === 0) {
+        logger.debug(`No flavor URLs found for brand: ${brandSlug}`);
+        return 0;
+      }
+      
+      logger.info(`Found ${flavorUrls.length} flavor URLs for brand: ${brandSlug}`);
+      
+      let flavorsScraped = 0;
+      let flavorsFailed = 0;
+      
+      // Iterate through each flavor URL and scrape details
+      for (let i = 0; i < flavorUrls.length; i++) {
+        const flavorUrl = flavorUrls[i];
+        
+        try {
+          // Extract flavor slug from URL
+          // Handle both absolute URLs (https://htreviews.org/tobaccos/brand/line/flavor)
+          // and relative URLs (/tobaccos/brand/line/flavor)
+          let flavorSlug: string;
+          
+          logger.info(`Processing flavor URL: ${flavorUrl}`);
+          
+          if (flavorUrl.startsWith('http')) {
+            // Absolute URL: extract path after /tobaccos/
+            const urlParts = new URL(flavorUrl);
+            const pathParts = urlParts.pathname.split('/').filter(part => part.length > 0); // Filter out empty strings
+            const tobaccosIndex = pathParts.indexOf('tobaccos');
+            
+            logger.info(`URL parts: pathname=${urlParts.pathname}, pathParts=[${pathParts.join(',')}], tobaccosIndex=${tobaccosIndex}`);
+            
+            if (tobaccosIndex >= 0 && tobaccosIndex < pathParts.length - 1) {
+              flavorSlug = pathParts.slice(tobaccosIndex + 1).join('/');
+              logger.info(`Extracted flavor slug: ${flavorSlug}`);
+            } else {
+              logger.warn(`Invalid flavor URL format: ${flavorUrl}` as any);
+              flavorsFailed++;
+              continue;
+            }
+          } else if (flavorUrl.startsWith('/tobaccos/')) {
+            // Relative URL starting with /tobaccos/: remove prefix
+            flavorSlug = flavorUrl.replace(/^\/tobaccos\//, '');
+            logger.info(`Extracted flavor slug (relative): ${flavorSlug}`);
+          } else {
+            // Other relative URL format, use as-is
+            flavorSlug = flavorUrl;
+            logger.info(`Using flavor slug as-is: ${flavorSlug}`);
+          }
+          
+          logger.info(`Scraping flavor ${i + 1} of ${flavorUrls.length} for brand ${brandSlug}: ${flavorSlug}`);
+          
+          // Scrape flavor details
+          const flavor = await scrapeFlavorDetails(flavorSlug);
+          
+          if (!flavor) {
+            logger.error(`Flavor details returned null: ${flavorSlug}`);
+            flavorsFailed++;
+            continue;
+          }
+          
+          // Save flavor to SQLite
+          this.db.setFlavor(flavor);
+          flavorsScraped++;
+          
+          logger.debug(`Flavor saved: ${flavor.slug} (${flavor.name})`);
+          
+          // Add delay between requests to respect rate limiting
+          // The HTTP client already has built-in delays, but we add extra delay here
+          // to be extra respectful to server
+          if (i < flavorUrls.length - 1) {
+            await this.sleep(1000); // 1 second delay between requests
+          }
+          
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          logger.error(`Failed to scrape flavor: ${flavorUrl}`, { error: errorMessage } as any);
+          flavorsFailed++;
+          
+          // Continue with next flavor even if one fails
+        }
+      }
+      
+      logger.info(`Flavor scraping completed for brand: ${brandSlug}`, {
+        flavorsScraped,
+        flavorsFailed,
+        total: flavorUrls.length
+      } as any);
+      
+      return flavorsScraped;
+      
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error(`Failed to scrape flavors for brand: ${brandSlug}`, { 
+        error: errorMessage, 
+        stack: error instanceof Error ? error.stack : undefined 
+      } as any);
+      
+      return 0;
+    }
+  }
+
+  /**
+   * Helper method to add delay between requests
+   * 
+   * @param ms Milliseconds to sleep
+   * @returns Promise that resolves after delay
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   /**
@@ -249,7 +385,7 @@ export class DataService {
               logger.debug(`Flavor saved: ${flavor.slug} (${flavor.name})`);
             } catch (error) {
               const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-              logger.error(`Failed to scrape flavor details: ${flavorSummary.slug}`, { error: errorMessage } as any);
+              logger.error(`Failed to scrape flavor: ${flavorSummary.slug}`, { error: errorMessage } as any);
               flavorsSkipped++;
             }
           }

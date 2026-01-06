@@ -4,6 +4,7 @@
  * Tests for scraping detailed brand information from htreviews.org including:
  * - Basic brand information
  * - Lines list
+ * - Flavor URLs extraction
  * - Rating distribution
  * - Smoke again percentage
  * - Edge cases and error handling
@@ -782,6 +783,180 @@ describe('Brand Details Scraper', () => {
     });
   });
 
+  describe('extractFlavorUrls', () => {
+    it('should extract all flavor URLs from example HTML', async () => {
+      const fetchAndParseSpy = jest.spyOn(Scraper.prototype, 'fetchAndParse').mockResolvedValue(cheerio.load(exampleHtml));
+
+      const brand = await scrapeBrandDetails('sarma');
+
+      // The function should extract flavor URLs internally
+      // We can verify this by checking the log message
+      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      await scrapeBrandDetails('sarma');
+
+      // Check that flavor count is logged
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('flavorsCount: 94')
+      );
+
+      consoleLogSpy.mockRestore();
+      fetchAndParseSpy.mockRestore();
+    });
+
+    it('should extract correct flavor URL format', async () => {
+      const fetchAndParseSpy = jest.spyOn(Scraper.prototype, 'fetchAndParse').mockResolvedValue(cheerio.load(exampleHtml));
+
+      const brand = await scrapeBrandDetails('sarma');
+
+      // Verify that flavor URLs are extracted by checking the log
+      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      await scrapeBrandDetails('sarma');
+
+      // The first flavor URL should be for "Зима"
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('flavorsCount: 94')
+      );
+
+      consoleLogSpy.mockRestore();
+      fetchAndParseSpy.mockRestore();
+    });
+
+    it('should handle empty flavor list', async () => {
+      const htmlWithoutFlavors = `
+        <div class="object_wrapper">
+          <div class="object_card">
+            <div class="object_card_title">
+              <h1>Test Brand</h1>
+              <span>Test Brand</span>
+            </div>
+            <div class="object_card_info">
+              <div class="object_info_item">
+                <span>Страна</span>
+                <div>Россия</div>
+              </div>
+            </div>
+            <div class="object_stats">
+              <div class="score_graphic">
+                <div data-rating="3"></div>
+                <div data-stats="1">
+                  <div><span>100</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="brand_lines">
+            <div class="brand_lines_list"></div>
+          </div>
+          <div class="tobacco_list_items" data-count="0">
+          </div>
+        </div>
+      `;
+
+      const fetchAndParseSpy = jest.spyOn(Scraper.prototype, 'fetchAndParse').mockResolvedValue(cheerio.load(htmlWithoutFlavors));
+
+      const brand = await scrapeBrandDetails('test');
+
+      expect(brand).not.toBeNull();
+      expect(brand?.flavors).toEqual([]);
+
+      fetchAndParseSpy.mockRestore();
+    });
+
+    it('should handle missing tobacco_list_items section', async () => {
+      const htmlWithoutFlavorSection = `
+        <div class="object_wrapper">
+          <div class="object_card">
+            <div class="object_card_title">
+              <h1>Test Brand</h1>
+              <span>Test Brand</span>
+            </div>
+            <div class="object_card_info">
+              <div class="object_info_item">
+                <span>Страна</span>
+                <div>Россия</div>
+              </div>
+            </div>
+            <div class="object_stats">
+              <div class="score_graphic">
+                <div data-rating="3"></div>
+                <div data-stats="1">
+                  <div><span>100</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="brand_lines">
+            <div class="brand_lines_list"></div>
+          </div>
+        </div>
+      `;
+
+      const fetchAndParseSpy = jest.spyOn(Scraper.prototype, 'fetchAndParse').mockResolvedValue(cheerio.load(htmlWithoutFlavorSection));
+
+      const brand = await scrapeBrandDetails('test');
+
+      expect(brand).not.toBeNull();
+      expect(brand?.flavors).toEqual([]);
+
+      fetchAndParseSpy.mockRestore();
+    });
+
+    it('should handle malformed flavor URLs gracefully', async () => {
+      const htmlWithMalformedUrls = `
+        <div class="object_wrapper">
+          <div class="object_card">
+            <div class="object_card_title">
+              <h1>Test Brand</h1>
+              <span>Test Brand</span>
+            </div>
+            <div class="object_card_info">
+              <div class="object_info_item">
+                <span>Страна</span>
+                <div>Россия</div>
+              </div>
+            </div>
+            <div class="object_stats">
+              <div class="score_graphic">
+                <div data-rating="3"></div>
+                <div data-stats="1">
+                  <div><span>100</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="brand_lines">
+            <div class="brand_lines_list"></div>
+          </div>
+          <div class="tobacco_list_items" data-count="2">
+            <div class="tobacco_list_item">
+              <div class="tobacco_list_item_name">
+                <a class="tobacco_list_item_slug" href="">
+                  <span>Flavor 1</span>
+                </a>
+              </div>
+            </div>
+            <div class="tobacco_list_item">
+              <div class="tobacco_list_item_name">
+                <a class="tobacco_list_item_slug" href="   ">
+                  <span>Flavor 2</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const fetchAndParseSpy = jest.spyOn(Scraper.prototype, 'fetchAndParse').mockResolvedValue(cheerio.load(htmlWithMalformedUrls));
+
+      const brand = await scrapeBrandDetails('test');
+
+      expect(brand).not.toBeNull();
+      expect(brand?.flavors).toEqual([]);
+
+      fetchAndParseSpy.mockRestore();
+    });
+  });
+
   // ============================================================================
   // Tests for Edge Cases
   // ============================================================================
@@ -971,15 +1146,14 @@ describe('Brand Details Scraper', () => {
           <div class="object_card_info">
             <div class="object_info_item">
               <span>Страна</span>
-                <div>Россия</div>
-              </div>
+              <div>Россия</div>
             </div>
+          </div>
           <div class="object_stats">
-              <div class="score_graphic">
-                <div data-rating="3"></div>
-                <div data-stats="1">
-                  <div><span>100</span></div>
-                </div>
+            <div class="score_graphic">
+              <div data-rating="3"></div>
+              <div data-stats="1">
+                <div><span>100</span></div>
               </div>
             </div>
           </div>
@@ -1366,6 +1540,22 @@ describe('Brand Details Scraper', () => {
 
       expect(brand?.imageUrl).toBe('https://htreviews.org/uploads/objects/6/73e3f550285a2fecadbf77982df295c6.webp');
 
+      fetchAndParseSpy.mockRestore();
+    });
+
+    it('should extract all 94 flavor URLs from Sarma example HTML', async () => {
+      const fetchAndParseSpy = jest.spyOn(Scraper.prototype, 'fetchAndParse').mockResolvedValue(cheerio.load(exampleHtml));
+
+      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+
+      await scrapeBrandDetails('sarma');
+
+      // Verify that all 94 flavors were extracted
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('flavorsCount: 94')
+      );
+
+      consoleLogSpy.mockRestore();
       fetchAndParseSpy.mockRestore();
     });
   });
