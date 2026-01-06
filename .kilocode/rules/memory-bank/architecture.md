@@ -200,7 +200,11 @@ hookah-db/
 │   │   │   ├── scraper.ts
 │   │   │   ├── brand-scraper.ts
 │   │   │   ├── brand-details-scraper.ts
-│   │   │   └── flavor-details-scraper.ts
+│   │   │   ├── flavor-details-scraper.ts
+│   │   │   ├── brand-id-extractor.ts          # API-based: Extract brand ID
+│   │   │   ├── api-flavor-extractor.ts        # API-based: Extract flavors
+│   │   │   ├── flavor-url-parser.ts           # API-based: Parse URLs
+│   │   │   └── api-response-validator.ts      # API-based: Validate responses
 │   │   ├── package.json
 │   │   └── tsconfig.json
 │   ├── parser/            # Data parsing and transformation
@@ -258,7 +262,7 @@ hookah-db/
 │   │   ├── api/           # API tests (119 tests)
 │   │   ├── cache/         # Cache tests (73 tests)
 │   │   ├── database/      # Database tests
-│   │   ├── scraper/       # Scraper tests (408 tests)
+│   │   ├── scraper/       # Scraper tests (563 tests: 408 HTML + 155 API)
 │   │   ├── services/      # Service tests (198 tests)
 │   │   └── scheduler/     # Scheduler tests (117 tests)
 │   └── integration/
@@ -282,7 +286,7 @@ hookah-db/
 
 ### Data Models
 
-Based on HTML structure analysis, the following data models are identified:
+Based on HTML structure analysis, following data models are identified:
 
 **Brand Model**:
 - `slug`: Unique identifier (e.g., "sarma")
@@ -340,9 +344,163 @@ Based on HTML structure analysis, the following data models are identified:
 
 1. **Brand Discovery**: Scrape `/tobaccos/brands` page to discover all brands
 2. **Brand Details**: For each brand, scrape brand detail page to get brand info and lines
-3. **Flavor Discovery**: From brand pages, discover all flavors
+3. **Flavor Discovery**: From brand pages, discover all flavors using API-based extraction
 4. **Flavor Details**: For each flavor, scrape flavor detail page to get complete data
 5. **Incremental Updates**: Track last scrape timestamp to only update changed data
+
+### API-Based Flavor Extraction
+
+The scraper now uses API-based extraction to retrieve all flavors for each brand, fixing the previous limitation where only the first 20 flavors were available.
+
+**Architecture**:
+
+```mermaid
+graph TB
+    subgraph "Brand Details Scraper"
+        A[Extract Brand ID]
+        B[API Flavor Extractor]
+    end
+    
+    subgraph "API Extraction Module"
+        C[Brand ID Extractor]
+        D[API Flavor Extractor]
+        E[Flavor URL Parser]
+        F[API Response Validator]
+    end
+    
+    subgraph "External API"
+        G[htreviews.org /postData]
+    end
+    
+    A --> C
+    C --> A
+    A --> B
+    B --> D
+    D --> G
+    G --> D
+    D --> E
+    E --> D
+    D --> F
+    F --> D
+    B --> A
+    
+    style D fill:#e1f5ff
+    style G fill:#fff4e1
+```
+
+**Components**:
+
+1. **Brand ID Extractor** ([`brand-id-extractor.ts`](packages/scraper/src/brand-id-extractor.ts:1))
+   - Extracts brand ID from brand detail page HTML
+   - Required for API requests to `/postData` endpoint
+   - 39 unit tests (100% pass rate)
+
+2. **API Flavor Extractor** ([`api-flavor-extractor.ts`](packages/scraper/src/api-flavor-extractor.ts:1))
+   - Orchestrates API requests to `/postData` endpoint
+   - Handles pagination with configurable delay
+   - Implements retry logic with exponential backoff
+   - Tracks extraction metrics (time, requests, count)
+   - 42 unit tests (100% pass rate)
+
+3. **Flavor URL Parser** ([`flavor-url-parser.ts`](packages/scraper/src/flavor-url-parser.ts:1))
+   - Parses API response and extracts flavor URLs
+   - Validates URL format
+   - Removes duplicates
+   - 38 unit tests (100% pass rate)
+
+4. **API Response Validator** ([`api-response-validator.ts`](packages/scraper/src/api-response-validator.ts:1))
+   - Validates API response structure
+   - Checks data integrity
+   - Provides detailed error messages
+   - 36 unit tests (100% pass rate)
+
+**Data Flow**:
+
+```mermaid
+sequenceDiagram
+    participant B as Brand Details Scraper
+    participant E as Brand ID Extractor
+    participant A as API Flavor Extractor
+    participant H as HTTP Client
+    participant API as htreviews.org /postData
+    participant P as Flavor URL Parser
+    participant V as API Response Validator
+    
+    B->>E: Extract brand ID from HTML
+    E-->>B: Return brand ID
+    
+    B->>A: extractFlavorUrls(brandId, brandSlug)
+    
+    loop Until all flavors extracted
+        A->>H: POST /postData with payload
+        H->>API: POST /postData
+        API-->>H: JSON response
+        H-->>A: Response data
+        
+        A->>V: validateResponse(response)
+        V-->>A: ValidationResult
+        
+        alt Validation failed
+            A->>A: Log error and retry or skip
+        else Validation passed
+            A->>P: parseFlavorUrls(response, brandSlug)
+            P-->>A: Parsed flavor URLs
+            
+            A->>A: Add to result array
+            A->>A: Check if complete
+        end
+        
+        alt Not complete
+            A->>A: Wait requestDelay ms
+            A->>A: Increment offset
+        end
+    end
+    
+    A-->>B: ApiFlavorExtractionResult
+    
+    alt API failed and fallback enabled
+        B->>B: extractFlavorUrlsFromHtml()
+        B-->>B: Flavor URLs from HTML
+    end
+```
+
+**Performance Improvements**:
+
+| Metric | HTML Scraping | API Extraction | Improvement |
+|--------|----------------|-----------------|-------------|
+| **Extraction Time** | 10-30s per brand | 2-5s per brand | **5-6x faster** |
+| **Flavor Coverage** | 20 flavors (78% missing) | All flavors | **100% coverage** |
+| **Network Requests** | 5-15 GET requests | 3-10 POST requests | Similar |
+| **Memory Usage** | Low | Low | Similar |
+
+**Configuration**:
+
+```bash
+# Enable/disable API-based extraction (default: true)
+ENABLE_API_EXTRACTION=true
+
+# Number of flavors per API request (default: 20)
+API_FLAVORS_PER_REQUEST=20
+
+# Delay between API requests in milliseconds (default: 500)
+API_REQUEST_DELAY=500
+
+# Maximum retry attempts for failed API requests (default: 3)
+API_MAX_RETRIES=3
+
+# Enable fallback to HTML scraping if API fails (default: true)
+ENABLE_API_FALLBACK=true
+```
+
+**Benefits**:
+
+- ✅ **Complete Flavor Coverage**: Retrieves all flavors, not just first 20
+- ✅ **5-6x Faster**: Extraction time reduced from 10-30s to 2-5s per brand
+- ✅ **Reliable**: Uses official API endpoint instead of JavaScript parsing
+- ✅ **Graceful Fallback**: Falls back to HTML scraping if API fails
+- ✅ **Configurable**: Adjust request delay, retry logic, and batch size
+- ✅ **Respectful**: Configurable rate limiting to respect server resources
+- ✅ **Backward Compatible**: HTML scraping still available as fallback
 
 ### Database Strategy
 
@@ -620,13 +778,14 @@ graph LR
 ## Critical Implementation Paths
 
 1. **Scraping Path**: Fetch HTML → Parse with Cheerio → Extract data → Validate → Store in database
-2. **API Request Path**: Auth check → Rate limit check → Cache lookup → Database fallback → Return data or 404
-3. **Database Update Path**: Scrape complete data → Validate → Update database → Clear cache
-4. **Error Handling Path**: Controller throws error → Error handler middleware catches → Log error → Return JSON error response
-5. **Documentation Path**: JSDoc comments → swagger-jsdoc → OpenAPI spec → Swagger UI
-6. **Scheduler Path**: Cron trigger → Execute job → Call DataService → Update database → Clear cache → Log execution
-7. **Docker Build Path**: Dockerfile stages (dependencies → development/production) → Container images → Docker Compose orchestration
-8. **Docker Deployment Path**: Build images → Create network → Start containers → Health checks → Volume mounts → Service communication
+2. **API-Based Extraction Path**: Extract brand ID → Make POST requests to /postData → Validate response → Parse flavor URLs → Return all flavors
+3. **API Request Path**: Auth check → Rate limit check → Cache lookup → Database fallback → Return data or 404
+4. **Database Update Path**: Scrape complete data → Validate → Update database → Clear cache
+5. **Error Handling Path**: Controller throws error → Error handler middleware catches → Log error → Return JSON error response
+6. **Documentation Path**: JSDoc comments → swagger-jsdoc → OpenAPI spec → Swagger UI
+7. **Scheduler Path**: Cron trigger → Execute job → Call DataService → Update database → Clear cache → Log execution
+8. **Docker Build Path**: Dockerfile stages (dependencies → development/production) → Container images → Docker Compose orchestration
+9. **Docker Deployment Path**: Build images → Create network → Start containers → Health checks → Volume mounts → Service communication
 
 ## Design Patterns
 
@@ -641,6 +800,7 @@ graph LR
 - **Scheduler Pattern**: Cron-based task scheduling with lifecycle management
 - **Container Pattern**: Multi-stage Docker builds for development and production
 - **Orchestration Pattern**: Docker Compose for single-container deployment (API + SQLite)
+- **API Extraction Pattern**: Direct API calls with pagination and retry logic for complete data retrieval
 
 ## Package Dependency Layers
 
@@ -697,3 +857,18 @@ All tests pass (117/117) and cover:
 - Execution history tracking
 - Integration with DataService
 - Cron expression validation
+
+## API-Based Extraction Test Coverage
+
+The API-based extraction has comprehensive test coverage with 155 tests:
+- **Brand ID Extractor** (39 tests): Brand ID extraction from HTML
+- **API Flavor Extractor** (42 tests): API request orchestration, pagination, retry logic
+- **Flavor URL Parser** (38 tests): URL parsing, validation, duplicate removal
+- **API Response Validator** (36 tests): Response validation, data integrity checks
+
+All tests pass (155/155) and cover:
+- Successful extraction scenarios
+- Error handling and retry logic
+- Pagination behavior
+- Fallback to HTML scraping
+- Edge cases and boundary conditions

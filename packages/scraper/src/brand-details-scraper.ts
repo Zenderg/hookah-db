@@ -3,6 +3,8 @@
  * 
  * Scrapes detailed information about a specific brand from htreviews.org.
  * Extracts complete brand information including lines, ratings, and metadata.
+ * 
+ * Supports both HTML-based scraping and API-based flavor extraction.
  */
 
 import { Scraper } from './scraper';
@@ -21,6 +23,8 @@ import {
   extractSlugFromUrl,
 } from './html-parser';
 import { LoggerFactory } from '@hookah-db/utils';
+import { BrandIdExtractor } from './brand-id-extractor';
+import { ApiFlavorExtractor } from './api-flavor-extractor';
 
 // Initialize logger
 const logger = LoggerFactory.createEnvironmentLogger('scraper');
@@ -378,12 +382,84 @@ function parseLineItem(lineItem: any, brandSlug: string): Line | null {
  * .tobacco_list_item_slug elements. It handles pagination by making additional
  * requests with offset parameters until all flavors are extracted.
  * 
+ * Supports both API-based extraction (new) and HTML-based scraping (legacy).
+ * 
  * @param $ Cheerio instance from initial page
  * @param brandSlug Brand slug for pagination requests
  * @param scraper Scraper instance for making additional requests
  * @returns Promise resolving to array of flavor URLs (strings)
  */
 async function extractFlavorUrlsWithPagination(
+  $: CheerioAPI,
+  brandSlug: string,
+  scraper: Scraper
+): Promise<string[]> {
+  // Check if API-based extraction is enabled
+  const enableApiExtraction = process.env.ENABLE_API_EXTRACTION !== 'false';
+  
+  if (enableApiExtraction) {
+    try {
+      logger.info('Using API-based flavor extraction', { brandSlug } as any);
+      
+      // Extract brand ID
+      const brandIdExtractor = new BrandIdExtractor();
+      const brandId = brandIdExtractor.extractBrandId($);
+      
+      if (!brandId) {
+        logger.warn('Failed to extract brand ID, falling back to HTML scraping', { brandSlug } as any);
+        return await extractFlavorUrlsFromHtml($, brandSlug, scraper);
+      }
+      
+      // Extract flavor URLs using API
+      const apiExtractor = new ApiFlavorExtractor(scraper.getHttpClient(), {
+        flavorsPerRequest: parseInt(process.env.API_FLAVORS_PER_REQUEST || '20', 10),
+        requestDelay: parseInt(process.env.API_REQUEST_DELAY || '500', 10),
+        maxRetries: parseInt(process.env.API_MAX_RETRIES || '3', 10),
+        enableApiExtraction: true,
+        enableFallback: process.env.ENABLE_API_FALLBACK !== 'false',
+      });
+      
+      const result = await apiExtractor.extractFlavorUrls(brandId, brandSlug);
+      
+      logger.info('API-based flavor extraction completed', {
+        brandSlug,
+        totalCount: result.totalCount,
+        requestsCount: result.requestsCount,
+        extractionTime: result.extractionTime,
+        usedFallback: result.usedFallback,
+      } as any);
+      
+      return result.flavorUrls;
+    } catch (error) {
+      logger.error('API-based extraction failed, falling back to HTML scraping', {
+        brandSlug,
+        error,
+      } as any);
+      
+      // Fallback to HTML scraping
+      return await extractFlavorUrlsFromHtml($, brandSlug, scraper);
+    }
+  } else {
+    // Use HTML-based scraping (current implementation)
+    logger.info('Using HTML-based flavor extraction', { brandSlug } as any);
+    return await extractFlavorUrlsFromHtml($, brandSlug, scraper);
+  }
+}
+
+/**
+ * Extract flavor URLs from brand detail page using HTML scraping (legacy method)
+ * 
+ * This function extracts all flavor URLs from .tobacco_list_items section
+ * by finding .tobacco_list_item elements and extracting href attributes from
+ * .tobacco_list_item_slug elements. It handles pagination by making additional
+ * requests with offset parameters until all flavors are extracted.
+ * 
+ * @param $ Cheerio instance from initial page
+ * @param brandSlug Brand slug for pagination requests
+ * @param scraper Scraper instance for making additional requests
+ * @returns Promise resolving to array of flavor URLs (strings)
+ */
+async function extractFlavorUrlsFromHtml(
   $: CheerioAPI,
   brandSlug: string,
   scraper: Scraper

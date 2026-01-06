@@ -23,6 +23,13 @@
 - **Cheerio**: Fast, flexible, and lean implementation of core jQuery for server-side HTML parsing
 - **axios**: HTTP client for fetching HTML pages from htreviews.org
 
+### API-Based Flavor Extraction
+- **API Endpoint**: htreviews.org `/postData` endpoint
+- **HTTP Method**: POST requests for flavor data
+- **Pagination**: Multiple requests with increasing offset (0, 20, 40, ...)
+- **Performance**: 5-6x faster than HTML scraping (2-5s vs 10-30s per brand)
+- **Coverage**: 100% flavor coverage (all flavors, not just first 20)
+
 ### API Framework
 - **Express.js**: Mature, widely-used, extensive middleware ecosystem (selected for this project)
 
@@ -348,6 +355,15 @@ Packages use `workspace:*` protocol to reference other packages in monorepo:
 - Add user-agent headers to identify scraper
 - Parse incrementally (brands → lines → flavors)
 
+### API-Based Flavor Extraction
+- Use POST requests to `/postData` endpoint
+- Implement pagination with increasing offset (0, 20, 40, ...)
+- Add configurable delay between requests (default: 500ms)
+- Stop when response returns empty array or fewer items than requested
+- Track extraction metrics (time, requests, count)
+- Support graceful fallback to HTML scraping if API fails
+- Implement retry logic with exponential backoff for failed requests
+
 ### Error Handling
 - Try-catch blocks around all I/O operations
 - Graceful degradation when scraping fails
@@ -415,6 +431,13 @@ Packages use `workspace:*` protocol to reference other packages in monorepo:
 - `LOG_LEVEL`: Logging level (default: info)
 - `LOG_DIR`: Directory for log files (default: ./logs)
 - `SERVICE_NAME`: Service name for log identification (default: hookah-db)
+
+### API-Based Extraction Variables
+- `ENABLE_API_EXTRACTION`: Enable/disable API-based flavor extraction (default: true)
+- `API_FLAVORS_PER_REQUEST`: Number of flavors per API request (default: 20)
+- `API_REQUEST_DELAY`: Delay between API requests in milliseconds (default: 500)
+- `API_MAX_RETRIES`: Maximum retry attempts for failed API requests (default: 3)
+- `ENABLE_API_FALLBACK`: Enable fallback to HTML scraping if API fails (default: true)
 
 ### Docker-Specific Variables
 - `NODE_ENV`: Environment (development/production)

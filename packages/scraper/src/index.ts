@@ -114,6 +114,45 @@ export type {
 } from './flavor-details-scraper';
 
 // ============================================================================
+// API-Based Flavor Extraction Exports
+// ============================================================================
+
+export {
+  BrandIdExtractor,
+} from './brand-id-extractor';
+
+export type {
+  BrandIdExtractorConfig,
+} from './brand-id-extractor';
+
+export {
+  ApiFlavorExtractor,
+  resetLogger,
+} from './api-flavor-extractor';
+
+export type {
+  ApiFlavorExtractorConfig,
+  ApiFlavorExtractionResult,
+} from './api-flavor-extractor';
+
+export {
+  FlavorUrlParser,
+} from './flavor-url-parser';
+
+export type {
+  FlavorUrlParserConfig,
+  ParsedFlavorUrl,
+} from './flavor-url-parser';
+
+export {
+  ApiResponseValidator,
+} from './api-response-validator';
+
+export type {
+  ValidationResult,
+} from './api-response-validator';
+
+// ============================================================================
 // Default Exports
 // ============================================================================
 
