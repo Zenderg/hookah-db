@@ -1,5 +1,5 @@
 # Production Docker Compose configuration
-# Uses ts-node for production runtime to avoid TypeScript workspace resolution issues
+# Uses tsx for production runtime to avoid TypeScript workspace resolution issues
 
 services:
   api:
@@ -17,9 +17,7 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - LOG_LEVEL=info
-    depends_on:
-      redis:
-        condition: service_healthy
+      - DATABASE_PATH=/app/hookah-db.db
     restart: always
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
@@ -32,35 +30,12 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-    networks:
-      - hookah-db-network
-
-  redis:
-    image: redis:7-alpine
-    container_name: hookah-db-redis-prod
-    ports:
-      - "6379:6379"
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
-      - redis-data:/data
-    restart: always
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+      # Mount SQLite database for persistence
+      - ./data/hookah-db.db:/app/hookah-db.db
     networks:
       - hookah-db-network
 
 networks:
   hookah-db-network:
     driver: bridge
-
-volumes:
-  redis-data:
-    driver: local

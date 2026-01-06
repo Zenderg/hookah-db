@@ -1,6 +1,6 @@
 /**
  * Controllers module exports
- * This file exports all controllers for the API
+ * This file exports all controllers for API
  */
 export * from './brand-controller';
 export * from './flavor-controller';

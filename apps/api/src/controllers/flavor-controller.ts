@@ -8,8 +8,6 @@
 import { Request, Response } from 'express';
 import { FlavorService } from '@hookah-db/services';
 import { Flavor } from '@hookah-db/types';
-import { createCache } from '@hookah-db/cache';
-import { scrapeFlavorDetails } from '@hookah-db/scraper';
 import { LoggerFactory } from '@hookah-db/utils';
 
 // Initialize logger
@@ -21,10 +19,16 @@ const logger = LoggerFactory.createEnvironmentLogger('flavor-controller');
 
 /**
  * Initialize FlavorService with required dependencies.
- * Creates an in-memory cache instance and scraper function.
+ * Service will be injected by server.ts during initialization.
  */
-const cache = createCache({ type: 'memory', defaultTTL: 86400 });
-const flavorService = new FlavorService(cache, scrapeFlavorDetails);
+let flavorService: FlavorService | null = null;
+
+/**
+ * Set FlavorService instance (called by server.ts)
+ */
+export function setFlavorService(service: FlavorService): void {
+  flavorService = service;
+}
 
 // ============================================================================
 // Controller Functions
@@ -59,6 +63,11 @@ const flavorService = new FlavorService(cache, scrapeFlavorDetails);
  * @param res Express Response object
  */
 export async function getFlavors(req: Request, res: Response): Promise<void> {
+  if (!flavorService) {
+    res.status(503).json({ error: 'FlavorService not initialized' });
+    return;
+  }
+
   try {
     // Parse query parameters
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
@@ -156,6 +165,11 @@ export async function getFlavors(req: Request, res: Response): Promise<void> {
  * @param res Express Response object
  */
 export async function getFlavorBySlug(req: Request, res: Response): Promise<void> {
+  if (!flavorService) {
+    res.status(503).json({ error: 'FlavorService not initialized' });
+    return;
+  }
+
   try {
     const { slug } = req.params;
 
@@ -181,7 +195,7 @@ export async function getFlavorBySlug(req: Request, res: Response): Promise<void
 /**
  * Get flavors for a specific brand.
  * 
- * Returns paginated list of flavors for the specified brand.
+ * Returns paginated list of flavors for specified brand.
  * 
  * Route params:
  * - brandSlug: Brand slug (e.g., "sarma")
@@ -207,6 +221,11 @@ export async function getFlavorBySlug(req: Request, res: Response): Promise<void
  * @param res Express Response object
  */
 export async function getFlavorsByBrand(req: Request, res: Response): Promise<void> {
+  if (!flavorService) {
+    res.status(503).json({ error: 'FlavorService not initialized' });
+    return;
+  }
+
   try {
     const { brandSlug } = req.params;
 
@@ -293,12 +312,14 @@ export async function getFlavorsByBrand(req: Request, res: Response): Promise<vo
  * @param res Express Response object
  */
 export async function refreshFlavors(_req: Request, res: Response): Promise<void> {
-  try {
-    // Force refresh flavor cache
-    await flavorService.refreshFlavorCache();
+  if (!flavorService) {
+    res.status(503).json({ error: 'FlavorService not initialized' });
+    return;
+  }
 
-    // Get refreshed flavors
-    const flavors = await flavorService.getAllFlavors();
+  try {
+    // Force refresh flavor data
+    const flavors = await flavorService.refreshFlavors();
 
     // Send response
     res.status(200).json({

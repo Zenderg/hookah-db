@@ -15,6 +15,7 @@ services:
       - NODE_ENV=development
       - PORT=3000
       - LOG_LEVEL=debug
+      - DATABASE_PATH=/app/hookah-db.db
     volumes:
       # Mount source code for development with hot reload
       - ./apps/api/src:/app/apps/api/src
@@ -22,21 +23,9 @@ services:
       # Mount TypeScript config files
       - ./tsconfig.json:/app/tsconfig.json
       - ./turbo.json:/app/turbo.json
+      # Mount SQLite database for persistence
+      - ./hookah-db.db:/app/hookah-db.db
     command: npx nodemon --watch src --ext ts --exec npx ts-node --project /app/tsconfig.dev.json src/server.ts
-    depends_on:
-      - redis
-    restart: unless-stopped
-    networks:
-      - hookah-db-network
-
-  redis:
-    image: redis:7-alpine
-    container_name: hookah-db-redis-dev
-    ports:
-      - "6379:6379"
-    command: redis-server --appendonly yes
-    volumes:
-      - redis-data:/data
     restart: unless-stopped
     networks:
       - hookah-db-network
@@ -44,7 +33,3 @@ services:
 networks:
   hookah-db-network:
     driver: bridge
-
-volumes:
-  redis-data:
-    driver: local

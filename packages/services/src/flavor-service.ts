@@ -1,221 +1,191 @@
 /**
  * Flavor Service
  * 
- * Orchestrates flavor data retrieval using cache-aside pattern.
- * Coordinates between scraper and cache layers for flavor-related operations.
+ * Orchestrates flavor data retrieval using SQLite database.
+ * Coordinates between database and data service for flavor-related operations.
  */
 
 import { Flavor } from '@hookah-db/types';
-import { scrapeFlavorDetails } from '@hookah-db/scraper';
-import { ICache } from '@hookah-db/cache';
+import { SQLiteDatabase } from '@hookah-db/database';
+import { DataService } from './data-service';
 import { LoggerFactory } from '@hookah-db/utils';
 
 // Initialize logger
 const logger = LoggerFactory.createEnvironmentLogger('flavor-service');
 
 // ============================================================================
-// Constants
-// ============================================================================
-
-const CACHE_TTL = 86400; // 24 hours in seconds
-
-// ============================================================================
 // Flavor Service Implementation
 // ============================================================================
 
 /**
- * FlavorService implements cache-aside pattern for flavor data.
+ * FlavorService implements database-first pattern for flavor data.
  * 
- * This service provides methods to retrieve flavor data, with intelligent caching
- * to minimize scraping operations. It follows the cache-aside pattern:
- * - Check cache first
- * - On cache miss, scrape data and populate cache
- * - Handle errors gracefully by falling back to stale cache data
+ * This service provides methods to retrieve flavor data directly from SQLite database.
+ * It uses DataService for data refresh operations that scrape from htreviews.org
+ * and persist to SQLite.
  */
 export class FlavorService {
-  private cache: ICache;
-  private flavorDetailsScraper: typeof scrapeFlavorDetails;
+  private db: SQLiteDatabase;
+  private dataService: DataService;
 
   /**
    * Create a new FlavorService instance
    * 
-   * @param cache Cache instance for storing flavor data
-   * @param flavorDetailsScraper Function to scrape flavor details
+   * @param db SQLiteDatabase instance for persistent storage
+   * @param dataService DataService for data refresh operations
    */
   constructor(
-    cache: ICache,
-    flavorDetailsScraper: typeof scrapeFlavorDetails
+    db: SQLiteDatabase,
+    dataService: DataService
   ) {
-    this.cache = cache;
-    this.flavorDetailsScraper = flavorDetailsScraper;
+    this.db = db;
+    this.dataService = dataService;
   }
 
   /**
-   * Get all flavors with caching
+   * Get a flavor by slug
    * 
-   * Implements cache-aside pattern:
-   * - If forceRefresh is false, check cache first
-   * - If cache miss or forceRefresh, scrape all flavors from all brands
-   * - Store results in cache with 24-hour TTL
-   * 
-   * @param forceRefresh If true, bypass cache and force scraping
-   * @returns Promise resolving to array of Flavor objects
-   */
-  async getAllFlavors(forceRefresh = false): Promise<Flavor[]> {
-    // Check cache first if not forcing refresh
-    if (!forceRefresh) {
-      const cachedFlavors = this.cache.getFlavors();
-      if (cachedFlavors && cachedFlavors.length > 0) {
-        return cachedFlavors;
-      }
-    }
-
-    // Cache miss or force refresh - scrape data
-    try {
-      // Get all brands to discover all flavors
-      // Note: This would require BrandService, but we're implementing it standalone
-      // For now, we'll rely on the cache having flavors or return empty array
-      // In a real implementation, you'd iterate through brands and scrape their flavors
-      
-      // Since flavors are scraped individually by slug, we'll need to know which flavors exist
-      // This is typically done by scraping brand detail pages which list flavors
-      // For this implementation, we'll return empty array as we don't have access to BrandService here
-      // The actual implementation would be:
-      // 1. Get all brands (from cache or scrape)
-      // 2. For each brand, scrape brand details to get list of flavors
-      // 3. For each flavor, scrape flavor details
-      // 4. Store all flavors in cache
-      
-      // For now, return empty array - this will be populated by individual flavor scrapes
-      logger.warn('Cannot scrape all flavors without BrandService. Use getFlavorBySlug for individual flavors.' as any);
-      
-      // Check if we have any cached flavors to return
-      const cachedFlavors = this.cache.getFlavors();
-      if (cachedFlavors && cachedFlavors.length > 0) {
-        return cachedFlavors;
-      }
-      
-      return [];
-    } catch (error) {
-      logger.error('Failed to scrape all flavors', { error } as any);
-      
-      // Fall back to cached data if available
-      const cachedFlavors = this.cache.getFlavors();
-      if (cachedFlavors && cachedFlavors.length > 0) {
-        logger.warn('Returning stale cached flavors data' as any);
-        return cachedFlavors;
-      }
-      
-      // Return empty array on complete failure
-      return [];
-    }
-  }
-
-  /**
-   * Get a specific flavor by slug with caching
-   * 
-   * Implements cache-aside pattern:
-   * - If forceRefresh is false, check cache first
-   * - If cache miss or forceRefresh, scrape flavor details
-   * - Store result in cache with 24-hour TTL
+   * Retrieves flavor data directly from SQLite database.
    * 
    * @param slug Flavor slug (e.g., "sarma/klassicheskaya/zima")
-   * @param forceRefresh If true, bypass cache and force scraping
    * @returns Promise resolving to Flavor object or null if not found
    */
-  async getFlavorBySlug(slug: string, forceRefresh = false): Promise<Flavor | null> {
-    // Check cache first if not forcing refresh
-    if (!forceRefresh) {
-      const cachedFlavor = this.cache.getFlavor(slug);
-      if (cachedFlavor) {
-        return cachedFlavor;
-      }
-    }
-
-    // Cache miss or force refresh - scrape data
+  async getFlavor(slug: string): Promise<Flavor | null> {
     try {
-      const flavor = await this.flavorDetailsScraper(slug);
+      logger.debug('Getting flavor from database', { slug } as any);
+      
+      const flavor = this.db.getFlavor(slug);
       
       if (flavor) {
-        // Store in cache with 24-hour TTL
-        this.cache.setFlavor(flavor, CACHE_TTL);
-        
-        // Also update the flavors list in cache
-        const allFlavors = this.cache.getFlavors();
-        const updatedFlavors = allFlavors.filter(f => f.slug !== slug);
-        updatedFlavors.push(flavor);
-        this.cache.setFlavors(updatedFlavors, CACHE_TTL);
-        
-        return flavor;
+        logger.debug('Flavor found in database', { slug, name: flavor.name } as any);
+      } else {
+        logger.debug('Flavor not found in database', { slug } as any);
       }
       
-      // Flavor not found
-      return null;
+      return flavor;
     } catch (error) {
-      logger.error('Failed to scrape flavor details', { slug, error } as any);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('Failed to get flavor from database', { 
+        slug, 
+        error: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined
+      } as any);
       
-      // Fall back to cached data if available
-      const cachedFlavor = this.cache.getFlavor(slug);
-      if (cachedFlavor) {
-        logger.warn('Returning stale cached flavor data', { slug } as any);
-        return cachedFlavor;
-      }
-      
-      // Return null on complete failure
       return null;
     }
+  }
+
+  /**
+   * Get all flavors
+   * 
+   * Retrieves all flavors from SQLite database.
+   * 
+   * @returns Promise resolving to array of Flavor objects
+   */
+  async getFlavors(): Promise<Flavor[]> {
+    try {
+      logger.debug('Getting all flavors from database');
+      
+      const flavors = this.db.getAllFlavors();
+      
+      logger.debug('Flavors retrieved from database', { count: flavors.length } as any);
+      
+      return flavors;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('Failed to get flavors from database', { 
+        error: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined
+      } as any);
+      
+      return [];
+    }
+  }
+
+  /**
+   * Get all flavors (alias for getFlavors)
+   * 
+   * @returns Promise resolving to array of Flavor objects
+   */
+  async getAllFlavors(): Promise<Flavor[]> {
+    return this.getFlavors();
+  }
+
+  /**
+   * Get a flavor by slug (alias for getFlavor)
+   * 
+   * @param slug Flavor slug (e.g., "sarma/klassicheskaya/zima")
+   * @returns Promise resolving to Flavor object or null if not found
+   */
+  async getFlavorBySlug(slug: string): Promise<Flavor | null> {
+    return this.getFlavor(slug);
   }
 
   /**
    * Get flavors filtered by brand
    * 
-   * Retrieves all flavors (from cache or scrape) and filters by brandSlug.
+   * Retrieves flavors from database filtered by brandSlug.
    * 
    * @param brandSlug Brand slug to filter by (e.g., "sarma")
    * @returns Promise resolving to array of Flavor objects matching brand
    */
   async getFlavorsByBrand(brandSlug: string): Promise<Flavor[]> {
     try {
-      const allFlavors = await this.getAllFlavors();
+      logger.debug('Getting flavors by brand', { brandSlug } as any);
       
-      // Filter flavors by brandSlug
-      const filteredFlavors = allFlavors.filter(
-        flavor => flavor.brandSlug === brandSlug
-      );
+      const flavors = this.db.getFlavorsByBrand(brandSlug);
       
-      return filteredFlavors;
+      logger.debug('Flavors retrieved by brand', { 
+        brandSlug, 
+        count: flavors.length 
+      } as any);
+      
+      return flavors;
     } catch (error) {
-      logger.error('Failed to get flavors by brand', { brandSlug, error } as any);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('Failed to get flavors by brand', { 
+        brandSlug, 
+        error: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined
+      } as any);
       
-      // Try using cache's getFlavorsByBrand method as fallback
-      try {
-        return this.cache.getFlavorsByBrand(brandSlug);
-      } catch {
-        return [];
-      }
+      return [];
     }
   }
 
   /**
    * Get flavors filtered by line
    * 
-   * Retrieves all flavors (from cache or scrape) and filters by lineSlug.
+   * Retrieves all flavors from database and filters by lineSlug.
    * 
    * @param lineSlug Line slug to filter by (e.g., "klassicheskaya")
    * @returns Promise resolving to array of Flavor objects matching line
    */
   async getFlavorsByLine(lineSlug: string): Promise<Flavor[]> {
     try {
-      const allFlavors = await this.getAllFlavors();
+      logger.debug('Getting flavors by line', { lineSlug } as any);
+      
+      const allFlavors = this.db.getAllFlavors();
       
       // Filter flavors by lineSlug
       const filteredFlavors = allFlavors.filter(
         flavor => flavor.lineSlug === lineSlug
       );
       
+      logger.debug('Flavors filtered by line', { 
+        lineSlug, 
+        count: filteredFlavors.length 
+      } as any);
+      
       return filteredFlavors;
     } catch (error) {
-      logger.error('Failed to get flavors by line', { lineSlug, error } as any);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('Failed to get flavors by line', { 
+        lineSlug, 
+        error: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined
+      } as any);
+      
       return [];
     }
   }
@@ -223,7 +193,7 @@ export class FlavorService {
   /**
    * Get flavors filtered by tag
    * 
-   * Retrieves all flavors (from cache or scrape) and filters by tag.
+   * Retrieves all flavors from database and filters by tag.
    * Tag matching is case-insensitive.
    * 
    * @param tag Tag name to filter by (e.g., "Холодок")
@@ -231,7 +201,9 @@ export class FlavorService {
    */
   async getFlavorsByTag(tag: string): Promise<Flavor[]> {
     try {
-      const allFlavors = await this.getAllFlavors();
+      logger.debug('Getting flavors by tag', { tag } as any);
+      
+      const allFlavors = this.db.getAllFlavors();
       
       // Filter flavors that contain tag (case-insensitive)
       const filteredFlavors = allFlavors.filter(
@@ -240,27 +212,59 @@ export class FlavorService {
         )
       );
       
+      logger.debug('Flavors filtered by tag', { 
+        tag, 
+        count: filteredFlavors.length 
+      } as any);
+      
       return filteredFlavors;
     } catch (error) {
-      logger.error('Failed to get flavors by tag', { tag, error } as any);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('Failed to get flavors by tag', { 
+        tag, 
+        error: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined
+      } as any);
+      
       return [];
     }
   }
 
   /**
-   * Refresh all flavors in cache
+   * Refresh all flavors
    * 
-   * Forces a refresh of all flavor data by bypassing cache and scraping.
-   * This updates the cache with fresh data.
+   * Forces a refresh of all flavor data by scraping from htreviews.org
+   * and storing in SQLite database via DataService.
    * 
-   * @returns Promise that resolves when cache refresh is complete
+   * @returns Promise resolving to array of refreshed Flavor objects
    */
-  async refreshFlavorCache(): Promise<void> {
+  async refreshFlavors(): Promise<Flavor[]> {
     try {
-      // Force refresh by passing true to getAllFlavors
-      await this.getAllFlavors(true);
+      logger.info('Starting flavor refresh');
+      
+      // Use DataService to refresh flavors from htreviews.org
+      const result = await this.dataService.refreshFlavors();
+      
+      if (!result.success) {
+        logger.error('Flavor refresh failed', { error: result.error } as any);
+        throw new Error(result.error || 'Flavor refresh failed');
+      }
+      
+      // Return refreshed flavors from database
+      const flavors = this.db.getAllFlavors();
+      
+      logger.info('Flavor refresh completed successfully', { 
+        count: flavors.length 
+      } as any);
+      
+      return flavors;
     } catch (error) {
-      logger.error('Failed to refresh flavor cache', { error } as any);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('Failed to refresh flavors', { 
+        error: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined
+      } as any);
+      
       throw error;
     }
   }

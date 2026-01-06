@@ -8,9 +8,9 @@ A centralized data service that aggregates and provides structured information a
 - **Secure API Access**: API key-based authentication for up to 10 authorized clients
 - **Comprehensive Data Model**: Brands, flavors, ratings, reviews, and metadata
 - **RESTful API**: Clean, documented endpoints for data retrieval
-- **Data Caching**: Efficient caching strategy to minimize scraping load
+- **Persistent Storage**: SQLite database with WAL mode for reliable data persistence
 - **Error Handling**: Robust error handling and rate limiting
-- **Automated Data Refresh**: Cron-based scheduler for automatic cache updates with configurable schedules
+- **Automated Data Refresh**: Cron-based scheduler for automatic database updates with configurable schedules
 - **Structured Logging**: Production-ready logging with Winston, file rotation, and request/response tracking
 
 ## Monorepo Structure
@@ -29,7 +29,8 @@ hookah-db/
 │   ├── utils/              # Utility functions (includes logging)
 │   ├── scraper/            # Web scraping logic
 │   ├── parser/             # HTML parsing logic
-│   ├── cache/              # Caching implementations
+│   ├── cache/              # In-memory caching layer
+│   ├── database/           # SQLite database layer
 │   ├── services/           # Business logic
 │   ├── scheduler/          # Cron job scheduler
 │   ├── config/             # Shared configuration
@@ -46,7 +47,8 @@ hookah-db/
 - **@hookah-db/utils**: Utility functions and logging system
 - **@hookah-db/scraper**: Web scraping logic for htreviews.org
 - **@hookah-db/parser**: HTML parsing with Cheerio
-- **@hookah-db/cache**: Caching layer (in-memory/Redis)
+- **@hookah-db/cache**: In-memory caching for frequently accessed data
+- **@hookah-db/database**: SQLite database for persistent storage
 - **@hookah-db/services**: Business logic orchestration
 - **@hookah-db/scheduler**: Cron job scheduler for automated data refresh
 - **@hookah-db/config**: Shared configuration presets
@@ -123,9 +125,8 @@ docker-compose -f docker-compose.dev.yml down
 - **Hot-Reload**: Code changes are automatically reflected without rebuilding
 - **Volume Mounts**: Source code is mounted for live editing
 - **TypeScript Compilation**: Uses ts-node for on-the-fly compilation
-- **Redis Integration**: Redis service included for caching (when implemented)
+- **SQLite Database**: Persistent SQLite database file mounted for data persistence
 - **API Access**: API available at `http://localhost:3000`
-- **Redis Access**: Redis available at `localhost:6379`
 
 #### Accessing Services
 
@@ -148,9 +149,6 @@ docker-compose -f docker-compose.dev.yml logs -f
 
 # View API service logs only
 docker-compose -f docker-compose.dev.yml logs -f api
-
-# View Redis service logs only
-docker-compose -f docker-compose.dev.yml logs -f redis
 ```
 
 ### Production Deployment
@@ -177,7 +175,7 @@ docker-compose -f docker-compose.prod.yml down
 - **Health Checks**: Built-in health checks for service monitoring
 - **Environment Configuration**: Separate `.env.prod` for production settings
 - **Logging**: Production-ready logging with file rotation
-- **Redis Integration**: Redis service for distributed caching
+- **SQLite Database**: Persistent SQLite database with WAL mode
 
 #### Environment Configuration
 
@@ -201,9 +199,8 @@ NODE_ENV=production
 # API Keys (configure at least one)
 API_KEY_CLIENT1=your-production-api-key
 
-# Cache configuration
-CACHE_TTL=86400
-REDIS_URL=redis://redis:6379
+# Database configuration
+DATABASE_PATH=/app/hookah-db.db
 
 # Scheduler configuration
 SCHEDULER_ENABLED=true
@@ -223,7 +220,7 @@ SERVICE_NAME=hookah-db
 # Basic health check
 curl http://localhost:3000/health
 
-# Detailed health check with cache stats
+# Detailed health check with database stats
 curl http://localhost:3000/health/detailed
 
 # Check container health
@@ -245,38 +242,78 @@ The project uses a multi-stage Dockerfile for optimized builds:
 
 **API Service** (`api`):
 - Exposes port 3000
-- Depends on Redis
 - Health check endpoint: `/health`
 - Includes all application code
-
-**Redis Service** (`redis`):
-- Exposes port 6379
-- Used for caching (when implemented)
-- Persists data to named volume
-- Health check: Redis PING command
+- Mounts SQLite database file for persistence
 
 #### Network Configuration
 
 - **Network**: `hookah-db-network` (bridge network)
-- Services communicate via service names (e.g., `redis`, `api`)
-- External access via exposed ports (3000, 6379)
+- External access via exposed port 3000
 
 #### Volume Configuration
 
 - **Source Code Volume**: Mounts source code for development
 - **Logs Volume**: Persists application logs
-- **Redis Data Volume**: Persists Redis data
+- **Database Volume**: Mounts SQLite database file for persistence
 - **Node Modules Volume**: Caches node_modules for faster rebuilds
 
-### Environment Variables
+## Database
 
-#### Environment Files
+### SQLite Database
+
+The project uses SQLite for persistent data storage:
+
+- **Database File**: `hookah-db.db` (configurable via `DATABASE_PATH`)
+- **Mode**: WAL (Write-Ahead Logging) for better performance and concurrency
+- **Location**:
+  - Development: `./hookah-db.db` (project root)
+  - Production: `/app/hookah-db.db` (container)
+
+### Database Features
+
+- **Persistent Storage**: Data persists across server restarts
+- **Simple Backup**: Just copy the database file
+- **No External Dependencies**: Self-contained database
+- **Fast Queries**: Optimized with indexes
+- **WAL Mode**: Better concurrency and performance
+- **ACID Compliant**: Reliable transactions
+
+### Database Schema
+
+The database stores:
+- **Brands**: Brand information (name, description, country, website, etc.)
+- **Flavors**: Flavor details (name, description, brand, line, ratings, etc.)
+- **Lines**: Product lines (name, description, strength, etc.)
+
+### Database Management
+
+```bash
+# Backup database (development)
+cp hookah-db.db hookah-db.db.backup
+
+# Restore database (development)
+cp hookah-db.db.backup hookah-db.db
+
+# Backup database (Docker)
+docker cp hookah-db-api-prod:/app/hookah-db.db ./hookah-db.db.backup
+
+# Restore database (Docker)
+docker cp ./hookah-db.db.backup hookah-db-api-prod:/app/hookah-db.db
+
+# View database file size
+ls -lh hookah-db.db
+```
+
+## Environment Variables
+
+### Environment Files
 
 - **`.env.example`**: Template with all available variables
 - **`.env.dev`**: Development environment configuration
 - **`.env.prod`**: Production environment configuration
 
-#### Required Variables
+### Required Variables
 
 ```bash
 # Server
@@ -286,12 +323,11 @@ NODE_ENV=development|production
 # API Keys (at least one required)
 API_KEY_CLIENT1=your-api-key
 
-# Cache
-CACHE_TTL=86400
-REDIS_URL=redis://redis:6379
+# Database
+DATABASE_PATH=./hookah-db.db
 ```
 
-#### Optional Variables
+### Optional Variables
 
 ```bash
 # Scheduler
@@ -310,7 +346,7 @@ RATE_LIMIT_WINDOW=60000
 RATE_LIMIT_MAX=100
 ```
 
-#### API Key Authentication
+### API Key Authentication
 
 All API v1 endpoints require authentication via the `X-API-Key` header:
 
@@ -359,16 +395,17 @@ docker-compose -f docker-compose.dev.yml restart api
 docker-compose -f docker-compose.dev.yml logs -f api | grep "ts-node"
 ```
 
-**3. Redis connection issues**
+**3. Database connection issues**
 
 ```bash
-# Check Redis logs
-docker-compose -f docker-compose.dev.yml logs redis
+# Check if database file exists
+ls -la hookah-db.db
 
-# Test Redis connection
-docker-compose -f docker-compose.dev.yml exec redis redis-cli ping
+# Check database file permissions
+ls -l hookah-db.db
 
-# Should return: PONG
+# Verify DATABASE_PATH in environment
+docker-compose -f docker-compose.dev.yml exec api env | grep DATABASE_PATH
 ```
 
 **4. Build failures**
@@ -485,9 +522,6 @@ docker-compose -f docker-compose.dev.yml run --rm api sh
 # View environment variables in container
 docker-compose -f docker-compose.dev.yml exec api env
 
-# Test network connectivity
-docker-compose -f docker-compose.dev.yml exec api ping redis
-
 # View mounted volumes
 docker inspect --format='{{json .Mounts}}' hookah-db-api | jq
 ```
@@ -498,11 +532,11 @@ docker inspect --format='{{json .Mounts}}' hookah-db-api | jq
 # Update base image
 docker-compose -f docker-compose.dev.yml pull
 
-# Backup Redis data
-docker run --rm -v hookah-db-redis-data:/data -v $(pwd):/backup alpine tar czf /backup/redis-backup.tar.gz /data
+# Backup database
+cp hookah-db.db hookah-db.db.backup
 
-# Restore Redis data
-docker run --rm -v hookah-db-redis-data:/data -v $(pwd):/backup alpine tar xzf /backup/redis-backup.tar.gz -C /
+# Restore database
+cp hookah-db.db.backup hookah-db.db
 
 # View disk usage
 docker system df
@@ -650,6 +684,7 @@ For comprehensive logging documentation, see [docs/LOGGING.md](docs/LOGGING.md).
 - **Build System**: Turborepo
 - **Web Scraping**: Cheerio, axios
 - **API Framework**: Express.js
+- **Database**: SQLite with WAL mode
 - **Logging**: Winston, winston-daily-rotate-file
 - **Scheduler**: node-cron for automated task scheduling
 - **Testing**: Jest, Supertest
@@ -664,7 +699,7 @@ GET /health
   Returns: Basic health check
 
 GET /health/detailed
-  Returns: Detailed health check with cache stats
+  Returns: Detailed health check with database stats
 
 GET /api-docs
   Returns: Interactive Swagger UI for API documentation
@@ -716,9 +751,9 @@ The API includes a built-in scheduler for automatic data refresh:
 
 ### Default Scheduled Tasks
 
-1. **Brands Refresh** - Updates brand data cache at 2:00 AM UTC
-2. **Flavors Refresh** - Updates flavor data cache at 3:00 AM UTC
-3. **All Data Refresh** - Updates all data cache at 4:00 AM UTC
+1. **Brands Refresh** - Updates brand data in database at 2:00 AM UTC
+2. **Flavors Refresh** - Updates flavor data in database at 3:00 AM UTC
+3. **All Data Refresh** - Updates all data in database at 4:00 AM UTC
 
 ### Monitoring
 

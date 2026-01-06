@@ -13,13 +13,18 @@ The project has been restructured as a monorepo using pnpm workspaces and Turbor
 - Root TypeScript configuration ([`tsconfig.json`](tsconfig.json:1))
 - Git ignore rules ([`.gitignore`](.gitignore:1))
 - Application packages in [`apps/`](apps/) directory (api, cli)
-- Shared packages in [`packages/`](packages/) directory (types, utils, scraper, parser, cache, services, scheduler, config, tsconfig)
+- Shared packages in [`packages/`](packages/) directory (types, utils, scraper, parser, cache, database, services, scheduler, config, tsconfig)
 - Complete data models in [`packages/types/src/`](packages/types/src/) directory
 - **Fully implemented web scraper module** in [`packages/scraper/`](packages/scraper/)
 - **Fully implemented cache module** in [`packages/cache/`](packages/cache/)
+- **Fully implemented database module** in [`packages/database/`](packages/database/) with:
+  - SQLite database implementation with WAL mode
+  - Database interface and types
+  - Comprehensive error handling
+  - Database initialization and migration support
 - **Fully implemented services module** in [`packages/services/`](packages/services/) with:
-  - BrandService: Brand data management with cache integration
-  - FlavorService: Flavor data management with cache integration
+  - BrandService: Brand data management with database and cache integration
+  - FlavorService: Flavor data management with database and cache integration
   - DataService: Orchestration service for data fetching and caching
 - **Fully implemented scheduler module** in [`packages/scheduler/`](packages/scheduler/) with:
   - Scheduler class with cron job management
@@ -58,7 +63,7 @@ The project has been restructured as a monorepo using pnpm workspaces and Turbor
   - Multi-stage Dockerfile with dependencies, development, and production stages
   - Development environment with hot reload and volume mounts
   - Production environment with optimized runtime and health checks
-  - Redis integration for distributed caching
+  - SQLite database file mounted for persistence
   - Docker Compose configurations for both dev and prod environments
   - TypeScript configuration for Docker environments ([`tsconfig.docker.json`](tsconfig.docker.json:1))
   - tsx runtime for production to avoid TypeScript workspace resolution issues
@@ -69,6 +74,33 @@ The project has been restructured as a monorepo using pnpm workspaces and Turbor
 - **Comprehensive README** with Docker setup instructions, troubleshooting guides, and API documentation
 
 ## Recent Changes
+
+- **SQLite Database Migration** (2026-01-06):
+  - Migrated from cache-only architecture to SQLite for persistent storage
+  - Created [`packages/database/`](packages/database/) package with SQLite implementation
+  - Implemented [`sqlite-database.ts`](packages/database/src/sqlite-database.ts:1) with:
+    - Database initialization and connection management
+    - WAL mode for better concurrency and performance
+    - Brand and flavor CRUD operations
+    - Bulk insert operations for efficient data loading
+    - Comprehensive error handling and logging
+  - Updated all services to use database instead of cache-only approach:
+    - [`brand-service.ts`](packages/services/src/brand-service.ts:1) - Now uses database for persistence
+    - [`flavor-service.ts`](packages/services/src/flavor-service.ts:1) - Now uses database for persistence
+    - [`data-service.ts`](packages/services/src/data-service.ts:1) - Orchestrates database updates
+  - Updated Docker configurations:
+    - [`docker-compose.dev.yml`](docker-compose.dev.yml:1) - Removed Redis service, added SQLite volume mount
+    - [`docker-compose.prod.yml`](docker-compose.prod.yml:1) - Removed Redis service, added SQLite volume mount
+  - Updated environment files:
+    - [`.env.dev`](.env.dev:1) - Removed REDIS_URL, added DATABASE_PATH
+    - [`.env.prod`](.env.prod:1) - Removed REDIS_URL, added DATABASE_PATH
+    - [`.env.example`](.env.example:1) - Removed REDIS_URL, added DATABASE_PATH
+  - Updated [`.gitignore`](.gitignore:1) - Added hookah-db.db to ignore list
+  - Updated all documentation to reflect SQLite architecture:
+    - [`README.md`](README.md:1) - Updated architecture, data storage, Docker setup, environment variables
+    - [`.kilocode/rules/memory-bank/architecture.md`](.kilocode/rules/memory-bank/architecture.md:1) - Updated system architecture, Docker architecture
+    - [`.kilocode/rules/memory-bank/tech.md`](.kilocode/rules/memory-bank/tech.md:1) - Updated technology stack, database section
+  - Dependencies installed: better-sqlite3@latest
 
 - **Docker Setup Implementation** (2026-01-05):
   - Created multi-stage [`Dockerfile`](Dockerfile:1) with three stages: dependencies, development, and production
@@ -301,12 +333,11 @@ The project has been restructured as a monorepo using pnpm workspaces and Turbor
 
 The project is now production-ready with all core features implemented:
 1. ✅ **Set up monitoring**: Structured logging (Winston) for production - **COMPLETED**
-2. ✅ **Add persistent storage**: Redis for distributed caching - **COMPLETED** (Docker setup includes Redis)
+2. ✅ **Add persistent storage**: SQLite database for persistent data - **COMPLETED**
 3. ✅ **Deploy API server**: Containerized deployment with Docker Compose - **COMPLETED**
 
 **Potential Future Enhancements**:
-- Implement actual Redis cache implementation (currently using in-memory cache)
-- Add database persistence layer (PostgreSQL, MongoDB) for historical data
+- Add database migration system for schema versioning
 - Implement CI/CD pipeline with automated testing and deployment
 - Add metrics and monitoring (Prometheus, Grafana)
 - Implement API rate limiting per client key (currently IP-based)
@@ -333,8 +364,9 @@ The project is now production-ready with all core features implemented:
 - **Version Management**: @changesets/cli (for versioning and changelog generation)
 - **Testing Framework**: Jest (selected for comprehensive testing capabilities)
 - **Scraper Architecture**: Modular design with separate HTTP client, HTML parser, and scraper classes
-- **Caching Solution**: In-memory with node-cache, with interface designed for future Redis implementation
-- **Services Architecture**: Service layer with cache-first strategy and comprehensive error handling
+- **Database Solution**: SQLite with better-sqlite3 for persistent storage with WAL mode
+- **Caching Solution**: In-memory with node-cache for frequently accessed data
+- **Services Architecture**: Service layer with database-first strategy and comprehensive error handling
 - **API Authentication**: API key-based authentication via X-API-Key header
 - **Rate Limiting**: express-rate-limit for IP-based rate limiting
 - **Error Handling**: Centralized error handling middleware with consistent JSON responses
@@ -343,20 +375,18 @@ The project is now production-ready with all core features implemented:
 - **Logging**: Winston with winston-daily-rotate-file for production-ready structured logging
 - **Containerization**: Docker with multi-stage builds for development and production environments
 - **Runtime**: tsx for production to avoid TypeScript workspace resolution issues
-- **Orchestration**: Docker Compose for multi-container setup (API + Redis)
+- **Orchestration**: Docker Compose for single-container deployment (API + SQLite)
 
 ## Technical Decisions Pending
 
-- **Database**: Whether to use persistent storage or just cache (currently using cache-only approach)
 - **Scraping Strategy**: How frequently to scrape htreviews.org (scheduler implemented, schedules configurable via environment variables)
-- **Redis Implementation**: Currently using in-memory cache; Redis infrastructure is in place but not actively used
 
 ## Key Considerations
 
 - Must be respectful of htreviews.org's server resources (rate limiting implemented)
 - Need to handle potential HTML structure changes on htreviews.org (CSS selectors documented)
 - Should provide robust error handling for scraping failures (comprehensive error handling implemented)
-- Must maintain data consistency between scrapes (addressed by caching layer)
+- Must maintain data consistency between scrapes (addressed by database layer)
 - Need to implement proper attribution to htreviews.org (to be added to API responses)
 - Monorepo structure requires careful dependency management (workspace:* protocol used)
 - All scraper functions are fully tested with 408 unit tests (100% pass rate)
@@ -366,9 +396,10 @@ The project is now production-ready with all core features implemented:
 - All scheduler functions are fully tested with 117 unit tests (100% pass rate)
 - All logging functions are fully tested with 100+ unit tests (100% pass rate)
 - Integration tests available but disabled by default to respect htreviews.org resources
-- Cache layer implemented with in-memory storage using node-cache, with interface designed for future Redis implementation
-- Services layer implements cache-first strategy with fallback to scraper for data retrieval
-- Business logic layer is now complete with comprehensive orchestration of scraper and cache
+- Database layer implemented with SQLite for persistent storage with WAL mode
+- Cache layer implemented with in-memory storage using node-cache for frequently accessed data
+- Services layer implements database-first strategy with cache optimization for data retrieval
+- Business logic layer is now complete with comprehensive orchestration of scraper, database, and cache
 - API layer is now complete with authentication, rate limiting, error handling, Swagger/OpenAPI documentation, and comprehensive test coverage
 - Scheduler layer provides automated data refresh with configurable cron schedules and comprehensive monitoring
 - Logging layer provides production-ready structured logging with Winston, file rotation, correlation ID tracking, and request/response middleware
@@ -378,5 +409,5 @@ The project is now production-ready with all core features implemented:
 - Environment variable examples available at [`.env.example`](.env.example:1)
 - Docker development environment supports hot reload with volume mounts
 - Docker production environment includes health checks and log rotation
-- Redis integration provides distributed caching with persistence and memory management
+- SQLite database provides persistent storage with WAL mode for better performance
 - Comprehensive README with Docker setup instructions, troubleshooting guides, and API documentation

@@ -3,11 +3,8 @@ import path from 'path';
 import express, { Express, Request, Response, NextFunction } from 'express';
 import brandRoutes from './routes/brand-routes';
 import flavorRoutes from './routes/flavor-routes';
-import {
-  healthCheck,
-  healthCheckDetailed,
-} from './controllers';
-import { errorHandler, authMiddleware } from './middleware';
+import errorHandler from './middleware/error-handler-middleware';
+import authMiddleware from './middleware/auth-middleware';
 import swaggerJsdoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
 import swaggerOptions from './swagger';
@@ -15,9 +12,9 @@ import { Scheduler, createScheduler } from '@hookah-db/scheduler';
 import { DataService } from '@hookah-db/services';
 import { BrandService } from '@hookah-db/services';
 import { FlavorService } from '@hookah-db/services';
-import { createCache } from '@hookah-db/cache';
-import { scrapeBrandsList, scrapeBrandDetails, scrapeFlavorDetails } from '@hookah-db/scraper';
+import { SQLiteDatabase } from '@hookah-db/database';
 import { LoggerFactory } from '@hookah-db/utils';
+import { setBrandService, setFlavorService } from './controllers';
 
 // Initialize logger
 const logger = LoggerFactory.createEnvironmentLogger('api-server');
@@ -79,14 +76,19 @@ if (process.env.NODE_ENV !== 'production') {
  *                   example: Internal server error
  */
 // Health check routes (no authentication required)
-app.get('/health', healthCheck);
+app.get('/health', (_req: Request, res: Response) => {
+  res.status(200).json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+  });
+});
 
 /**
  * @swagger
  * /health/detailed:
  *   get:
- *     summary: Detailed health check with cache statistics
- *     description: Returns detailed health status including cache statistics, server uptime, and version information. This endpoint provides insights into system performance and cache efficiency. Does not require authentication.
+ *     summary: Detailed health check with database statistics
+ *     description: Returns detailed health status including database statistics, server uptime, and version information. This endpoint provides insights into system performance and database efficiency. Does not require authentication.
  *     tags:
  *       - Health
  *     responses:
@@ -115,31 +117,26 @@ app.get('/health', healthCheck);
  *                   type: string
  *                   description: API version
  *                   example: '1.0.0'
- *                 cache:
+ *                 database:
  *                   type: object
- *                   description: Cache performance statistics
+ *                   description: Database performance statistics
  *                   properties:
- *                     size:
+ *                     path:
+ *                       type: string
+ *                       description: Path to SQLite database file
+ *                       example: './hookah-db.db'
+ *                     brandsCount:
  *                       type: integer
- *                       description: Total number of items in cache
+ *                       description: Total number of brands in database
+ *                       example: 50
+ *                     flavorsCount:
+ *                       type: integer
+ *                       description: Total number of flavors in database
  *                       example: 150
- *                     keys:
+ *                     dbSize:
  *                       type: integer
- *                       description: Number of unique cache keys
- *                       example: 50
- *                     hits:
- *                       type: integer
- *                       description: Total cache hits
- *                       example: 1000
- *                     misses:
- *                       type: integer
- *                       description: Total cache misses
- *                       example: 50
- *                     hitRate:
- *                       type: number
- *                       format: float
- *                       description: Cache hit rate percentage (0-100)
- *                       example: 95.24
+ *                       description: Database file size in bytes
+ *                       example: 102400
  *       500:
  *         description: Internal server error
  *         content:
@@ -151,7 +148,34 @@ app.get('/health', healthCheck);
  *                   type: string
  *                   example: Internal server error
  */
-app.get('/health/detailed', healthCheckDetailed);
+app.get('/health/detailed', (_req: Request, res: Response) => {
+  if (!db) {
+    res.status(503).json({ error: 'Database not initialized' });
+    return;
+  }
+
+  const dbStats = db.getStats();
+  const dbPath = process.env.DATABASE_PATH || './hookah-db.db';
+  
+  // Determine health status
+  let status: 'ok' | 'degraded' | 'error' = 'ok';
+  if (dbStats.brandsCount === 0 && dbStats.flavorsCount === 0) {
+    status = 'degraded';
+  }
+
+  res.status(200).json({
+    status,
+    timestamp: new Date().toISOString(),
+    uptime: Math.floor(process.uptime()),
+    version: '1.0.0',
+    database: {
+      path: dbPath,
+      brandsCount: dbStats.brandsCount,
+      flavorsCount: dbStats.flavorsCount,
+      dbSize: dbStats.dbSize,
+    },
+  });
+});
 
 // Generate OpenAPI specification
 const specs = swaggerJsdoc(swaggerOptions);
@@ -208,13 +232,31 @@ app.use(errorHandler);
 // Initialize scheduler
 let scheduler: Scheduler | null = null;
 
-// Initialize cache instance
-const cache = createCache({ type: 'memory', defaultTTL: 86400 });
+// Initialize database
+let db: SQLiteDatabase | null = null;
 
-// Initialize DataService with required services
-const brandService = new BrandService(cache, scrapeBrandsList, scrapeBrandDetails);
-const flavorService = new FlavorService(cache, scrapeFlavorDetails);
-const dataService = new DataService(brandService, flavorService);
+try {
+  const dbPath = process.env.DATABASE_PATH || './hookah-db.db';
+  logger.info(`Initializing SQLite database at ${dbPath}` as any);
+  db = new SQLiteDatabase(dbPath);
+  logger.info('Database initialized successfully' as any);
+} catch (error) {
+  const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+  logger.error('Failed to initialize database', { 
+    error: errorMessage,
+    stack: error instanceof Error ? error.stack : undefined
+  } as any);
+  throw error;
+}
+
+// Initialize services with database
+const dataService = new DataService(db);
+const brandService = new BrandService(db, dataService);
+const flavorService = new FlavorService(db, dataService);
+
+// Inject services into controllers
+setBrandService(brandService);
+setFlavorService(flavorService);
 
 // Create scheduler configuration
 const schedulerConfig = {
@@ -227,8 +269,17 @@ const schedulerConfig = {
 
 // Create scheduler instance
 if (schedulerConfig.enabled) {
-  scheduler = createScheduler(schedulerConfig);
-  logger.info('Scheduler instance created' as any);
+  try {
+    scheduler = createScheduler(dataService, db, schedulerConfig);
+    logger.info('Scheduler instance created' as any);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error('Failed to create scheduler', { 
+      error: errorMessage,
+      stack: error instanceof Error ? error.stack : undefined
+    } as any);
+    // Continue without scheduler if it fails to initialize
+  }
 }
 
 // Graceful shutdown handlers
@@ -239,6 +290,12 @@ const gracefulShutdown = async (signal: string) => {
     logger.info('Stopping scheduler...' as any);
     await scheduler.stop();
     logger.info('Scheduler stopped' as any);
+  }
+  
+  if (db) {
+    logger.info('Closing database connection...' as any);
+    db.close();
+    logger.info('Database connection closed' as any);
   }
   
   process.exit(0);
@@ -255,7 +312,7 @@ export async function startServer(): Promise<void> {
   if (scheduler && schedulerConfig.enabled) {
     try {
       // Schedule default refresh tasks
-      scheduler.scheduleDefaultRefreshTasks(() => dataService.refreshAllCache());
+      scheduler.scheduleDefaultRefreshTasks();
       
       await scheduler.start();
       logger.info('Scheduler started successfully' as any);
@@ -263,7 +320,11 @@ export async function startServer(): Promise<void> {
       logger.info(`  - Flavors refresh: ${schedulerConfig.flavorsSchedule}` as any);
       logger.info(`  - All data refresh: ${schedulerConfig.allDataSchedule}` as any);
     } catch (error) {
-      logger.error('Failed to start scheduler', { error } as any);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('Failed to start scheduler', { 
+        error: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined
+      } as any);
       // Continue without scheduler if it fails to start
     }
   } else {
@@ -288,7 +349,11 @@ export default app;
 // Start server if this file is run directly
 if (require.main === module) {
   startServer().catch((error) => {
-    logger.error('Failed to start server', { error } as any);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error('Failed to start server', { 
+      error: errorMessage,
+      stack: error instanceof Error ? error.stack : undefined
+    } as any);
     process.exit(1);
   });
 }

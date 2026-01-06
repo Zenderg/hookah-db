@@ -8,8 +8,6 @@
 import { Request, Response } from 'express';
 import { BrandService } from '@hookah-db/services';
 import { Brand } from '@hookah-db/types';
-import { createCache } from '@hookah-db/cache';
-import { scrapeBrandsList, scrapeBrandDetails } from '@hookah-db/scraper';
 import { LoggerFactory } from '@hookah-db/utils';
 
 // Initialize logger
@@ -40,10 +38,16 @@ export class NotFoundError extends Error {
 
 /**
  * Initialize BrandService with required dependencies.
- * Creates an in-memory cache instance and scraper functions.
+ * Service will be injected by server.ts during initialization.
  */
-const cache = createCache({ type: 'memory', defaultTTL: 86400 });
-const brandService = new BrandService(cache, scrapeBrandsList, scrapeBrandDetails);
+let brandService: BrandService | null = null;
+
+/**
+ * Set BrandService instance (called by server.ts)
+ */
+export function setBrandService(service: BrandService): void {
+  brandService = service;
+}
 
 // ============================================================================
 // Controller Functions
@@ -75,6 +79,11 @@ const brandService = new BrandService(cache, scrapeBrandsList, scrapeBrandDetail
  * @param res Express Response object
  */
 export async function getBrands(req: Request, res: Response): Promise<void> {
+  if (!brandService) {
+    res.status(503).json({ error: 'BrandService not initialized' });
+    return;
+  }
+
   try {
     // Parse query parameters
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
@@ -146,6 +155,11 @@ export async function getBrands(req: Request, res: Response): Promise<void> {
  * @param res Express Response object
  */
 export async function getBrandBySlug(req: Request, res: Response): Promise<void> {
+  if (!brandService) {
+    res.status(503).json({ error: 'BrandService not initialized' });
+    return;
+  }
+
   try {
     const { slug } = req.params;
 
@@ -185,12 +199,14 @@ export async function getBrandBySlug(req: Request, res: Response): Promise<void>
  * @param res Express Response object
  */
 export async function refreshBrands(_req: Request, res: Response): Promise<void> {
-  try {
-    // Force refresh brand cache
-    await brandService.refreshBrandCache();
+  if (!brandService) {
+    res.status(503).json({ error: 'BrandService not initialized' });
+    return;
+  }
 
-    // Get refreshed brands
-    const brands = await brandService.getAllBrands();
+  try {
+    // Force refresh brand data
+    const brands = await brandService.refreshBrands();
 
     // Send response
     res.status(200).json({

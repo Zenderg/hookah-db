@@ -1,173 +1,130 @@
 /**
  * Brand Service
  * 
- * Orchestrates brand data retrieval using cache-aside pattern.
- * Coordinates between scraper and cache layers for brand-related operations.
+ * Orchestrates brand data retrieval using SQLite database.
+ * Coordinates between database and data service for brand-related operations.
  */
 
 import { Brand } from '@hookah-db/types';
-import { scrapeBrandsList, scrapeBrandDetails } from '@hookah-db/scraper';
-import { ICache } from '@hookah-db/cache';
+import { SQLiteDatabase } from '@hookah-db/database';
+import { DataService } from './data-service';
 import { LoggerFactory } from '@hookah-db/utils';
 
 // Initialize logger
 const logger = LoggerFactory.createEnvironmentLogger('brand-service');
 
 // ============================================================================
-// Constants
-// ============================================================================
-
-const CACHE_TTL = 86400; // 24 hours in seconds
-
-// ============================================================================
 // Brand Service Implementation
 // ============================================================================
 
 /**
- * BrandService implements cache-aside pattern for brand data.
+ * BrandService implements database-first pattern for brand data.
  * 
- * This service provides methods to retrieve brand data, with intelligent caching
- * to minimize scraping operations. It follows the cache-aside pattern:
- * - Check cache first
- * - On cache miss, scrape data and populate cache
- * - Handle errors gracefully by falling back to stale cache data
+ * This service provides methods to retrieve brand data directly from SQLite database.
+ * It uses DataService for data refresh operations that scrape from htreviews.org
+ * and persist to SQLite.
  */
 export class BrandService {
-  private cache: ICache;
-  private brandScraper: typeof scrapeBrandsList;
-  private brandDetailsScraper: typeof scrapeBrandDetails;
+  private db: SQLiteDatabase;
+  private dataService: DataService;
 
   /**
    * Create a new BrandService instance
    * 
-   * @param cache Cache instance for storing brand data
-   * @param brandScraper Function to scrape brand list
-   * @param brandDetailsScraper Function to scrape brand details
+   * @param db SQLiteDatabase instance for persistent storage
+   * @param dataService DataService for data refresh operations
    */
   constructor(
-    cache: ICache,
-    brandScraper: typeof scrapeBrandsList,
-    brandDetailsScraper: typeof scrapeBrandDetails
+    db: SQLiteDatabase,
+    dataService: DataService
   ) {
-    this.cache = cache;
-    this.brandScraper = brandScraper;
-    this.brandDetailsScraper = brandDetailsScraper;
+    this.db = db;
+    this.dataService = dataService;
   }
 
   /**
-   * Get all brands with caching
+   * Get a brand by slug
    * 
-   * Implements cache-aside pattern:
-   * - If forceRefresh is false, check cache first
-   * - If cache miss or forceRefresh, scrape all brands
-   * - Store results in cache with 24-hour TTL
+   * Retrieves brand data directly from SQLite database.
    * 
-   * @param forceRefresh If true, bypass cache and force scraping
+   * @param slug Brand slug (e.g., "sarma")
+   * @returns Promise resolving to Brand object or null if not found
+   */
+  async getBrand(slug: string): Promise<Brand | null> {
+    try {
+      logger.debug('Getting brand from database', { slug } as any);
+      
+      const brand = this.db.getBrand(slug);
+      
+      if (brand) {
+        logger.debug('Brand found in database', { slug, name: brand.name } as any);
+      } else {
+        logger.debug('Brand not found in database', { slug } as any);
+      }
+      
+      return brand;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('Failed to get brand from database', { 
+        slug, 
+        error: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined
+      } as any);
+      
+      return null;
+    }
+  }
+
+  /**
+   * Get all brands
+   * 
+   * Retrieves all brands from SQLite database.
+   * 
    * @returns Promise resolving to array of Brand objects
    */
-  async getAllBrands(forceRefresh = false): Promise<Brand[]> {
-    // Check cache first if not forcing refresh
-    if (!forceRefresh) {
-      const cachedBrands = this.cache.getBrands();
-      if (cachedBrands && cachedBrands.length > 0) {
-        return cachedBrands;
-      }
-    }
-
-    // Cache miss or force refresh - scrape data
+  async getBrands(): Promise<Brand[]> {
     try {
-      const brandSummaries = await this.brandScraper();
+      logger.debug('Getting all brands from database');
       
-      // Convert BrandSummary[] to Brand[] by adding missing fields
-      const brands: Brand[] = brandSummaries.map(summary => ({
-        slug: summary.slug,
-        name: summary.name,
-        nameEn: summary.nameEn,
-        description: summary.description,
-        country: summary.country,
-        website: null, // Not available in brand list
-        foundedYear: null, // Not available in brand list
-        status: '', // Not available in brand list
-        imageUrl: summary.imageUrl,
-        rating: summary.rating,
-        ratingsCount: summary.ratingsCount,
-        reviewsCount: summary.reviewsCount,
-        viewsCount: summary.viewsCount,
-        lines: [], // Will be populated by brand details scraper
-        flavors: [], // Will be populated separately
-      }));
-
-      // Store in cache with 24-hour TTL
-      this.cache.setBrands(brands, CACHE_TTL);
+      const brands = this.db.getAllBrands();
+      
+      logger.debug('Brands retrieved from database', { count: brands.length } as any);
       
       return brands;
     } catch (error) {
-      logger.error('Failed to scrape brands list', { error } as any);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('Failed to get brands from database', { 
+        error: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined
+      } as any);
       
-      // Fall back to cached data if available
-      const cachedBrands = this.cache.getBrands();
-      if (cachedBrands && cachedBrands.length > 0) {
-        logger.warn('Returning stale cached brands data' as any);
-        return cachedBrands;
-      }
-      
-      // Return empty array on complete failure
       return [];
     }
   }
 
   /**
-   * Get a specific brand by slug with caching
+   * Get all brands (alias for getBrands)
    * 
-   * Implements cache-aside pattern:
-   * - If forceRefresh is false, check cache first
-   * - If cache miss or forceRefresh, scrape brand details
-   * - Store result in cache with 24-hour TTL
+   * @returns Promise resolving to array of Brand objects
+   */
+  async getAllBrands(): Promise<Brand[]> {
+    return this.getBrands();
+  }
+
+  /**
+   * Get a brand by slug (alias for getBrand)
    * 
    * @param slug Brand slug (e.g., "sarma")
-   * @param forceRefresh If true, bypass cache and force scraping
    * @returns Promise resolving to Brand object or null if not found
    */
-  async getBrandBySlug(slug: string, forceRefresh = false): Promise<Brand | null> {
-    // Check cache first if not forcing refresh
-    if (!forceRefresh) {
-      const cachedBrand = this.cache.getBrand(slug);
-      if (cachedBrand) {
-        return cachedBrand;
-      }
-    }
-
-    // Cache miss or force refresh - scrape data
-    try {
-      const brand = await this.brandDetailsScraper(slug);
-      
-      if (brand) {
-        // Store in cache with 24-hour TTL
-        this.cache.setBrand(brand, CACHE_TTL);
-        return brand;
-      }
-      
-      // Brand not found
-      return null;
-    } catch (error) {
-      logger.error('Failed to scrape brand details', { slug, error } as any);
-      
-      // Fall back to cached data if available
-      const cachedBrand = this.cache.getBrand(slug);
-      if (cachedBrand) {
-        logger.warn('Returning stale cached brand data', { slug } as any);
-        return cachedBrand;
-      }
-      
-      // Return null on complete failure
-      return null;
-    }
+  async getBrandBySlug(slug: string): Promise<Brand | null> {
+    return this.getBrand(slug);
   }
 
   /**
    * Get brands filtered by country
    * 
-   * Retrieves all brands (from cache or scrape) and filters by country.
+   * Retrieves all brands from database and filters by country.
    * Country comparison is case-insensitive.
    * 
    * @param country Country name to filter by (e.g., "Россия", "USA")
@@ -175,34 +132,68 @@ export class BrandService {
    */
   async getBrandsByCountry(country: string): Promise<Brand[]> {
     try {
-      const allBrands = await this.getAllBrands();
+      logger.debug('Getting brands by country', { country } as any);
+      
+      const allBrands = this.db.getAllBrands();
       
       // Filter brands by country (case-insensitive)
       const filteredBrands = allBrands.filter(
         brand => brand.country.toLowerCase() === country.toLowerCase()
       );
       
+      logger.debug('Brands filtered by country', { 
+        country, 
+        count: filteredBrands.length 
+      } as any);
+      
       return filteredBrands;
     } catch (error) {
-      logger.error('Failed to get brands by country', { country, error } as any);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('Failed to get brands by country', { 
+        country, 
+        error: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined
+      } as any);
+      
       return [];
     }
   }
 
   /**
-   * Refresh all brands in cache
+   * Refresh all brands
    * 
-   * Forces a refresh of all brand data by bypassing cache and scraping.
-   * This updates the cache with fresh data.
+   * Forces a refresh of all brand data by scraping from htreviews.org
+   * and storing in SQLite database via DataService.
    * 
-   * @returns Promise that resolves when cache refresh is complete
+   * @returns Promise resolving to array of refreshed Brand objects
    */
-  async refreshBrandCache(): Promise<void> {
+  async refreshBrands(): Promise<Brand[]> {
     try {
-      // Force refresh by passing true to getAllBrands
-      await this.getAllBrands(true);
+      logger.info('Starting brand refresh');
+      
+      // Use DataService to refresh brands from htreviews.org
+      const result = await this.dataService.refreshBrands();
+      
+      if (!result.success) {
+        logger.error('Brand refresh failed', { error: result.error } as any);
+        throw new Error(result.error || 'Brand refresh failed');
+      }
+      
+      // Return refreshed brands from database
+      const brands = this.db.getAllBrands();
+      
+      logger.info('Brand refresh completed successfully', { 
+        count: brands.length 
+      } as any);
+      
+      return brands;
     } catch (error) {
-      logger.error('Failed to refresh brand cache', { error } as any);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('Failed to refresh brands', { 
+        error: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined
+      } as any);
+      
       throw error;
     }
   }

@@ -31,13 +31,15 @@
 - **dotenv**: Environment variable loading from .env files
 - **Rate Limiting**: express-rate-limit for IP-based rate limiting
 
-### Caching
-**Primary (In-Memory)**:
-- **node-cache**: Simple in-memory caching for development/small deployments
+### Database & Caching
+**Primary Database**:
+- **SQLite**: Lightweight, self-contained SQL database for persistent storage
+- **better-sqlite3**: Synchronous SQLite driver for Node.js with WAL mode support
+- **WAL Mode**: Write-Ahead Logging for better concurrency and performance
 
-**Optional (Production)**:
-- **Redis**: Distributed caching for production environments with multiple instances
-- Redis 7 Alpine with AOF persistence and LRU eviction policy
+**Caching**:
+- **node-cache**: Simple in-memory caching for frequently accessed data
+- Cache-first strategy with database fallback
 
 ### Scheduler
 - **node-cron**: Cron job scheduler for automated task execution
@@ -170,9 +172,6 @@ docker logs -f hookah-db-api-prod
 
 # Check container health
 docker inspect hookah-db-api-prod | grep -A 10 Health
-
-# Connect to Redis in container
-docker exec -it hookah-db-redis-prod redis-cli
 ```
 
 ### Accessing API Documentation
@@ -213,7 +212,8 @@ hookah-db/
 │   ├── types/             # TypeScript interfaces and types
 │   ├── scraper/           # Web scraping module
 │   ├── parser/            # Data parsing and transformation
-│   ├── cache/             # Caching layer
+│   ├── cache/             # In-memory caching layer
+│   ├── database/          # SQLite database layer
 │   ├── services/          # Business logic
 │   ├── scheduler/         # Cron job scheduler
 │   ├── utils/             # Utility functions
@@ -243,16 +243,13 @@ The Docker setup uses a multi-stage build approach:
 - **API Service**: Node.js API server with Express.js
   - Development: Hot reload with nodemon and volume mounts
   - Production: Optimized runtime with health checks and log rotation
-- **Redis Service**: Redis 7 Alpine for distributed caching
-  - AOF persistence enabled
-  - Memory limits and LRU eviction policy (production)
-  - Health checks for monitoring
+  - SQLite database file mounted for persistence
 
 **Networks**:
 - **hookah-db-network**: Bridge network for container communication
 
 **Volumes**:
-- **redis-data**: Persistent storage for Redis data
+- **Database Volume**: Mounts SQLite database file for persistence
 
 ### Package Naming Convention
 
@@ -262,7 +259,8 @@ All packages use the `@hookah-db/*` naming convention:
 - `@hookah-db/types` - TypeScript types and interfaces
 - `@hookah-db/scraper` - Web scraping module
 - `@hookah-db/parser` - Data parsing module
-- `@hookah-db/cache` - Caching layer
+- `@hookah-db/cache` - In-memory caching layer
+- `@hookah-db/database` - SQLite database layer
 - `@hookah-db/services` - Business logic services
 - `@hookah-db/scheduler` - Cron job scheduler
 - `@hookah-db/utils` - Utility functions and logging system
@@ -271,7 +269,7 @@ All packages use the `@hookah-db/*` naming convention:
 
 ### Workspace Dependencies
 
-Packages use the `workspace:*` protocol to reference other packages in the monorepo:
+Packages use `workspace:*` protocol to reference other packages in monorepo:
 
 ```json
 {
@@ -317,6 +315,7 @@ Packages use the `workspace:*` protocol to reference other packages in the monor
 ### Performance Requirements
 - API response time: <200ms (average)
 - Cache hit rate: >90%
+- Database query time: <50ms (average)
 - Scraping interval: At least 24 hours between full scrapes
 - Container startup time: <30 seconds (production)
 
@@ -325,14 +324,14 @@ Packages use the `workspace:*` protocol to reference other packages in the monor
 - Handle 100+ brands with 10,000+ flavors
 - Rate limiting: ~100 requests/minute per client
 - Horizontal scaling: Can deploy multiple API containers with load balancer
-- Redis clustering: Can scale Redis for high-availability
+- SQLite database: Suitable for single-instance deployments
 
 ### Resource Limits
 - Memory usage: <500MB for in-memory cache
+- Database size: <100MB for full dataset
 - Network bandwidth: Minimal (only scraping htreviews.org)
 - CPU usage: Low (scraping is I/O bound)
 - Container memory: Configurable via Docker Compose
-- Redis memory: 256MB max with LRU eviction (production)
 
 ### External Dependencies
 - **htreviews.org**: Must be respectful of server resources
@@ -355,11 +354,18 @@ Packages use the `workspace:*` protocol to reference other packages in the monor
 - Log errors with appropriate severity levels
 - Return cached data when fresh data unavailable
 
+### Database Strategy
+- Use SQLite for persistent storage
+- Enable WAL mode for better concurrency
+- Create appropriate indexes for queries
+- Use transactions for data consistency
+- Cache frequently accessed data in memory
+
 ### Caching Strategy
 - Cache brand and flavor data separately
 - Implement TTL (Time To Live) for cache entries
-- Invalidate cache on successful scrape
-- Fallback to stale cache if scrape fails
+- Invalidate cache on successful database update
+- Fallback to database if cache miss
 
 ### API Design
 - RESTful conventions for endpoints
@@ -400,10 +406,10 @@ Packages use the `workspace:*` protocol to reference other packages in the monor
 ### Required Variables
 - `PORT`: Server port (default: 3000)
 - `HTREVIEWS_BASE_URL`: Base URL for htreviews.org (default: https://htreviews.org)
-- `CACHE_TTL`: Cache time-to-live in seconds (default: 86400)
+- `DATABASE_PATH`: Path to SQLite database file (default: ./hookah-db.db)
 
 ### Optional Variables
-- `REDIS_URL`: Redis connection string (if using Redis)
+- `CACHE_TTL`: Cache time-to-live in seconds (default: 86400)
 - `RATE_LIMIT_WINDOW`: Rate limit time window in milliseconds (default: 60000)
 - `RATE_LIMIT_MAX`: Maximum requests per window (default: 100)
 - `LOG_LEVEL`: Logging level (default: info)
@@ -414,6 +420,7 @@ Packages use the `workspace:*` protocol to reference other packages in the monor
 - `NODE_ENV`: Environment (development/production)
 - `PORT`: Container port (default: 3000)
 - `LOG_LEVEL`: Container log level (debug for dev, info for prod)
+- `DATABASE_PATH`: Database path (./hookah-db.db for dev, /app/hookah-db.db for prod)
 
 ### Scheduler Configuration
 - `SCHEDULER_ENABLED`: Enable/disable scheduler (default: true)
@@ -432,14 +439,16 @@ Packages use the `workspace:*` protocol to reference other packages in the monor
 ### Development
 - Use `pnpm --filter @hookah-db/api dev` for hot-reloading
 - Run with `ts-node` for TypeScript support
-- Local caching (in-memory)
+- SQLite database in project root (./hookah-db.db)
+- In-memory caching for frequently accessed data
 - Or use Docker: `docker-compose -f docker-compose.dev.yml up`
 
 ### Production
 - Build all packages with `pnpm build`
 - Use Docker Compose for containerized deployment: `docker-compose -f docker-compose.prod.yml up -d`
 - Use process manager (PM2, systemd) if not using Docker
-- Consider Redis for distributed caching
+- SQLite database in data directory (/app/hookah-db.db)
+- In-memory caching for frequently accessed data
 - Implement proper logging (winston, pino)
 - Set up health check endpoints
 - Configure reverse proxy (nginx, Apache)
@@ -457,6 +466,7 @@ Packages use the `workspace:*` protocol to reference other packages in the monor
 ### Monitoring
 - Track API response times
 - Monitor cache hit rates
+- Monitor database query performance
 - Log scraping errors
 - Track rate limit violations
 - Monitor server resources (CPU, memory, disk)
@@ -464,10 +474,9 @@ Packages use the `workspace:*` protocol to reference other packages in the monor
 - Monitor log file sizes and rotation
 - Track correlation IDs for request tracing
 - Monitor container health and restarts
-- Monitor Redis memory usage and eviction rates
 - Track Docker resource usage (CPU, memory, disk I/O)
 
-## Installed Dependencies (as of 2026-01-05)
+## Installed Dependencies (as of 2026-01-06)
 
 ### Core Dependencies
 - cheerio: 1.1.2
@@ -476,6 +485,7 @@ Packages use the `workspace:*` protocol to reference other packages in the monor
 - tslib: 2.8.1
 - winston: 3.19.0
 - winston-daily-rotate-file: 5.0.0
+- better-sqlite3: Latest
 
 ### Build & Workspace Tools
 - turbo: 2.4.4
@@ -509,6 +519,9 @@ Packages use the `workspace:*` protocol to reference other packages in the monor
 ### Caching
 - node-cache: 5.1.2
 - @types/node-cache: 4.2.5
+
+### Database
+- better-sqlite3: Latest
 
 ### Scheduler
 - node-cron: 3.0.3

@@ -26,8 +26,10 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@hookah-db/database": "workspace:*",
     "@hookah-db/services": "workspace:*",
     "@hookah-db/types": "workspace:*",
+    "@hookah-db/utils": "workspace:*",
     "@hookah-db/config": "workspace:*",
     "node-cron": "^3.0.3"
   },

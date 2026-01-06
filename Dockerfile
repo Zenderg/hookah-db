@@ -55,6 +55,9 @@ RUN pnpm install --frozen-lockfile
 # Install development tools
 RUN pnpm add -D -w tsx nodemon
 
+# Create directory for SQLite database
+RUN mkdir -p /app/data
+
 # Expose API port
 EXPOSE 3000
 
@@ -97,6 +100,9 @@ RUN pnpm install --frozen-lockfile
 
 # Install tsx for production runtime (no JSDoc YAML parsing issues)
 RUN pnpm add -D -w tsx
+
+# Create directory for SQLite database
+RUN mkdir -p /app/data
 
 # Expose API port
 EXPOSE 3000

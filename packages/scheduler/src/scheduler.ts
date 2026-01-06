@@ -3,6 +3,7 @@
  *
  * This module provides main Scheduler class for managing
  * automated data refresh tasks using node-cron.
+ * Works directly with SQLite database and DataService for data persistence.
  */
 
 import type { ScheduledTask as CronTask } from 'node-cron';
@@ -16,6 +17,8 @@ import type {
   ScheduledTask as ScheduledTaskInterface
 } from './types';
 import { LoggerFactory } from '@hookah-db/utils';
+import type { DataService } from '@hookah-db/services';
+import type { SQLiteDatabase } from '@hookah-db/database';
 
 // Initialize logger
 const logger = LoggerFactory.createEnvironmentLogger('scheduler');
@@ -52,8 +55,8 @@ interface InternalScheduledTask {
  * Scheduler class for managing scheduled tasks
  *
  * This class provides a centralized way to schedule and manage
- * periodic data refresh operations, ensuring that cache stays
- * up-to-date with minimal manual intervention.
+ * periodic data refresh operations, ensuring that SQLite database
+ * stays up-to-date with minimal manual intervention.
  */
 export class Scheduler {
   private tasks: Map<string, InternalScheduledTask>;
@@ -65,9 +68,15 @@ export class Scheduler {
   /**
    * Create a new Scheduler instance
    *
+   * @param dataService DataService for data operations
+   * @param _db SQLiteDatabase for persistent storage (stored for future use)
    * @param config Scheduler configuration
    */
-  constructor(config: SchedulerConfig) {
+  constructor(
+    private dataService: DataService,
+    private _db: SQLiteDatabase, // Stored for future use, available via getDatabase()
+    config: SchedulerConfig
+  ) {
     this.tasks = new Map();
     this.config = {
       enabled: config.enabled ?? true,
@@ -323,16 +332,39 @@ export class Scheduler {
    * Schedule brands data refresh task
    *
    * Creates a scheduled task to refresh brand data using configured
-   * brandsSchedule cron expression.
+   * brandsSchedule cron expression. Uses dataService.refreshBrands()
+   * to update data in SQLite database.
    *
-   * @param refreshBrands Function to refresh brand data (typically DataService.refreshAllCache)
    * @returns Task ID
    */
-  scheduleBrandsRefresh(refreshBrands: () => Promise<void>): string {
+  scheduleBrandsRefresh(): string {
+    const refreshTask = async () => {
+      logger.info('Starting scheduled brands refresh');
+      try {
+        const result = await this.dataService.refreshBrands();
+        if (result.success) {
+          logger.info('Scheduled brands refresh completed successfully', {
+            brandsCount: result.brandsCount
+          } as any);
+        } else {
+          logger.error('Scheduled brands refresh failed', {
+            error: result.error
+          } as any);
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        logger.error('Error during scheduled brands refresh', {
+          error: errorMessage,
+          stack: error instanceof Error ? error.stack : undefined
+        } as any);
+        throw error;
+      }
+    };
+
     return this.scheduleJob({
       name: 'brands-refresh',
       cronExpression: this.config.brandsSchedule ?? '0 2 * * *',
-      task: refreshBrands,
+      task: refreshTask,
       enabled: true
     });
   }
@@ -341,16 +373,39 @@ export class Scheduler {
    * Schedule flavors data refresh task
    *
    * Creates a scheduled task to refresh flavor data using configured
-   * flavorsSchedule cron expression.
+   * flavorsSchedule cron expression. Uses dataService.refreshFlavors()
+   * to update data in SQLite database.
    *
-   * @param refreshFlavors Function to refresh flavor data (typically DataService.refreshAllCache)
    * @returns Task ID
    */
-  scheduleFlavorsRefresh(refreshFlavors: () => Promise<void>): string {
+  scheduleFlavorsRefresh(): string {
+    const refreshTask = async () => {
+      logger.info('Starting scheduled flavors refresh');
+      try {
+        const result = await this.dataService.refreshFlavors();
+        if (result.success) {
+          logger.info('Scheduled flavors refresh completed successfully', {
+            flavorsCount: result.flavorsCount
+          } as any);
+        } else {
+          logger.error('Scheduled flavors refresh failed', {
+            error: result.error
+          } as any);
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        logger.error('Error during scheduled flavors refresh', {
+          error: errorMessage,
+          stack: error instanceof Error ? error.stack : undefined
+        } as any);
+        throw error;
+      }
+    };
+
     return this.scheduleJob({
       name: 'flavors-refresh',
       cronExpression: this.config.flavorsSchedule ?? '0 3 * * *',
-      task: refreshFlavors,
+      task: refreshTask,
       enabled: true
     });
   }
@@ -358,17 +413,41 @@ export class Scheduler {
   /**
    * Schedule all data refresh task
    *
-   * Creates a scheduled task to refresh all cached data using configured
-   * allDataSchedule cron expression.
+   * Creates a scheduled task to refresh all data using configured
+   * allDataSchedule cron expression. Uses dataService.refreshAllData()
+   * to update data in SQLite database.
    *
-   * @param refreshAllData Function to refresh all data (typically DataService.refreshAllCache)
    * @returns Task ID
    */
-  scheduleAllDataRefresh(refreshAllData: () => Promise<void>): string {
+  scheduleAllDataRefresh(): string {
+    const refreshTask = async () => {
+      logger.info('Starting scheduled all data refresh');
+      try {
+        const result = await this.dataService.refreshAllData();
+        if (result.success) {
+          logger.info('Scheduled all data refresh completed successfully', {
+            brandsCount: result.brandsCount,
+            flavorsCount: result.flavorsCount
+          } as any);
+        } else {
+          logger.error('Scheduled all data refresh failed', {
+            error: result.error
+          } as any);
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        logger.error('Error during scheduled all data refresh', {
+          error: errorMessage,
+          stack: error instanceof Error ? error.stack : undefined
+        } as any);
+        throw error;
+      }
+    };
+
     return this.scheduleJob({
       name: 'all-data-refresh',
       cronExpression: this.config.allDataSchedule ?? '0 4 * * *',
-      task: refreshAllData,
+      task: refreshTask,
       enabled: true
     });
   }
@@ -379,17 +458,16 @@ export class Scheduler {
    * Convenience method to schedule all three default refresh tasks
    * (brands, flavors, and all data) in one call.
    *
-   * @param refreshAllData Function to refresh all data (typically DataService.refreshAllCache)
    * @returns Object containing task IDs for all scheduled tasks
    */
-  scheduleDefaultRefreshTasks(refreshAllData: () => Promise<void>): {
+  scheduleDefaultRefreshTasks(): {
     brandsTaskId: string;
     flavorsTaskId: string;
     allDataTaskId: string;
   } {
-    const brandsTaskId = this.scheduleBrandsRefresh(refreshAllData);
-    const flavorsTaskId = this.scheduleFlavorsRefresh(refreshAllData);
-    const allDataTaskId = this.scheduleAllDataRefresh(refreshAllData);
+    const brandsTaskId = this.scheduleBrandsRefresh();
+    const flavorsTaskId = this.scheduleFlavorsRefresh();
+    const allDataTaskId = this.scheduleAllDataRefresh();
 
     logger.info('All default refresh tasks scheduled' as any);
 
@@ -651,6 +729,15 @@ export class Scheduler {
   // ==========================================================================
   // Utility Methods
   // ==========================================================================
+
+  /**
+   * Get database instance (for future use)
+   *
+   * @returns SQLiteDatabase instance
+   */
+  getDatabase(): SQLiteDatabase {
+    return this._db;
+  }
 
   /**
    * Generate a unique task ID

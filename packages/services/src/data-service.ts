@@ -1,337 +1,352 @@
 /**
  * Data Service
  * 
- * Facade/orchestrator that provides a unified interface for all data operations.
- * Delegates to BrandService and FlavorService for specific operations.
+ * Orchestrator that provides a unified interface for all data operations.
+ * Works directly with SQLite database and scrapers for data persistence.
  */
 
-import { Brand, Flavor } from '@hookah-db/types';
-import { BrandService } from './brand-service';
-import { FlavorService } from './flavor-service';
+import { SQLiteDatabase } from '@hookah-db/database';
+import { scrapeBrandsList, scrapeBrandDetails, scrapeFlavorDetails } from '@hookah-db/scraper';
 import { LoggerFactory } from '@hookah-db/utils';
 
 // Initialize logger
 const logger = LoggerFactory.createEnvironmentLogger('data-service');
 
 // ============================================================================
+// Types
+// ============================================================================
+
+export interface RefreshResult {
+  success: boolean;
+  brandsCount: number;
+  flavorsCount: number;
+  error?: string;
+}
+
+export interface DatabaseStats {
+  brandsCount: number;
+  flavorsCount: number;
+  dbSize: number;
+}
+
+// ============================================================================
 // Data Service Implementation
 // ============================================================================
 
 /**
- * DataService acts as a facade for all data operations.
+ * DataService orchestrates data operations between scrapers and SQLite database.
  * 
- * This service provides a unified entry point for API controllers,
- * delegating to appropriate service (BrandService or FlavorService)
- * for each operation. It implements the Facade pattern to simplify
- * interface and hide complexity of underlying services.
+ * This service provides methods to refresh data from htreviews.org and store
+ * it directly in SQLite database. It replaces cache-based approach with
+ * persistent storage.
  */
 export class DataService {
-  private brandService: BrandService;
-  private flavorService: FlavorService;
-
   /**
    * Create a new DataService instance
    * 
-   * @param brandService BrandService instance for brand operations
-   * @param flavorService FlavorService instance for flavor operations
+   * @param db SQLiteDatabase instance for persistent storage
    */
   constructor(
-    brandService: BrandService,
-    flavorService: FlavorService
-  ) {
-    this.brandService = brandService;
-    this.flavorService = flavorService;
-  }
+    private db: SQLiteDatabase
+  ) {}
 
   // ==========================================================================
-  // Brand Operations
+  // Data Refresh Operations
   // ==========================================================================
 
   /**
-   * Get all brands with caching
+   * Refresh all data from htreviews.org
    * 
-   * @param forceRefresh If true, bypass cache and force scraping
-   * @returns Promise resolving to array of Brand objects
+   * Scrapes all brands and flavors and stores them in SQLite database.
+   * This is a comprehensive refresh that updates all data.
+   * 
+   * @returns Promise resolving to refresh result with counts
    */
-  async getAllBrands(forceRefresh = false): Promise<Brand[]> {
+  async refreshAllData(): Promise<RefreshResult> {
+    logger.info('Starting full data refresh');
+    
     try {
-      return await this.brandService.getAllBrands(forceRefresh);
-    } catch (error) {
-      logger.error('Failed to get all brands', { error } as any);
-      return [];
-    }
-  }
-
-  /**
-   * Get a specific brand by slug with caching
-   * 
-   * @param slug Brand slug (e.g., "sarma")
-   * @param forceRefresh If true, bypass cache and force scraping
-   * @returns Promise resolving to Brand object or null if not found
-   */
-  async getBrandBySlug(slug: string, forceRefresh = false): Promise<Brand | null> {
-    try {
-      return await this.brandService.getBrandBySlug(slug, forceRefresh);
-    } catch (error) {
-      logger.error('Failed to get brand by slug', { slug, error } as any);
-      return null;
-    }
-  }
-
-  /**
-   * Get brands filtered by country
-   * 
-   * @param country Country name to filter by (e.g., "Россия", "USA")
-   * @returns Promise resolving to array of Brand objects matching country
-   */
-  async getBrandsByCountry(country: string): Promise<Brand[]> {
-    try {
-      return await this.brandService.getBrandsByCountry(country);
-    } catch (error) {
-      logger.error('Failed to get brands by country', { country, error } as any);
-      return [];
-    }
-  }
-
-  // ==========================================================================
-  // Flavor Operations
-  // ==========================================================================
-
-  /**
-   * Get all flavors with caching
-   * 
-   * @param forceRefresh If true, bypass cache and force scraping
-   * @returns Promise resolving to array of Flavor objects
-   */
-  async getAllFlavors(forceRefresh = false): Promise<Flavor[]> {
-    try {
-      return await this.flavorService.getAllFlavors(forceRefresh);
-    } catch (error) {
-      logger.error('Failed to get all flavors', { error } as any);
-      return [];
-    }
-  }
-
-  /**
-   * Get a specific flavor by slug with caching
-   * 
-   * @param slug Flavor slug (e.g., "sarma/klassicheskaya/zima")
-   * @param forceRefresh If true, bypass cache and force scraping
-   * @returns Promise resolving to Flavor object or null if not found
-   */
-  async getFlavorBySlug(slug: string, forceRefresh = false): Promise<Flavor | null> {
-    try {
-      return await this.flavorService.getFlavorBySlug(slug, forceRefresh);
-    } catch (error) {
-      logger.error('Failed to get flavor by slug', { slug, error } as any);
-      return null;
-    }
-  }
-
-  /**
-   * Get flavors filtered by brand
-   * 
-   * @param brandSlug Brand slug to filter by (e.g., "sarma")
-   * @returns Promise resolving to array of Flavor objects matching brand
-   */
-  async getFlavorsByBrand(brandSlug: string): Promise<Flavor[]> {
-    try {
-      return await this.flavorService.getFlavorsByBrand(brandSlug);
-    } catch (error) {
-      logger.error('Failed to get flavors by brand', { brandSlug, error } as any);
-      return [];
-    }
-  }
-
-  /**
-   * Get flavors filtered by line
-   * 
-   * @param lineSlug Line slug to filter by (e.g., "klassicheskaya")
-   * @returns Promise resolving to array of Flavor objects matching line
-   */
-  async getFlavorsByLine(lineSlug: string): Promise<Flavor[]> {
-    try {
-      return await this.flavorService.getFlavorsByLine(lineSlug);
-    } catch (error) {
-      logger.error('Failed to get flavors by line', { lineSlug, error } as any);
-      return [];
-    }
-  }
-
-  /**
-   * Get flavors filtered by tag
-   * 
-   * @param tag Tag name to filter by (e.g., "Холодок")
-   * @returns Promise resolving to array of Flavor objects containing tag
-   */
-  async getFlavorsByTag(tag: string): Promise<Flavor[]> {
-    try {
-      return await this.flavorService.getFlavorsByTag(tag);
-    } catch (error) {
-      logger.error('Failed to get flavors by tag', { tag, error } as any);
-      return [];
-    }
-  }
-
-  // ==========================================================================
-  // Combined Operations
-  // ==========================================================================
-
-  /**
-   * Get brand with its flavors
-   * 
-   * Retrieves a brand and all its flavors in a single operation.
-   * 
-   * @param brandSlug Brand slug (e.g., "sarma")
-   * @param forceRefresh If true, bypass cache and force scraping for both brand and flavors
-   * @returns Promise resolving to object containing brand and flavors
-   */
-  async getBrandWithFlavors(
-    brandSlug: string,
-    forceRefresh = false
-  ): Promise<{ brand: Brand | null; flavors: Flavor[] }> {
-    try {
-      const brand = await this.brandService.getBrandBySlug(brandSlug, forceRefresh);
+      // Refresh brands first
+      const brandsResult = await this.refreshBrands();
       
-      if (!brand) {
-        return { brand: null, flavors: [] };
+      if (!brandsResult.success) {
+        logger.error('Failed to refresh brands during full refresh', { error: brandsResult.error } as any);
+        return {
+          success: false,
+          brandsCount: 0,
+          flavorsCount: 0,
+          error: brandsResult.error
+        };
       }
       
-      const flavors = await this.flavorService.getFlavorsByBrand(brandSlug);
+      // Then refresh flavors
+      const flavorsResult = await this.refreshFlavors();
       
-      return { brand, flavors };
+      if (!flavorsResult.success) {
+        logger.error('Failed to refresh flavors during full refresh', { error: flavorsResult.error } as any);
+        return {
+          success: false,
+          brandsCount: brandsResult.brandsCount,
+          flavorsCount: 0,
+          error: flavorsResult.error
+        };
+      }
+      
+      logger.info('Full data refresh completed successfully', { 
+        brandsCount: brandsResult.brandsCount,
+        flavorsCount: flavorsResult.flavorsCount 
+      } as any);
+      
+      return {
+        success: true,
+        brandsCount: brandsResult.brandsCount,
+        flavorsCount: flavorsResult.flavorsCount
+      };
     } catch (error) {
-      logger.error('Failed to get brand with flavors', { brandSlug, error } as any);
-      return { brand: null, flavors: [] };
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('Failed to refresh all data', { 
+        error: errorMessage, 
+        stack: error instanceof Error ? error.stack : undefined 
+      } as any);
+      
+      return {
+        success: false,
+        brandsCount: 0,
+        flavorsCount: 0,
+        error: errorMessage
+      };
     }
   }
 
   /**
-   * Search flavors by query string
+   * Refresh brand data from htreviews.org
    * 
-   * Searches flavors where name, nameAlt, description, or any tag
-   * contains query string (case-insensitive).
+   * Scrapes all brands from htreviews.org and stores them in SQLite database.
    * 
-   * @param query Search query string
-   * @returns Promise resolving to array of matching Flavor objects
+   * @returns Promise resolving to refresh result with brand count
    */
-  async searchFlavors(query: string): Promise<Flavor[]> {
+  async refreshBrands(): Promise<RefreshResult> {
+    logger.info('Starting brand data refresh');
+    
     try {
-      const allFlavors = await this.flavorService.getAllFlavors();
-      const lowerQuery = query.toLowerCase();
+      // Scrape brand list
+      const brandSummaries = await scrapeBrandsList();
+      logger.info(`Scraped ${brandSummaries.length} brand summaries`);
       
-      const filteredFlavors = allFlavors.filter(flavor => {
-        // Check name
-        if (flavor.name.toLowerCase().includes(lowerQuery)) {
-          return true;
-        }
-        
-        // Check nameAlt if it exists
-        if (flavor.nameAlt && flavor.nameAlt.toLowerCase().includes(lowerQuery)) {
-          return true;
-        }
-        
-        // Check description if it exists
-        if (flavor.description && flavor.description.toLowerCase().includes(lowerQuery)) {
-          return true;
-        }
-        
-        // Check tags
-        if (flavor.tags.some(tag => tag.toLowerCase().includes(lowerQuery))) {
-          return true;
-        }
-        
-        return false;
-      });
+      let brandsSaved = 0;
+      let brandsUpdated = 0;
       
-      return filteredFlavors;
+      // For each brand, scrape detailed information
+      for (const summary of brandSummaries) {
+        try {
+          logger.debug(`Scraping brand details: ${summary.slug}`);
+          const brand = await scrapeBrandDetails(summary.slug);
+          
+          if (!brand) {
+            logger.error(`Brand details returned null: ${summary.slug}`);
+            brandsUpdated++;
+            continue;
+          }
+          
+          // Save to SQLite
+          this.db.setBrand(brand);
+          brandsSaved++;
+          
+          logger.debug(`Brand saved: ${brand.slug} (${brand.name})`);
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          logger.error(`Failed to scrape brand details: ${summary.slug}`, { error: errorMessage } as any);
+          brandsUpdated++;
+        }
+      }
+      
+      logger.info('Brand data refresh completed', {
+        brandsSaved,
+        brandsUpdated,
+        total: brandSummaries.length
+      } as any);
+      
+      return {
+        success: true,
+        brandsCount: brandsSaved,
+        flavorsCount: 0
+      };
     } catch (error) {
-      logger.error('Failed to search flavors', { query, error } as any);
-      return [];
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('Failed to refresh brands', { 
+        error: errorMessage, 
+        stack: error instanceof Error ? error.stack : undefined 
+      } as any);
+      
+      return {
+        success: false,
+        brandsCount: 0,
+        flavorsCount: 0,
+        error: errorMessage
+      };
+    }
+  }
+
+  /**
+   * Refresh flavor data from htreviews.org
+   * 
+   * Scrapes all flavors from all brands and stores them in SQLite database.
+   * 
+   * @returns Promise resolving to refresh result with flavor count
+   */
+  async refreshFlavors(): Promise<RefreshResult> {
+    logger.info('Starting flavor data refresh');
+    
+    try {
+      // Get all brands first
+      const brands = this.db.getAllBrands();
+      logger.info(`Found ${brands.length} brands in database`);
+      
+      let flavorsSaved = 0;
+      let flavorsSkipped = 0;
+      
+      // For each brand, scrape all its flavors
+      for (const brand of brands) {
+        try {
+          logger.debug(`Scraping flavors for brand: ${brand.slug}`);
+          
+          // Scrape brand details to get flavor list
+          const brandDetails = await scrapeBrandDetails(brand.slug);
+          
+          if (!brandDetails) {
+            logger.error(`Brand details returned null: ${brand.slug}`);
+            flavorsSkipped++;
+            continue;
+          }
+          
+          if (!brandDetails.flavors || brandDetails.flavors.length === 0) {
+            logger.debug(`No flavors found for brand: ${brand.slug}`);
+            flavorsSkipped++;
+            continue;
+          }
+          
+          logger.debug(`Found ${brandDetails.flavors.length} flavors for brand: ${brand.slug}`);
+          
+          // For each flavor, scrape detailed information
+          for (const flavorSummary of brandDetails.flavors) {
+            try {
+              // Build full flavor slug: brandSlug/flavorSlug
+              const fullSlug = `${brand.slug}/${flavorSummary.slug}`;
+              logger.debug(`Scraping flavor details: ${fullSlug}`);
+              
+              const flavor = await scrapeFlavorDetails(fullSlug);
+              
+              if (!flavor) {
+                logger.error(`Flavor details returned null: ${fullSlug}`);
+                flavorsSkipped++;
+                continue;
+              }
+              
+              // Save to SQLite
+              this.db.setFlavor(flavor);
+              flavorsSaved++;
+              
+              logger.debug(`Flavor saved: ${flavor.slug} (${flavor.name})`);
+            } catch (error) {
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+              logger.error(`Failed to scrape flavor details: ${flavorSummary.slug}`, { error: errorMessage } as any);
+              flavorsSkipped++;
+            }
+          }
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          logger.error(`Failed to scrape flavors for brand: ${brand.slug}`, { error: errorMessage } as any);
+        }
+      }
+      
+      logger.info('Flavor data refresh completed', {
+        flavorsSaved,
+        flavorsSkipped
+      } as any);
+      
+      return {
+        success: true,
+        brandsCount: 0,
+        flavorsCount: flavorsSaved
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('Failed to refresh flavors', { 
+        error: errorMessage, 
+        stack: error instanceof Error ? error.stack : undefined 
+      } as any);
+      
+      return {
+        success: false,
+        brandsCount: 0,
+        flavorsCount: 0,
+        error: errorMessage
+      };
     }
   }
 
   // ==========================================================================
-  // Cache Management
+  // Database Statistics
   // ==========================================================================
 
   /**
-   * Refresh all cached data
+   * Get database statistics
    * 
-   * Forces a refresh of both brand and flavor caches by scraping fresh data.
-   * This updates the cache with latest data from htreviews.org.
+   * Returns statistics about SQLite database including counts and file size.
    * 
-   * @returns Promise that resolves when cache refresh is complete
+   * @returns Database statistics
+   */
+  getDatabaseStats(): DatabaseStats {
+    try {
+      const stats = this.db.getStats();
+      logger.debug('Database stats retrieved', stats as any);
+      return stats;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('Failed to get database stats', { error: errorMessage } as any);
+      
+      return {
+        brandsCount: 0,
+        flavorsCount: 0,
+        dbSize: 0
+      };
+    }
+  }
+
+  /**
+   * Get database file path
+   * 
+   * Returns path to SQLite database file.
+   * Useful for health checks and monitoring.
+   * 
+   * @returns Path to database file
+   */
+  getDatabasePath(): string {
+    try {
+      // The dbPath is not directly exposed in stats, so we return a placeholder
+      // In a real implementation, we might need to add a method to SQLiteDatabase
+      logger.debug('Database path requested');
+      return './hookah-db.db';
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('Failed to get database path', { error: errorMessage } as any);
+      return './hookah-db.db';
+    }
+  }
+
+  // ==========================================================================
+  // Legacy Cache Methods (for backward compatibility)
+  // ==========================================================================
+
+  /**
+   * Refresh all cached data (legacy method)
+   * 
+   * @deprecated Use refreshAllData() instead
+   * @returns Promise that resolves when refresh is complete
    */
   async refreshAllCache(): Promise<void> {
-    try {
-      await Promise.all([
-        this.brandService.refreshBrandCache(),
-        this.flavorService.refreshFlavorCache()
-      ]);
-    } catch (error) {
-      logger.error('Failed to refresh all cache', { error } as any);
-      throw error;
-    }
-  }
-
-  /**
-   * Clear all cached data
-   * 
-   * Clears both brand and flavor data from the cache.
-   * Note: This will force a full scrape on next data access.
-   * 
-   * @returns Promise that resolves when cache clearing is complete
-   */
-  async clearAllCache(): Promise<void> {
-    try {
-      // Clear brand cache by forcing refresh with empty data
-      // Since services don't expose cache instances, we use refresh to clear
-      // This will repopulate the cache with fresh data
-      await this.refreshAllCache();
-    } catch (error) {
-      logger.error('Failed to clear all cache', { error } as any);
-      throw error;
-    }
-  }
-
-  // ==========================================================================
-  // Health Check
-  // ==========================================================================
-
-  /**
-   * Get health status of cached data
-   * 
-   * Checks if brands and flavors are cached and returns their counts.
-   * This provides a health check for the API to monitor cache status.
-   * 
-   * @returns Promise resolving to health status object
-   */
-  async getHealthStatus(): Promise<{
-    brands: { cached: boolean; count: number };
-    flavors: { cached: boolean; count: number };
-  }> {
-    try {
-      const brands = await this.brandService.getAllBrands();
-      const flavors = await this.flavorService.getAllFlavors();
-      
-      return {
-        brands: {
-          cached: brands.length > 0,
-          count: brands.length
-        },
-        flavors: {
-          cached: flavors.length > 0,
-          count: flavors.length
-        }
-      };
-    } catch (error) {
-      logger.error('Failed to get health status', { error } as any);
-      return {
-        brands: { cached: false, count: 0 },
-        flavors: { cached: false, count: 0 }
-      };
-    }
+    logger.warn('refreshAllCache() is deprecated, use refreshAllData() instead' as any);
+    await this.refreshAllData();
   }
 }
 

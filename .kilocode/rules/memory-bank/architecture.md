@@ -13,7 +13,7 @@ graph TB
     subgraph "Data Layer"
         B[Web Scraper]
         C[Data Parser]
-        D[Cache Layer]
+        D[Database Layer]
     end
     
     subgraph "Business Layer"
@@ -67,7 +67,7 @@ graph TB
 
 ## Docker Deployment Architecture
 
-The Docker deployment uses a multi-container architecture with API and Redis services:
+The Docker deployment uses a single-container architecture with API service and SQLite database:
 
 ```mermaid
 graph TB
@@ -77,13 +77,7 @@ graph TB
             A2[Express.js Server]
             A3[TypeScript Runtime tsx]
             A4[Health Check Endpoint]
-        end
-        
-        subgraph "Redis Container"
-            R1[Redis 7 Alpine]
-            R2[AOF Persistence]
-            R3[Memory Management]
-            R4[Health Check]
+            A5[SQLite Database]
         end
     end
     
@@ -99,18 +93,17 @@ graph TB
     end
     
     V1 --> A1
-    V2 --> R1
+    V2 --> A5
     E1 --> A1
-    E1 --> R1
-    A2 --> R1
-    R1 --> A2
+    A2 --> A5
+    A5 --> A2
     A2 --> E2
     E2 --> A2
     C --> A2
     A4 -.-> A1
     
     style A1 fill:#e1f5ff
-    style R1 fill:#fff4e1
+    style A5 fill:#fff4e1
     style C fill:#c8e6c9
 ```
 
@@ -127,49 +120,36 @@ graph TB
   - Logging system (Winston)
   - Scheduler (node-cron)
   - Health check endpoint
+  - SQLite database with WAL mode
 - **Development Features**:
   - Hot reload via nodemon
   - Volume mounts for live code updates
   - Debug logging enabled
+  - SQLite database file mounted for persistence
 - **Production Features**:
   - Optimized runtime with tsx
   - Health checks (30s interval, 10s timeout)
   - Log rotation (10MB max, 3 files)
   - Automatic restart on failure
   - No hot reload (performance optimized)
-
-**Redis Container** (`hookah-db-redis-dev` / `hookah-db-redis-prod`):
-- **Base Image**: redis:7-alpine
-- **Components**:
-  - Redis server with AOF persistence
-  - Memory management with LRU eviction
-  - Health check endpoint
-- **Development Features**:
-  - AOF persistence enabled
-  - Volume mount for data persistence
-- **Production Features**:
-  - AOF persistence enabled
-  - Memory limit: 256MB
-  - Eviction policy: allkeys-lru
-  - Health checks (10s interval, 5s timeout)
-  - Log rotation (10MB max, 3 files)
-  - Automatic restart on failure
+  - SQLite database file mounted for persistence
 
 **Network Configuration**:
 - **Network Name**: hookah-db-network
 - **Type**: Bridge network
 - **Purpose**: Container-to-container communication
-- **Port Mappings**:
+- **Port Mapping**:
   - API: 3000:3000 (host:container)
-  - Redis: 6379:6379 (host:container)
 
 **Volume Management**:
-- **redis-data**: Persistent storage for Redis AOF files
 - **Development Volume Mounts**:
   - `./apps/api/src:/app/apps/api/src` - Hot reload for API source
   - `./packages:/app/packages` - Hot reload for shared packages
   - `./tsconfig.json:/app/tsconfig.json` - TypeScript config
   - `./turbo.json:/app/turbo.json` - Turborepo config
+  - `./hookah-db.db:/app/hookah-db.db` - SQLite database file
+- **Production Volume Mounts**:
+  - `./data/hookah-db.db:/app/hookah-db.db` - SQLite database file
 
 ## Source Code Structure
 
@@ -228,12 +208,19 @@ hookah-db/
 │   │   │   └── index.ts   # Data parser entry point
 │   │   ├── package.json
 │   │   └── tsconfig.json
-│   ├── cache/             # Caching layer
+│   ├── cache/             # In-memory caching layer
 │   │   ├── src/
 │   │   │   ├── index.ts   # Cache interface and implementations
 │   │   │   ├── types.ts
 │   │   │   ├── in-memory-cache.ts
 │   │   │   └── cache-factory.ts
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   ├── database/          # SQLite database layer
+│   │   ├── src/
+│   │   │   ├── index.ts   # Database interface and implementations
+│   │   │   ├── types.ts
+│   │   │   └── sqlite-database.ts
 │   │   ├── package.json
 │   │   └── tsconfig.json
 │   ├── services/          # Business logic
@@ -270,6 +257,7 @@ hookah-db/
 │   ├── unit/
 │   │   ├── api/           # API tests (119 tests)
 │   │   ├── cache/         # Cache tests (73 tests)
+│   │   ├── database/      # Database tests
 │   │   ├── scraper/       # Scraper tests (408 tests)
 │   │   ├── services/      # Service tests (198 tests)
 │   │   └── scheduler/     # Scheduler tests (117 tests)
@@ -356,12 +344,13 @@ Based on HTML structure analysis, the following data models are identified:
 4. **Flavor Details**: For each flavor, scrape flavor detail page to get complete data
 5. **Incremental Updates**: Track last scrape timestamp to only update changed data
 
-### Caching Strategy
+### Database Strategy
 
-- **In-Memory Cache**: Store frequently accessed data in memory for fast access
-- **TTL**: Set appropriate time-to-live for cached data (e.g., 24 hours)
-- **Cache Invalidation**: Invalidate cache when fresh data is scraped
-- **Optional Redis**: For production, use Redis for distributed caching
+- **SQLite Database**: Persistent storage for all brand and flavor data
+- **WAL Mode**: Write-Ahead Logging for better concurrency and performance
+- **In-Memory Cache**: Cache frequently accessed data in memory for fast access
+- **Cache-First Strategy**: Check cache first, fallback to database if needed
+- **Database Update**: Scrape complete data → Validate → Update database → Clear cache
 
 ### API Design
 
@@ -372,7 +361,7 @@ GET /health
   Returns: Basic health check
 
 GET /health/detailed
-  Returns: Detailed health check with cache stats
+  Returns: Detailed health check with database stats
 
 GET /api-docs
   Returns: Interactive Swagger UI for API documentation
@@ -493,7 +482,7 @@ The API includes comprehensive Swagger/OpenAPI documentation:
 
 - **Health Controller** ([`health-controller.ts`](apps/api/src/controllers/health-controller.ts:1)):
   - `healthCheck()`: Basic health check endpoint
-  - `healthCheckDetailed()`: Detailed health check with cache statistics
+  - `healthCheckDetailed()`: Detailed health check with database statistics
 
 **Routes**:
 - **Brand Routes** ([`brand-routes.ts`](apps/api/src/routes/brand-routes.ts:1)):
@@ -584,14 +573,14 @@ The API includes comprehensive Swagger/OpenAPI documentation:
 
 **Docker Compose - Development** ([`docker-compose.dev.yml`](docker-compose.dev.yml:1)):
 - API service with hot reload and volume mounts
-- Redis service with AOF persistence
+- SQLite database file mounted for persistence
 - Bridge network for container communication
 - Environment configuration via `.env.dev`
 
 **Docker Compose - Production** ([`docker-compose.prod.yml`](docker-compose.prod.yml:1)):
 - Optimized API service with health checks and log rotation
-- Redis service with memory limits and LRU eviction policy
-- Health checks for both services
+- SQLite database file mounted for persistence
+- Health checks for API service
 - Log rotation with size limits
 - Environment configuration via `.env.prod`
 
@@ -605,7 +594,7 @@ The API includes comprehensive Swagger/OpenAPI documentation:
 - **tsx**: Used for production runtime to avoid ts-node JSDoc YAML parsing issues
 - **nodemon**: Used for development hot reload
 - **node:22-alpine**: Lightweight base image for smaller container sizes
-- **redis:7-alpine**: Lightweight Redis image with AOF persistence
+- **better-sqlite3**: SQLite database driver with synchronous API
 
 ## Component Relationships
 
@@ -613,8 +602,8 @@ The API includes comprehensive Swagger/OpenAPI documentation:
 graph LR
     Scraper[@hookah-db/scraper] --> Parser[@hookah-db/parser]
     Parser --> Types[@hookah-db/types]
-    Parser --> Cache[@hookah-db/cache]
-    Cache --> Services[@hookah-db/services]
+    Parser --> Database[@hookah-db/database]
+    Database --> Services[@hookah-db/services]
     Services --> Controllers[API Controllers]
     Controllers --> Routes[API Routes]
     Routes --> Server[@hookah-db/api]
@@ -624,34 +613,34 @@ graph LR
     Swagger[Swagger UI] --> Server
     Scheduler[@hookah-db/scheduler] --> Services
     Scheduler --> Server
-    Redis[Redis Cache] --> Cache
-    Cache --> Redis
+    Cache[In-Memory Cache] --> Services
+    Services --> Cache
 ```
 
 ## Critical Implementation Paths
 
-1. **Scraping Path**: Fetch HTML → Parse with Cheerio → Extract data → Validate → Store in cache
-2. **API Request Path**: Auth check → Rate limit check → Cache lookup → Return data or 404
-3. **Cache Update Path**: Scrape complete data → Validate → Update cache → Set TTL
+1. **Scraping Path**: Fetch HTML → Parse with Cheerio → Extract data → Validate → Store in database
+2. **API Request Path**: Auth check → Rate limit check → Cache lookup → Database fallback → Return data or 404
+3. **Database Update Path**: Scrape complete data → Validate → Update database → Clear cache
 4. **Error Handling Path**: Controller throws error → Error handler middleware catches → Log error → Return JSON error response
 5. **Documentation Path**: JSDoc comments → swagger-jsdoc → OpenAPI spec → Swagger UI
-6. **Scheduler Path**: Cron trigger → Execute job → Call DataService → Update cache → Log execution
+6. **Scheduler Path**: Cron trigger → Execute job → Call DataService → Update database → Clear cache → Log execution
 7. **Docker Build Path**: Dockerfile stages (dependencies → development/production) → Container images → Docker Compose orchestration
 8. **Docker Deployment Path**: Build images → Create network → Start containers → Health checks → Volume mounts → Service communication
 
 ## Design Patterns
 
-- **Repository Pattern**: Data access layer abstracts cache implementation
+- **Repository Pattern**: Data access layer abstracts database implementation
 - **Factory Pattern**: Parser factory for different page types
 - **Middleware Pattern**: Express middleware for cross-cutting concerns (auth, rate limiting, error handling)
-- **Strategy Pattern**: Different caching strategies (in-memory vs Redis)
+- **Strategy Pattern**: Different caching strategies (in-memory cache)
 - **Monorepo Pattern**: Shared packages organized by dependency layer
 - **Controller Pattern**: Request handlers separate from business logic
 - **Route Handler Pattern**: Route definitions separate from controller logic
 - **Documentation-First Pattern**: JSDoc comments drive API specification generation
 - **Scheduler Pattern**: Cron-based task scheduling with lifecycle management
 - **Container Pattern**: Multi-stage Docker builds for development and production
-- **Orchestration Pattern**: Docker Compose for multi-container deployment
+- **Orchestration Pattern**: Docker Compose for single-container deployment (API + SQLite)
 
 ## Package Dependency Layers
 
@@ -661,12 +650,13 @@ Application Layer
 └── @hookah-db/cli (depends on: services, utils, config)
 
 Business Layer
-├── @hookah-db/services (depends on: scraper, parser, cache, types, utils)
+├── @hookah-db/services (depends on: scraper, parser, database, cache, types, utils)
 └── @hookah-db/scheduler (depends on: services, types, utils, config)
 
 Core Layer
 ├── @hookah-db/scraper (depends on: types, utils, config)
 ├── @hookah-db/parser (depends on: types, utils, config)
+├── @hookah-db/database (depends on: types, utils, config)
 └── @hookah-db/cache (depends on: types, utils, config)
 
 Utility Layer
@@ -682,7 +672,7 @@ The API layer has comprehensive test coverage with 119 tests:
 - **Middleware Tests** (33 tests): Authentication, rate limiting, error handling
 - **Brand Routes Tests** (27 tests): All brand endpoints with various scenarios
 - **Flavor Routes Tests** (35 tests): All flavor endpoints with various scenarios
-- **Health Endpoint Tests** (24 tests): Health check endpoints with cache stats
+- **Health Endpoint Tests** (24 tests): Health check endpoints with database stats
 
 All tests pass (119/119) and cover:
 - Successful requests
