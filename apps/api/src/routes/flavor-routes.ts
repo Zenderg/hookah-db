@@ -9,7 +9,7 @@ import { rateLimitMiddleware, authMiddleware } from '../middleware';
 /**
  * Flavor routes for the Hookah Tobacco Database API.
  * 
- * Routes:
+ * Available routes:
  * - GET /api/v1/flavors - Get paginated list of flavors
  * - GET /api/v1/flavors/:slug - Get a single flavor by slug (supports slugs with slashes via URL encoding)
  * - POST /api/v1/flavors/refresh - Refresh flavor data (requires authentication)
@@ -256,7 +256,7 @@ router.post('/refresh', refreshFlavors);
  *         required: true
  *         schema:
  *           type: string
- *         description: Flavor slug (unique identifier, may contain slashes - use URL encoding for slashes: %2F)
+ *         description: "Flavor slug (unique identifier, may contain slashes - use URL encoding for slashes %2F)"
  *         example: sarma%2Fklassicheskaya%2Fzima
  *     responses:
  *       200:
