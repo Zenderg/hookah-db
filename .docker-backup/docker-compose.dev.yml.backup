@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: hookah-db-api-dev
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env.dev
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - LOG_LEVEL=debug
+      - DATABASE_PATH=/app/data/database.db
+    volumes:
+      # Mount source code for development with hot reload
+      - ./apps/api/src:/app/apps/api/src
+      - ./packages:/app/packages
+      # Mount TypeScript config files
+      - ./tsconfig.json:/app/tsconfig.json
+      - ./tsconfig.docker.json:/app/tsconfig.docker.json
+      - ./turbo.json:/app/turbo.json
+      # Mount SQLite database for persistence
+      - ./data:/app/data
+    # Override command to run from correct directory with tsx
+    command: npx nodemon --watch src --ext ts --exec npx tsx src/server.ts
+    restart: unless-stopped
+    networks:
+      - hookah-db-network
+
+networks:
+  hookah-db-network:
+    driver: bridge

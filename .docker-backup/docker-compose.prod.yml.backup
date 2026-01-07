@@ -1,0 +1,45 @@
+# Production Docker Compose configuration
+# Uses tsx for production runtime to avoid TypeScript workspace resolution issues
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: hookah-db-api-prod
+    image: hookah-db-api:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      # Use named volume for database persistence in production
+      - hookah-db-data:/app/data
+    env_file:
+      - .env.prod
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - LOG_LEVEL=info
+      - DATABASE_PATH=/app/data/hookah-db.db
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - hookah-db-network
+
+networks:
+  hookah-db-network:
+    driver: bridge
+
+volumes:
+  hookah-db-data:
+    driver: local
