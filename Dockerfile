@@ -46,8 +46,15 @@ COPY apps ./apps
 COPY tsconfig.json ./
 COPY tsconfig.docker.json ./
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
+# Install build tools needed for native modules (better-sqlite3)
+RUN apk add --no-cache python3 make g++ sqlite-dev
+
+# Install dependencies (allow build scripts for better-sqlite3 native bindings)
+RUN pnpm install --frozen-lockfile --ignore-scripts=false
+
+# Build better-sqlite3 from source for Alpine Linux ARM64
+RUN cd node_modules/.pnpm/better-sqlite3@*/node_modules/better-sqlite3 && \
+    npm run build-release
 
 # Install development tools
 RUN pnpm add -D -w tsx nodemon
@@ -87,8 +94,15 @@ COPY apps ./apps
 COPY tsconfig.json ./
 COPY tsconfig.docker.json ./
 
-# Install dependencies (better-sqlite3 uses precompiled binaries for Alpine)
-RUN pnpm install
+# Install build tools needed for native modules (better-sqlite3)
+RUN apk add --no-cache python3 make g++ sqlite-dev
+
+# Install dependencies (allow build scripts for better-sqlite3 native bindings)
+RUN pnpm install --ignore-scripts=false
+
+# Build better-sqlite3 from source for Alpine Linux ARM64
+RUN cd node_modules/.pnpm/better-sqlite3@*/node_modules/better-sqlite3 && \
+    npm run build-release
 
 # Install tsx for production runtime (no JSDoc YAML parsing issues)
 RUN pnpm add -D -w tsx
@@ -127,8 +141,15 @@ COPY apps ./apps
 COPY tsconfig.json ./
 COPY tsconfig.docker.json ./
 
-# Install dependencies (better-sqlite3 uses precompiled binaries for Alpine)
-RUN pnpm install
+# Install build tools needed for native modules (better-sqlite3)
+RUN apk add --no-cache python3 make g++ sqlite-dev
+
+# Install dependencies (allow build scripts for better-sqlite3 native bindings)
+RUN pnpm install --ignore-scripts=false
+
+# Build better-sqlite3 from source for Alpine Linux ARM64
+RUN cd node_modules/.pnpm/better-sqlite3@*/node_modules/better-sqlite3 && \
+    npm run build-release
 
 # Install tsx for production runtime (no JSDoc YAML parsing issues)
 RUN pnpm add -D -w tsx
@@ -153,5 +174,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 # Set working directory to API app
 WORKDIR /app/apps/api
 
-# Start application with tsx (no JSDoc YAML parsing issues)
-CMD ["npx", "tsx", "src/server.ts"]
+# Start application with node (using compiled JavaScript from dist/)
+CMD ["node", "dist/server.js"]
