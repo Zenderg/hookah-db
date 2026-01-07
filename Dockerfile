@@ -1,178 +1,99 @@
-# Multi-stage Dockerfile for Hookah DB API
-# Stage 1: Dependencies
-FROM node:24-alpine AS dependencies
+# =============================================================================
+# Stage1: Build
+# This stage compiles TypeScript to JavaScript using pnpm workspaces
+# =============================================================================
+FROM node:22-alpine AS builder
 
 # Set working directory
 WORKDIR /app
 
-# Install pnpm
-RUN corepack enable pnpm && corepack prepare pnpm@10.20.0 --activate
+# Install pnpm globally
+RUN npm install -g pnpm@latest
 
-# Copy package management files
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
+# Copy package files
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
-# Copy workspace packages and apps
-COPY packages ./packages
-COPY apps ./apps
+# Copy tsconfig files and turbo.json for build orchestration
+COPY tsconfig.json tsconfig.docker.json turbo.json ./
 
-# Copy TypeScript configuration
-COPY tsconfig.json ./
+# Copy all source code
+COPY apps/ ./apps/
+COPY packages/ ./packages/
 
-# Stage 2: Development
-FROM node:24-alpine AS development
+# Install all dependencies (including devDependencies for building)
+RUN pnpm install --frozen-lockfile
 
-# Set labels
-LABEL maintainer="Hookah DB Team"
-LABEL description="Hookah Tobacco Database API - Development Environment"
-LABEL version="1.0.0"
-
-# Set working directory
-WORKDIR /app
-
-# Set environment to development
-ENV NODE_ENV=development
-
-# Install pnpm
-RUN corepack enable pnpm && corepack prepare pnpm@10.20.0 --activate
-
-# Copy package management files
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
-
-# Copy workspace packages and apps
-COPY packages ./packages
-COPY apps ./apps
-
-# Copy TypeScript configuration
-COPY tsconfig.json ./
-COPY tsconfig.docker.json ./
-
-# Install build tools needed for native modules (better-sqlite3)
-RUN apk add --no-cache python3 make g++ sqlite-dev
-
-# Install dependencies (allow build scripts for better-sqlite3 native bindings)
-RUN pnpm install --frozen-lockfile --ignore-scripts=false
-
-# Build better-sqlite3 from source for Alpine Linux ARM64
-RUN cd node_modules/.pnpm/better-sqlite3@*/node_modules/better-sqlite3 && \
-    npm run build-release
-
-# Install development tools
-RUN pnpm add -D -w tsx nodemon
-
-# Create directory for SQLite database
-RUN mkdir -p /app/data
-
-# Expose API port
-EXPOSE 3000
-
-# Set working directory to API app
-WORKDIR /app/apps/api
-
-# Start application with nodemon for development
-CMD ["npx", "nodemon", "--watch", "src", "--ext", "ts", "--exec", "npx", "tsx", "src/server.ts"]
-
-# Stage 3: Production Build
-FROM node:24-alpine AS production-build
-
-# Set working directory
-WORKDIR /app
-
-# Set environment to production
-ENV NODE_ENV=production
-
-# Install pnpm
-RUN corepack enable pnpm && corepack prepare pnpm@10.20.0 --activate
-
-# Copy package management files
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
-
-# Copy workspace packages and apps
-COPY packages ./packages
-COPY apps ./apps
-
-# Copy TypeScript configuration
-COPY tsconfig.json ./
-COPY tsconfig.docker.json ./
-
-# Install build tools needed for native modules (better-sqlite3)
-RUN apk add --no-cache python3 make g++ sqlite-dev
-
-# Install dependencies (allow build scripts for better-sqlite3 native bindings)
-RUN pnpm install --ignore-scripts=false
-
-# Build better-sqlite3 from source for Alpine Linux ARM64
-RUN cd node_modules/.pnpm/better-sqlite3@*/node_modules/better-sqlite3 && \
-    npm run build-release
-
-# Install tsx for production runtime (no JSDoc YAML parsing issues)
-RUN pnpm add -D -w tsx
-
-# Build all packages to create dist/ directories
+# Build project - this creates all dist/ directories with compiled JavaScript
 RUN pnpm build
 
-# Stage 4: Production Runtime
-FROM node:24-alpine AS production
-
-# Set labels
-LABEL maintainer="Hookah DB Team"
-LABEL description="Hookah Tobacco Database API - Production Runtime"
-LABEL version="1.0.0"
-
-# Install curl for health checks
-RUN apk add --no-cache curl
+# =============================================================================
+# Stage 2: Runtime
+# This stage runs TypeScript files directly with tsx for proper module resolution
+# =============================================================================
+FROM node:22-alpine AS runtime
 
 # Set working directory
 WORKDIR /app
 
-# Set environment to production
-ENV NODE_ENV=production
+# Install build tools needed for native module compilation
+RUN apk add --no-cache python3 make g++
 
-# Install pnpm
-RUN corepack enable pnpm && corepack prepare pnpm@10.20.0 --activate
+# Install pnpm globally
+RUN npm install -g pnpm@latest
 
-# Copy package management files
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
+# Copy package files for production dependency resolution
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
-# Copy workspace packages and apps
-COPY packages ./packages
-COPY apps ./apps
+# Copy tsconfig files (needed for package resolution)
+COPY tsconfig.json tsconfig.docker.json ./
 
-# Copy TypeScript configuration
-COPY tsconfig.json ./
-COPY tsconfig.docker.json ./
+# Copy source code (not compiled dist) - tsx will compile on the fly
+COPY --from=builder /app/apps ./apps/
+COPY --from=builder /app/packages ./packages/
 
-# Install build tools needed for native modules (better-sqlite3)
-RUN apk add --no-cache python3 make g++ sqlite-dev
+# Copy package.json files for dependency resolution
+COPY --from=builder /app/apps/api/package.json ./apps/api/package.json
+COPY --from=builder /app/apps/cli/package.json ./apps/cli/package.json
+COPY --from=builder /app/packages/cache/package.json ./packages/cache/package.json
+COPY --from=builder /app/packages/database/package.json ./packages/database/package.json
+COPY --from=builder /app/packages/scheduler/package.json ./packages/scheduler/package.json
+COPY --from=builder /app/packages/scraper/package.json ./packages/scraper/package.json
+COPY --from=builder /app/packages/services/package.json ./packages/services/package.json
+COPY --from=builder /app/packages/types/package.json ./packages/types/package.json
+COPY --from=builder /app/packages/utils/package.json ./packages/utils/package.json
 
-# Install dependencies (allow build scripts for better-sqlite3 native bindings)
-RUN pnpm install --ignore-scripts=false
+# Install all dependencies fresh with build scripts enabled to compile native modules
+RUN pnpm install --frozen-lockfile
 
-# Build better-sqlite3 from source for Alpine Linux ARM64
-RUN cd node_modules/.pnpm/better-sqlite3@*/node_modules/better-sqlite3 && \
-    npm run build-release
+# Rebuild better-sqlite3 native module for runtime platform
+RUN cd /app/node_modules/.pnpm/better-sqlite3@11.10.0/node_modules/better-sqlite3 && \
+    npm rebuild --build-from-source
 
-# Install tsx for production runtime (no JSDoc YAML parsing issues)
-RUN pnpm add -D -w tsx
+# Create non-root user for security
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
 
-# Copy node_modules from build stage (includes compiled better-sqlite3 bindings)
-COPY --from=production-build /app/node_modules ./node_modules
+# Create data directory and set ownership
+RUN mkdir -p /app/data && \
+    chown -R nodejs:nodejs /app
 
-# Copy compiled dist/ directories from build stage
-COPY --from=production-build /app/packages/*/dist ./packages/
-COPY --from=production-build /app/apps/*/dist ./apps/
-
-# Create directory for SQLite database
-RUN mkdir -p /app/data
+# Switch to non-root user
+USER nodejs
 
 # Expose API port
 EXPOSE 3000
 
-# Health check
+# Health check endpoint
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD curl -f http://localhost:3000/health || exit 1
+    CMD node -e "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-# Set working directory to API app
-WORKDIR /app/apps/api
+# Set environment variables
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV DATABASE_PATH=/app/data/hookah-db.db
 
-# Start application with node (using compiled JavaScript from dist/)
-CMD ["node", "dist/server.js"]
+# Set NODE_PATH to help Node.js find workspace packages
+ENV NODE_PATH=/app/node_modules:/app/packages/*/node_modules
+
+# Start API server using tsx to run TypeScript files directly
+CMD ["npx", "tsx", "apps/api/src/server.ts"]

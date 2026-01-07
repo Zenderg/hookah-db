@@ -7,7 +7,7 @@
  */
 
 import { Scheduler } from './scheduler';
-import type { DataService } from '@hookah-db/services';
+import { DataService } from '@hookah-db/services';
 import type { SQLiteDatabase } from '@hookah-db/database';
 
 export { Scheduler } from './scheduler';
@@ -29,7 +29,7 @@ export type {
  * @returns New Scheduler instance
  */
 export function createScheduler(
-  dataService: DataService,
+  dataService: InstanceType<typeof DataService>,
   db: SQLiteDatabase,
   config?: {
     enabled?: boolean;

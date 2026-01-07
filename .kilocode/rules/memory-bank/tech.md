@@ -15,9 +15,9 @@
 ### Containerization
 - **Docker**: Container platform for consistent development and production environments
 - **Docker Compose**: Multi-container orchestration for development and production
-- **Multi-stage Dockerfile**: Optimized builds with separate stages for dependencies, development, and production
-- **tsx**: Fast TypeScript runtime for production Docker containers (avoids ts-node JSDoc YAML parsing issues)
-- **nodemon**: Development tool for hot reload in Docker containers
+- **Multi-stage Dockerfile**: Optimized 2-stage builds (build + runtime) for production deployment
+- **Pre-compiled JavaScript**: TypeScript compiled during build stage, no runtime compilation needed
+- **nodemon**: Development tool for hot reload in development mode
 
 ### Web Scraping
 - **Cheerio**: Fast, flexible, and lean implementation of core jQuery for server-side HTML parsing
@@ -124,61 +124,48 @@ pnpm clean
 
 ### Docker Setup
 
-#### Development Environment
+#### Build and Start Containers
 ```bash
-# Build and start development containers with hot reload
-docker-compose -f docker-compose.dev.yml up --build
+# Build and start containers
+docker-compose up --build
 
-# Start development containers in detached mode
-docker-compose -f docker-compose.dev.yml up -d
+# Start containers in detached mode
+docker-compose up -d
 
-# View development logs
-docker-compose -f docker-compose.dev.yml logs -f
+# View logs
+docker-compose logs -f
 
-# Stop development containers
-docker-compose -f docker-compose.dev.yml down
+# Stop containers
+docker-compose down
 
-# Stop development containers and remove volumes
-docker-compose -f docker-compose.dev.yml down -v
-```
-
-#### Production Environment
-```bash
-# Build and start production containers
-docker-compose -f docker-compose.prod.yml up --build
-
-# Start production containers in detached mode
-docker-compose -f docker-compose.prod.yml up -d
-
-# View production logs
-docker-compose -f docker-compose.prod.yml logs -f
-
-# Stop production containers
-docker-compose -f docker-compose.prod.yml down
-
-# Stop production containers and remove volumes
-docker-compose -f docker-compose.prod.yml down -v
+# Stop containers and remove volumes
+docker-compose down -v
 ```
 
 #### Docker Commands
 ```bash
-# Build specific stage
-docker build --target development -t hookah-db-api:dev .
-docker build --target production -t hookah-db-api:prod .
+# Build Docker image
+docker build -t hookah-db-api:latest .
 
 # Run container with custom environment
-docker run -p 3000:3000 --env-file .env.prod hookah-db-api:prod
+docker run -p 3000:3000 --env-file .env hookah-db-api:latest
 
 # Execute commands in running container
-docker exec -it hookah-db-api-prod sh
-docker exec -it hookah-db-api-prod npx tsx src/server.ts
+docker exec -it hookah-db-api sh
+docker exec -it hookah-db-api node apps/api/dist/server.js
 
 # View container logs
-docker logs hookah-db-api-prod
-docker logs -f hookah-db-api-prod
+docker logs hookah-db-api
+docker logs -f hookah-db-api
 
 # Check container health
-docker inspect hookah-db-api-prod | grep -A 10 Health
+docker inspect hookah-db-api | grep -A 10 Health
+
+# Restart container
+docker-compose restart
+
+# Rebuild and restart
+docker-compose up -d --build
 ```
 
 ### Accessing API Documentation
@@ -228,9 +215,8 @@ hookah-db/
 │   └── tsconfig/          # Shared TypeScript configurations
 ├── docs/                 # Documentation
 │   └── LOGGING.md        # Comprehensive logging documentation
-├── Dockerfile             # Multi-stage Docker build configuration
-├── docker-compose.dev.yml  # Development Docker Compose configuration
-├── docker-compose.prod.yml # Production Docker Compose configuration
+├── Dockerfile             # 2-stage Docker build configuration
+├── docker-compose.yml      # Single Docker Compose configuration
 ├── tsconfig.docker.json   # Docker-specific TypeScript configuration
 ├── pnpm-workspace.yaml    # pnpm workspace configuration
 ├── turbo.json             # Turborepo configuration
@@ -239,24 +225,26 @@ hookah-db/
 
 ### Docker Architecture
 
-The Docker setup uses a multi-stage build approach:
+The Docker setup uses a 2-stage multi-stage build approach:
 
 **Stages**:
-1. **Dependencies**: Installs all dependencies with frozen lockfile for reproducible builds
-2. **Development**: Development environment with hot reload via nodemon and volume mounts
-3. **Production**: Optimized production runtime with health checks and logging
+1. **Build**: Installs all dependencies and compiles TypeScript to JavaScript using `pnpm build`
+2. **Runtime**: Copies compiled JavaScript and production dependencies for minimal runtime image
 
 **Services** (Docker Compose):
 - **API Service**: Node.js API server with Express.js
-  - Development: Hot reload with nodemon and volume mounts
-  - Production: Optimized runtime with health checks and log rotation
-  - SQLite database file mounted for persistence
+  - Pre-compiled JavaScript for fast startup
+  - Health checks configured (30s interval, 10s timeout, 3 retries)
+  - SQLite database in named volume for persistence
+  - Non-root user (nodejs:nodejs) for security
+  - Restart policy: unless-stopped
 
 **Networks**:
 - **hookah-db-network**: Bridge network for container communication
 
 **Volumes**:
-- **Database Volume**: Mounts SQLite database file for persistence
+- **hookah-db-data**: Named volume for SQLite database persistence
+  - Mount path: /app/hookah-db.db (container)
 
 ### Package Naming Convention
 
@@ -295,15 +283,16 @@ Packages use `workspace:*` protocol to reference other packages in monorepo:
 - Automatic rebuilds on file changes (via nodemon/ts-node)
 
 **Docker Development**:
-- Use `docker-compose -f docker-compose.dev.yml up` for containerized development
-- Hot reload via nodemon with volume mounts
-- Changes to source code are reflected immediately in containers
+- Use `docker-compose up` for containerized development
+- Build stage compiles TypeScript to JavaScript
+- Runtime stage uses pre-compiled JavaScript
+- Changes require rebuild: `docker-compose up -d --build`
 
 **Docker Production**:
-- Use `docker-compose -f docker-compose.prod.yml up` for production deployment
-- Optimized multi-stage builds for smaller image sizes
+- Use `docker-compose up -d` for production deployment
+- Optimized 2-stage builds for smaller image sizes
 - Health checks and log rotation configured
-- No hot reload (production-optimized)
+- Pre-compiled JavaScript for fast startup (~20-30 seconds)
 
 **Build All**:
 - `pnpm build` - Builds all packages in dependency order
@@ -407,15 +396,17 @@ Packages use `workspace:*` protocol to reference other packages in monorepo:
 - Use child loggers for modules to add context
 
 ### Docker Best Practices
-- Use multi-stage builds for smaller image sizes
+- Use 2-stage multi-stage builds for smaller image sizes
+- Compile TypeScript during build stage, not runtime
 - Leverage Docker layer caching for faster builds
 - Use .dockerignore to exclude unnecessary files
-- Mount volumes for development (hot reload)
+- Use named volumes for database persistence (not bind mounts)
 - Use health checks for container monitoring
 - Configure log rotation to prevent disk space issues
 - Use specific version tags for base images (node:22-alpine)
 - Keep containers stateless (use volumes for persistence)
-- Use environment-specific configurations (.env.dev, .env.prod)
+- Use environment-specific configurations (.env)
+- Run as non-root user for security
 
 ## Environment Variables
 
@@ -464,22 +455,25 @@ Packages use `workspace:*` protocol to reference other packages in monorepo:
 - Run with `ts-node` for TypeScript support
 - SQLite database in project root (./hookah-db.db)
 - In-memory caching for frequently accessed data
-- Or use Docker: `docker-compose -f docker-compose.dev.yml up`
+- Or use Docker: `docker-compose up`
 
 ### Production
 - Build all packages with `pnpm build`
-- Use Docker Compose for containerized deployment: `docker-compose -f docker-compose.prod.yml up -d`
+- Use Docker Compose for containerized deployment: `docker-compose up -d`
 - Use process manager (PM2, systemd) if not using Docker
 - SQLite database in data directory (/app/hookah-db.db)
 - In-memory caching for frequently accessed data
 - Implement proper logging (winston, pino)
 - Set up health check endpoints
 - Configure reverse proxy (nginx, Apache)
-- Use environment-specific configurations (.env.prod)
+- Use environment-specific configurations (.env)
 
 ### Docker Deployment
-- **Development**: Use docker-compose.dev.yml with hot reload and volume mounts
-- **Production**: Use docker-compose.prod.yml with optimized builds and health checks
+- **Single Configuration**: Use docker-compose.yml for both development and production
+- **2-Stage Build**: Build stage compiles TypeScript, runtime stage runs pre-compiled JavaScript
+- **Named Volumes**: Use named Docker volumes for database persistence (not bind mounts)
+- **Health Checks**: Configured for Coolify monitoring (30s interval, 10s timeout, 3 retries)
+- **Coolify Deployment**: Single docker-compose.yml required, environment variables via Coolify UI
 - **Image Registry**: Push images to Docker Hub or private registry for CI/CD
 - **Orchestration**: Consider Kubernetes or Docker Swarm for larger deployments
 - **Monitoring**: Use container health checks and log aggregation
@@ -559,7 +553,3 @@ Packages use `workspace:*` protocol to reference other packages in monorepo:
 
 ### Environment & Configuration
 - dotenv: latest
-
-### Docker Runtime
-- tsx: Latest (for production Docker runtime)
-- nodemon: 3.1.11 (for development Docker hot reload)

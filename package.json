@@ -19,6 +19,16 @@
   "author": "",
   "license": "ISC",
   "packageManager": "pnpm@10.20.0",
+  "dependencies": {
+    "axios": "^1.13.2",
+    "cheerio": "^1.1.2",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "tslib": "^2.8.1",
+    "tsx": "^4.21.0",
+    "winston": "^3.19.0",
+    "winston-daily-rotate-file": "^5.0.0"
+  },
   "devDependencies": {
     "@changesets/cli": "^2.27.1",
     "@types/express": "^5.0.6",
@@ -33,13 +43,5 @@
     "ts-node": "^10.9.2",
     "turbo": "^2.4.4",
     "typescript": "^5.9.3"
-  },
-  "dependencies": {
-    "axios": "^1.13.2",
-    "cheerio": "^1.1.2",
-    "express": "^5.2.1",
-    "tslib": "^2.8.1",
-    "winston": "^3.19.0",
-    "winston-daily-rotate-file": "^5.0.0"
   }
 }

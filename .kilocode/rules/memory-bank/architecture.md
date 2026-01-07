@@ -75,15 +75,14 @@ graph TB
         subgraph "API Container"
             A1[Node.js 22 Alpine]
             A2[Express.js Server]
-            A3[TypeScript Runtime tsx]
+            A3[Pre-compiled JavaScript]
             A4[Health Check Endpoint]
             A5[SQLite Database]
         end
     end
     
     subgraph "Host System"
-        V1[Volume Mounts - Dev]
-        V2[Volume Mounts - Prod]
+        V1[Named Volume: hookah-db-data]
         E1[Environment Files]
     end
     
@@ -92,8 +91,7 @@ graph TB
         C[Authorized Clients]
     end
     
-    V1 --> A1
-    V2 --> A5
+    V1 --> A5
     E1 --> A1
     A2 --> A5
     A5 --> A2
@@ -109,9 +107,9 @@ graph TB
 
 ### Docker Container Architecture
 
-**API Container** (`hookah-db-api-dev` / `hookah-db-api-prod`):
+**API Container** (`hookah-db-api`):
 - **Base Image**: node:22-alpine
-- **Runtime**: Node.js with tsx for TypeScript execution
+- **Runtime**: Node.js with pre-compiled JavaScript (no tsx needed)
 - **Components**:
   - Express.js API server
   - Authentication middleware
@@ -121,18 +119,13 @@ graph TB
   - Scheduler (node-cron)
   - Health check endpoint
   - SQLite database with WAL mode
-- **Development Features**:
-  - Hot reload via nodemon
-  - Volume mounts for live code updates
-  - Debug logging enabled
-  - SQLite database file mounted for persistence
 - **Production Features**:
-  - Optimized runtime with tsx
-  - Health checks (30s interval, 10s timeout)
+  - Pre-compiled JavaScript for faster startup
+  - Health checks (30s interval, 10s timeout, 3 retries)
   - Log rotation (10MB max, 3 files)
   - Automatic restart on failure
-  - No hot reload (performance optimized)
-  - SQLite database file mounted for persistence
+  - Non-root user (nodejs:nodejs)
+  - Named Docker volume for database persistence
 
 **Network Configuration**:
 - **Network Name**: hookah-db-network
@@ -142,14 +135,61 @@ graph TB
   - API: 3000:3000 (host:container)
 
 **Volume Management**:
-- **Development Volume Mounts**:
-  - `./apps/api/src:/app/apps/api/src` - Hot reload for API source
-  - `./packages:/app/packages` - Hot reload for shared packages
-  - `./tsconfig.json:/app/tsconfig.json` - TypeScript config
-  - `./turbo.json:/app/turbo.json` - Turborepo config
-  - `./hookah-db.db:/app/hookah-db.db` - SQLite database file
-- **Production Volume Mounts**:
-  - `./data/hookah-db.db:/app/hookah-db.db` - SQLite database file
+- **Named Volume**: `hookah-db-data` for SQLite database persistence
+- **Mount Path**: `/app/hookah-db.db` (container)
+- **Purpose**: Persist database across container restarts
+
+### Dockerfile Architecture
+
+The project uses a 2-stage Dockerfile for optimized builds:
+
+**Stage 1 - Build**:
+- Base image: node:22-alpine
+- Installs pnpm globally
+- Copies package files, TypeScript configs, and source code
+- Installs all dependencies with frozen lockfile
+- Compiles TypeScript to JavaScript using `pnpm build`
+
+**Stage 2 - Runtime**:
+- Base image: node:22-alpine
+- Copies package files and compiled JavaScript from build stage
+- Installs production dependencies only
+- Creates non-root user (nodejs:nodejs)
+- Configures health checks
+- Sets environment variables
+- Starts server with `node apps/api/dist/server.js`
+
+**Key Benefits**:
+- Pre-compiled JavaScript for faster startup
+- Smaller runtime image (no TypeScript compiler)
+- More reliable than tsx runtime
+- Production best practice
+
+### Docker Compose Configuration
+
+The project uses a single `docker-compose.yml` file for both development and production:
+
+**Service Definition**:
+- **API Service**: Single service for API server
+  - Build from Dockerfile
+  - Container name: hookah-db-api
+  - Port mapping: 3000:3000
+  - Named volume: hookah-db-data for database persistence
+  - Environment variables: All configuration via environment
+  - Restart policy: unless-stopped
+  - Health check: Built-in health monitoring
+  - Network: hookah-db-network
+
+**Volume Configuration**:
+- **Named Volume**: hookah-db-data
+  - Driver: local
+  - Purpose: Persistent SQLite database storage
+  - Mount: /app/hookah-db.db
+
+**Network Configuration**:
+- **Network**: hookah-db-network
+  - Driver: bridge
+  - Purpose: Container communication
 
 ## Source Code Structure
 
@@ -271,10 +311,8 @@ hookah-db/
 ├── .kilocode/             # Kilo Code configuration
 │   └── rules/
 │       └── memory-bank/   # Memory bank files
-├── Dockerfile             # Multi-stage Docker build configuration
-├── docker-compose.dev.yml  # Development Docker Compose configuration
-├── docker-compose.prod.yml # Production Docker Compose configuration
-├── tsconfig.docker.json   # Docker-specific TypeScript configuration
+├── Dockerfile             # 2-stage Docker build configuration
+├── docker-compose.yml      # Single Docker Compose configuration
 ├── pnpm-workspace.yaml    # pnpm workspace configuration
 ├── turbo.json             # Turborepo configuration
 ├── .npmrc                 # npm/pnpm configuration
@@ -755,34 +793,21 @@ The API includes comprehensive Swagger/OpenAPI documentation:
 
 ### Docker Implementation
 
-**Multi-Stage Dockerfile** ([`Dockerfile`](Dockerfile:1)):
-- **Stage 1 - Dependencies**: Installs all dependencies with frozen lockfile for reproducible builds
-- **Stage 2 - Development**: Development environment with hot reload via nodemon and volume mounts
-- **Stage 3 - Production**: Optimized production runtime with health checks and logging
+**2-Stage Dockerfile** ([`Dockerfile`](Dockerfile:1)):
+- **Stage 1 - Build**: Installs dependencies and compiles TypeScript to JavaScript
+- **Stage 2 - Runtime**: Copies compiled JavaScript and production dependencies for minimal runtime image
 
-**Docker Compose - Development** ([`docker-compose.dev.yml`](docker-compose.dev.yml:1)):
-- API service with hot reload and volume mounts
-- SQLite database file mounted for persistence
-- Bridge network for container communication
-- Environment configuration via `.env.dev`
-
-**Docker Compose - Production** ([`docker-compose.prod.yml`](docker-compose.prod.yml:1)):
-- Optimized API service with health checks and logging configuration
-- SQLite database file mounted for persistence
+**Docker Compose** ([`docker-compose.yml`](docker-compose.yml:1)):
+- Single service for API server
+- Named Docker volume for database persistence
 - Health checks for API service
-- Log rotation with size limits
-- Environment configuration via `.env.prod`
-
-**Docker-Specific TypeScript Configuration** ([`tsconfig.docker.json`](tsconfig.docker.json:1)):
-- Extends base TypeScript config
-- Configured for CommonJS modules and ES2022 target
-- ts-node configuration with transpileOnly mode for faster execution
-- Experimental specifier resolution for workspace compatibility
+- Environment configuration via environment variables
+- Restart policy: unless-stopped
 
 **Runtime Decisions**:
-- **tsx**: Used for production runtime to avoid ts-node JSDoc YAML parsing issues
-- **nodemon**: Used for development hot reload
+- **Pre-compiled JavaScript**: TypeScript compiled during build stage, no tsx runtime needed
 - **node:22-alpine**: Lightweight base image for smaller container sizes
+- **Non-root user**: Security best practice (nodejs:nodejs)
 - **better-sqlite3**: SQLite database driver with synchronous API
 
 ## Component Relationships
@@ -815,8 +840,8 @@ graph LR
 5. **Error Handling Path**: Controller throws error → Error handler middleware catches → Log error → Return JSON error response
 6. **Documentation Path**: JSDoc comments → swagger-jsdoc → OpenAPI spec → Swagger UI
 7. **Scheduler Path**: Cron trigger → Execute job → Call DataService → Update database → Clear cache → Log execution
-8. **Docker Build Path**: Dockerfile stages (dependencies → development/production) → Container images → Docker Compose orchestration
-9. **Docker Deployment Path**: Build images → Create network → Start containers → Health checks → Volume mounts → Service communication
+8. **Docker Build Path**: Dockerfile stages (build → runtime) → Container image → Docker Compose orchestration
+9. **Docker Deployment Path**: Build image → Create network → Start container → Health checks → Volume mounts → Service communication
 10. **Search Path**: Extract search parameter → Check if search provided → If search: Query database with LIKE → If no search: Use cache → Return results
 
 ## Design Patterns
@@ -830,7 +855,7 @@ graph LR
 - **Route Handler Pattern**: Route definitions separate from controller logic
 - **Documentation-First Pattern**: JSDoc comments drive API specification generation
 - **Scheduler Pattern**: Cron-based task scheduling with lifecycle management
-- **Container Pattern**: Multi-stage Docker builds for development and production
+- **Container Pattern**: 2-stage Docker builds for production deployment
 - **Orchestration Pattern**: Docker Compose for single-container deployment (API + SQLite)
 - **API Extraction Pattern**: Direct API calls with pagination and retry logic for complete data retrieval
 - **Search Pattern**: LIKE-based queries with cache-first strategy for optimal performance

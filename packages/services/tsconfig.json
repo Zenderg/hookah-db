@@ -6,6 +6,12 @@
     "rootDir": "src",
     "outDir": "dist"
   },
+  "references": [
+    { "path": "../types" },
+    { "path": "../utils" },
+    { "path": "../scraper" },
+    { "path": "../database" }
+  ],
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "**/*.spec.ts", "**/*.test.ts"]
 }

@@ -18,6 +18,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@hookah-db/cache": "workspace:*",
     "@hookah-db/database": "workspace:*",
     "@hookah-db/scheduler": "workspace:*",
     "@hookah-db/scraper": "workspace:*",

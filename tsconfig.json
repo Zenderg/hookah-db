@@ -6,6 +6,7 @@
     { "path": "./packages/scraper" },
     { "path": "./packages/parser" },
     { "path": "./packages/cache" },
+    { "path": "./packages/database" },
     { "path": "./packages/services" },
     { "path": "./apps/api" },
     { "path": "./apps/cli" }

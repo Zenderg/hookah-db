@@ -1,83 +1,74 @@
-# Build artifacts (exclude root dist only, keep package and apps dist for production)
-/dist
-.tsbuildinfo/
-**/.tsbuildinfo/
-build/
-**/build/
+# Dependencies
+node_modules
+npm-debug.log
+yarn-error.log
+pnpm-debug.log
 
-# Node modules (exclude to force fresh install in container)
-node_modules/
-**/node_modules
+# Build outputs
+dist
+build
+*.tsbuildinfo
 
-# Test files
-tests/
-**/tests/
-*.test.ts
-**/*.test.ts
-*.test.js
-**/*.test.js
-*.spec.ts
-**/*.spec.ts
-*.spec.js
-**/*.spec.js
-coverage/
-**/coverage/
-
-# Git files
-.git/
+# Git
+.git
 .gitignore
 .gitattributes
 
-# Environment files (exclude local/dev files, keep examples)
+# Environment files
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 
-# IDE files
-.vscode/
-.idea/
+# Testing
+coverage
+.nyc_output
+*.test.ts
+*.spec.ts
+tests/
+
+# Documentation
+docs/
+README.md
+*.md
+
+# IDE
+.vscode
+.idea
 *.swp
 *.swo
 *~
 
-# Logs
-logs/
-*.log
-**/*.log
-
-# Documentation
-README.md
-docs/
-.kilocode/
-plans/
-
 # CI/CD
-.github/
+.github
 .gitlab-ci.yml
 .travis.yml
 
-# Development tools
-.eslintrc*
-.prettierrc*
-.editorconfig
-
-# Examples
-examples/
-
-# Package manager debug logs
-pnpm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Docker files (keep Dockerfile.prod for production builds)
-Dockerfile
-docker-compose*.yml
-.dockerignore
+# Docker (exclude backup and old files, keep main files)
+.docker-backup/
+docker-compose.dev.yml
+docker-compose.prod.yml
+docker-compose.dev.yaml
+docker-compose.prod.yaml
+tsconfig.docker.json.backup
 
 # Temporary files
-.DS_Store
-Thumbs.db
 *.tmp
+*.temp
+test-*.ts
+test-*.db
+test-*.log
+
+# Data files (will be mounted as volumes)
+data/
+hookah-db.db
+logs/
+
+# Plans and reports
+plans/
+reports/
+
+# Kilo Code configuration
+.kilocode/
 
 # Cache files
 .cache/

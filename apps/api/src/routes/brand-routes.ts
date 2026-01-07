@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Router as RouterType } from 'express';
 import {
   getBrands,
   getBrandBySlug,
@@ -19,7 +19,7 @@ import authMiddleware from '../middleware/auth-middleware';
  * 
  * All routes require authentication via X-API-Key header.
  */
-const router = Router();
+const router: RouterType = Router();
 
 // Apply rate limiting to all brand routes
 router.use(rateLimitMiddleware);

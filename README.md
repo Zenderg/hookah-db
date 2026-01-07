@@ -251,7 +251,7 @@ hookah-db/
 ├── apps/                    # Applications
 │   ├── api/               # REST API server
 │   └── cli/               # CLI tool
-├── packages/                # Shared packages
+├── packages/                 # Shared packages
 │   ├── types/              # TypeScript types and interfaces
 │   ├── utils/              # Utility functions (includes logging)
 │   ├── scraper/            # Web scraping logic
@@ -299,6 +299,8 @@ hookah-db/
 
 - Node.js (LTS version)
 - pnpm (install via `npm install -g pnpm`)
+- Docker (for containerized development and production)
+- Docker Compose (for multi-container orchestration)
 
 ### Installation
 
@@ -323,111 +325,186 @@ This project includes comprehensive Docker support for both development and prod
 ### Quick Start
 
 ```bash
-# Start development environment with hot-reload
-docker-compose -f docker-compose.dev.yml up
-
-# Start production environment
-docker-compose -f docker-compose.prod.yml up -d
-
-# Stop services
-docker-compose -f docker-compose.dev.yml down
-docker-compose -f docker-compose.prod.yml down
-```
-
-### Development with Docker
-
-The development environment uses `docker-compose.dev.yml` for local development with hot-reload capabilities.
-
-#### Starting Development Environment
-
-```bash
-# Start all services in development mode
-docker-compose -f docker-compose.dev.yml up
-
-# Start in detached mode (background)
-docker-compose -f docker-compose.dev.yml up -d
+# Build and start containers
+docker-compose up -d
 
 # View logs
-docker-compose -f docker-compose.dev.yml logs -f
+docker-compose logs -f
 
 # Stop services
-docker-compose -f docker-compose.dev.yml down
+docker-compose down
 ```
 
-#### Features
+### Docker Architecture
 
-- **Hot-Reload**: Code changes are automatically reflected without rebuilding
-- **Volume Mounts**: Source code is mounted for live editing
-- **TypeScript Compilation**: Uses ts-node for on-the-fly compilation
-- **SQLite Database**: Persistent SQLite database file mounted for data persistence
-- **API Access**: API available at `http://localhost:3000`
+The Docker setup uses a multi-stage build approach:
 
-#### Accessing Services
+**Stages**:
+1. **Build Stage**: Installs dependencies and compiles TypeScript to JavaScript
+2. **Runtime Stage**: Copies compiled JavaScript and production dependencies for minimal runtime image
 
-```bash
-# Health check
-curl http://localhost:3000/health
+**Services** (Docker Compose):
+- **API Service**: Node.js API server with Express.js
+  - Pre-compiled JavaScript (no tsx runtime needed)
+  - Health checks (30s interval, 10s timeout, 3 retries)
+  - SQLite database file mounted for persistence
+  - Named Docker volume for database persistence
+  - Restart policy: unless-stopped
 
-# API documentation (Swagger UI)
-open http://localhost:3000/api-docs
+**Networks**:
+- **hookah-db-network**: Bridge network for container communication
 
-# Test API with authentication
-curl -H "X-API-Key: your-api-key" http://localhost:3000/api/v1/brands
+**Volumes**:
+- **Database Volume**: Named Docker volume for SQLite database persistence
 
-# Test search functionality
-curl -H "X-API-Key: your-api-key" \
-  "http://localhost:3000/api/v1/brands?search=Sarma"
+### Dockerfile Details
+
+The project uses a 2-stage Dockerfile for optimized builds:
+
+```dockerfile
+# Stage 1: Build
+FROM node:22-alpine AS builder
+WORKDIR /app
+# Install pnpm and dependencies
+# Build TypeScript to JavaScript
+
+# Stage 2: Runtime
+FROM node:22-alpine
+WORKDIR /app
+# Copy compiled JavaScript from build stage
+# Copy production dependencies
+# Set up non-root user
+# Configure health check
+# Start Node.js with pre-compiled code
+CMD ["node", "apps/api/dist/server.js"]
 ```
 
-#### Viewing Logs
+**Key Features**:
+- **Pre-compiled JavaScript**: TypeScript compiled during build stage
+- **No tsx runtime**: Uses Node.js directly with compiled code
+- **Smaller runtime image**: Only includes production dependencies
+- **Non-root user**: Security best practice
+- **Health checks**: Built-in health monitoring
+- **Named volumes**: Persistent database storage
 
-```bash
-# View all logs
-docker-compose -f docker-compose.dev.yml logs -f
+### Docker Compose Configuration
 
-# View API service logs only
-docker-compose -f docker-compose.dev.yml logs -f api
+The project uses a single `docker-compose.yml` file for both development and production:
+
+```yaml
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hookah-db-api
+    ports:
+      - "3000:3000"
+    volumes:
+      # Named Docker volume for database persistence
+      - hookah-db-data:/app/hookah-db.db
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_PATH=/app/hookah-db.db
+      # Add other environment variables as needed
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - hookah-db-network
+
+networks:
+  hookah-db-network:
+    driver: bridge
+
+volumes:
+  hookah-db-data:
+    driver: local
 ```
 
-### Production Deployment
+**Key Features**:
+- **Single file**: Works with Coolify deployment
+- **Named volume**: Persistent database storage across container restarts
+- **Health checks**: Container health monitoring
+- **Restart policy**: Automatic restart on failure
+- **Environment variables**: Configure via Coolify UI or .env file
 
-The production environment uses `docker-compose.prod.yml` for optimized production deployments.
-
-#### Building and Starting Production Environment
+### Docker Commands
 
 ```bash
-# Build and start production services
-docker-compose -f docker-compose.prod.yml up -d --build
+# Build and start containers
+docker-compose up -d
+
+# Build and start with rebuild
+docker-compose up -d --build
 
 # View logs
-docker-compose -f docker-compose.prod.yml logs -f
+docker-compose logs -f
 
-# Stop services
-docker-compose -f docker-compose.prod.yml down
+# View logs for specific service
+docker-compose logs -f api
+
+# Stop containers
+docker-compose down
+
+# Stop and remove volumes
+docker-compose down -v
+
+# Rebuild specific service
+docker-compose build api
+
+# Execute command in container
+docker-compose exec api sh
+
+# Check container health
+docker inspect hookah-db-api | grep -A 10 Health
 ```
 
-#### Production Features
+### Coolify Deployment
 
-- **Multi-Stage Build**: Optimized Dockerfile for smaller production images
-- **Compiled TypeScript**: Pre-compiled JavaScript for faster startup
-- **Health Checks**: Built-in health checks for service monitoring
-- **Environment Configuration**: Separate `.env.prod` for production settings
-- **Logging**: Production-ready logging with file rotation
-- **SQLite Database**: Persistent SQLite database with WAL mode
+The project is ready for Coolify deployment:
 
-#### Environment Configuration
+1. **Push code to repository**
+2. **Create new service in Coolify**
+3. **Select Git source** and enter repository URL
+4. **Configure environment variables** in Coolify UI:
+   - `NODE_ENV=production`
+   - `PORT=3000`
+   - `DATABASE_PATH=/app/hookah-db.db`
+   - `API_KEY_CLIENT1=your-api-key`
+   - Add other required environment variables
+5. **Configure volume mount** for database:
+   - Container path: `/app/hookah-db.db`
+   - Use Coolify managed volume
+6. **Deploy service**
 
-Create a `.env.prod` file based on `.env.example`:
+Coolify will automatically:
+- Build Docker image using Dockerfile
+- Start container with health checks
+- Monitor container health
+- Collect and display logs
+- Handle restarts on failure
+
+### Environment Configuration
+
+Create a `.env` file based on `.env.example`:
 
 ```bash
 # Copy example file
-cp .env.example .env.prod
+cp .env.example .env
 
-# Edit with production values
-nano .env.prod
+# Edit with your values
+nano .env
 ```
 
-#### Important Production Variables
+### Important Environment Variables
 
 ```bash
 # Server configuration
@@ -459,7 +536,7 @@ LOG_DIR=/app/logs
 SERVICE_NAME=hookah-db
 ```
 
-#### Health Checks
+### Health Checks
 
 ```bash
 # Basic health check
@@ -472,36 +549,218 @@ curl http://localhost:3000/health/detailed
 docker inspect --format='{{.State.Health.Status}}' hookah-db-api
 ```
 
-### Docker Architecture
+### Troubleshooting
 
-#### Multi-Stage Dockerfile
+#### Common Issues
 
-The project uses a multi-stage Dockerfile for optimized builds:
+**1. Container fails to start**
 
-1. **Base Stage**: Sets up Node.js and pnpm
-2. **Dependencies Stage**: Installs all dependencies
-3. **Build Stage**: Compiles TypeScript to JavaScript
-4. **Production Stage**: Creates minimal runtime image
+```bash
+# Check container logs
+docker-compose logs api
 
-#### Services
+# Check if port 3000 is already in use
+lsof -i :3000
 
-**API Service** (`api`):
-- Exposes port 3000
-- Health check endpoint: `/health`
-- Includes all application code
-- Mounts SQLite database file for persistence
+# Stop conflicting services and retry
+docker-compose down
+docker-compose up
+```
 
-#### Network Configuration
+**2. Health check fails**
 
-- **Network**: `hookah-db-network` (bridge network)
-- External access via exposed port 3000
+```bash
+# Check if server is listening
+netstat -tlnp | grep 3000
 
-#### Volume Configuration
+# Test health endpoint manually
+curl http://localhost:3000/health
 
-- **Source Code Volume**: Mounts source code for development
-- **Logs Volume**: Persists application logs
-- **Database Volume**: Mounts SQLite database file for persistence
-- **Node Modules Volume**: Caches node_modules for faster rebuilds
+# Check health check configuration
+docker inspect hookah-db-api | grep -A 10 Health
+```
+
+**3. Database persistence issues**
+
+```bash
+# Check if volume exists
+docker volume ls | grep hookah-db-data
+
+# Check volume details
+docker volume inspect hookah-db-data
+
+# Verify database file exists in container
+docker-compose exec api ls -la /app/hookah-db.db
+```
+
+**4. Build failures**
+
+```bash
+# Clean build artifacts
+docker-compose down -v
+docker system prune -f
+
+# Rebuild without cache
+docker-compose build --no-cache
+docker-compose up
+```
+
+#### Rebuilding Images
+
+```bash
+# Rebuild specific service
+docker-compose build api
+
+# Rebuild all services
+docker-compose build
+
+# Rebuild without cache
+docker-compose build --no-cache
+```
+
+#### Cleaning Up
+
+```bash
+# Stop and remove containers
+docker-compose down
+
+# Stop and remove containers with volumes
+docker-compose down -v
+
+# Remove all Docker resources for this project
+docker-compose down -v --rmi all
+
+# Clean up unused Docker resources
+docker system prune -a
+```
+
+#### Viewing Container Logs
+
+```bash
+# View all logs
+docker-compose logs
+
+# Follow logs in real-time
+docker-compose logs -f
+
+# View last 100 lines
+docker-compose logs --tail=100
+
+# View logs since a specific time
+docker-compose logs --since="2024-01-05T10:00:00"
+
+# View logs for specific service
+docker-compose logs api
+```
+
+### Useful Commands
+
+#### Container Management
+
+```bash
+# List running containers
+docker-compose ps
+
+# Execute command in container
+docker-compose exec api sh
+
+# Restart service
+docker-compose restart api
+
+# Scale service (run multiple instances)
+docker-compose up -d --scale api=3
+```
+
+#### Monitoring
+
+```bash
+# View resource usage
+docker stats
+
+# View container details
+docker inspect hookah-db-api
+
+# View container processes
+docker-compose top
+
+# Check container health
+docker inspect --format='{{.State.Health.Status}}' hookah-db-api
+```
+
+#### Debugging
+
+```bash
+# Run container in debug mode
+docker-compose run --rm api sh
+
+# View environment variables in container
+docker-compose exec api env
+
+# View mounted volumes
+docker inspect --format='{{json .Mounts}}' hookah-db-api | jq
+```
+
+#### Maintenance
+
+```bash
+# Update base image
+docker-compose pull
+
+# Backup database
+docker-compose exec api cp /app/hookah-db.db /tmp/hookah-db.db.backup
+
+# Restore database
+docker-compose exec api cp /tmp/hookah-db.db.backup /app/hookah-db.db
+
+# View disk usage
+docker system df
+```
+
+#### API Testing
+
+```bash
+# Health check
+curl http://localhost:3000/health
+
+# Detailed health check
+curl http://localhost:3000/health/detailed
+
+# Get brands (requires API key)
+curl -H "X-API-Key: your-api-key" http://localhost:3000/api/v1/brands
+
+# Search brands (requires API key)
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:3000/api/v1/brands?search=Sarma"
+
+# Get specific brand
+curl -H "X-API-Key: your-api-key" http://localhost:3000/api/v1/brands/sarma
+
+# Get flavors (requires API key)
+curl -H "X-API-Key: your-api-key" http://localhost:3000/api/v1/flavors
+
+# Search flavors (requires API key)
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:3000/api/v1/flavors?search=Зима"
+
+# Get scheduler stats
+curl -H "X-API-Key: your-api-key" http://localhost:3000/api/v1/scheduler/stats
+
+# Get scheduled jobs
+curl -H "X-API-Key: your-api-key" http://localhost:3000/api/v1/scheduler/jobs
+```
+
+#### Documentation Access
+
+```bash
+# Open Swagger UI in browser (macOS)
+open http://localhost:3000/api-docs
+
+# Open Swagger UI in browser (Linux)
+xdg-open http://localhost:3000/api-docs
+
+# Download OpenAPI specification
+curl http://localhost:3000/api-docs.json -o openapi.json
+```
 
 ## Database
 
@@ -513,12 +772,12 @@ The project uses SQLite for persistent data storage:
 - **Mode**: WAL (Write-Ahead Logging) for better performance and concurrency
 - **Location**:
   - Development: `./hookah-db.db` (project root)
-  - Production: `/app/hookah-db.db` (container)
+  - Production: `/app/hookah-db.db` (container, using named volume)
 
 ### Database Features
 
 - **Persistent Storage**: Data persists across server restarts
-- **Simple Backup**: Just copy the database file
+- **Simple Backup**: Just copy database file
 - **No External Dependencies**: Self-contained database
 - **Fast Queries**: Optimized with indexes
 - **WAL Mode**: Better concurrency and performance
@@ -541,10 +800,10 @@ cp hookah-db.db hookah-db.db.backup
 cp hookah-db.db.backup hookah-db.db
 
 # Backup database (Docker)
-docker cp hookah-db-api-prod:/app/hookah-db.db ./hookah-db.db.backup
+docker cp hookah-db-api:/app/hookah-db.db ./hookah-db.db.backup
 
 # Restore database (Docker)
-docker cp ./hookah-db.db.backup hookah-db-api-prod:/app/hookah-db.db
+docker cp ./hookah-db.db.backup hookah-db-api:/app/hookah-db.db
 
 # View database file size
 ls -lh hookah-db.db
@@ -555,8 +814,7 @@ ls -lh hookah-db.db
 ### Environment Files
 
 - **`.env.example`**: Template with all available variables
-- **`.env.dev`**: Development environment configuration
-- **`.env.prod`**: Production environment configuration
+- **`.env`**: Local environment configuration (not committed to git)
 
 ### Required Variables
 
@@ -614,230 +872,6 @@ Configure API keys in your environment file:
 API_KEY_CLIENT1=abc123def456
 API_KEY_CLIENT2=xyz789ghi012
 API_KEY_CLIENT3=lmn345opq678
-```
-
-### Troubleshooting
-
-#### Common Issues
-
-**1. Container fails to start**
-
-```bash
-# Check container logs
-docker-compose -f docker-compose.dev.yml logs api
-
-# Check if port 3000 is already in use
-lsof -i :3000
-
-# Stop conflicting services and retry
-docker-compose -f docker-compose.dev.yml down
-docker-compose -f docker-compose.dev.yml up
-```
-
-**2. Hot-reload not working**
-
-```bash
-# Verify volume mounts are correct
-docker-compose -f docker-compose.dev.yml config
-
-# Restart service
-docker-compose -f docker-compose.dev.yml restart api
-
-# Check if ts-node is watching files
-docker-compose -f docker-compose.dev.yml logs -f api | grep "ts-node"
-```
-
-**3. Database connection issues**
-
-```bash
-# Check if database file exists
-ls -la hookah-db.db
-
-# Check database file permissions
-ls -l hookah-db.db
-
-# Verify DATABASE_PATH in environment
-docker-compose -f docker-compose.dev.yml exec api env | grep DATABASE_PATH
-```
-
-**4. Build failures**
-
-```bash
-# Clean build artifacts
-docker-compose -f docker-compose.dev.yml down -v
-docker system prune -f
-
-# Rebuild without cache
-docker-compose -f docker-compose.dev.yml build --no-cache
-docker-compose -f docker-compose.dev.yml up
-```
-
-**5. Permission issues with logs**
-
-```bash
-# Fix log directory permissions
-docker-compose -f docker-compose.dev.yml exec api mkdir -p /app/logs
-docker-compose -f docker-compose.dev.yml exec api chown -R node:node /app/logs
-```
-
-#### Rebuilding Images
-
-```bash
-# Rebuild specific service
-docker-compose -f docker-compose.dev.yml build api
-
-# Rebuild all services
-docker-compose -f docker-compose.dev.yml build
-
-# Rebuild without cache
-docker-compose -f docker-compose.dev.yml build --no-cache
-```
-
-#### Cleaning Up
-
-```bash
-# Stop and remove containers
-docker-compose -f docker-compose.dev.yml down
-
-# Stop and remove containers with volumes
-docker-compose -f docker-compose.dev.yml down -v
-
-# Remove all Docker resources for this project
-docker-compose -f docker-compose.dev.yml down -v --rmi all
-
-# Clean up unused Docker resources
-docker system prune -a
-```
-
-#### Viewing Container Logs
-
-```bash
-# View all logs
-docker-compose -f docker-compose.dev.yml logs
-
-# Follow logs in real-time
-docker-compose -f docker-compose.dev.yml logs -f
-
-# View last 100 lines
-docker-compose -f docker-compose.dev.yml logs --tail=100
-
-# View logs since a specific time
-docker-compose -f docker-compose.dev.yml logs --since="2024-01-05T10:00:00"
-
-# View logs for specific service
-docker-compose -f docker-compose.dev.yml logs api
-```
-
-### Useful Commands
-
-#### Container Management
-
-```bash
-# List running containers
-docker-compose -f docker-compose.dev.yml ps
-
-# Execute command in container
-docker-compose -f docker-compose.dev.yml exec api sh
-
-# Attach to container
-docker-compose -f docker-compose.dev.yml attach api
-
-# Restart service
-docker-compose -f docker-compose.dev.yml restart api
-
-# Scale service (run multiple instances)
-docker-compose -f docker-compose.dev.yml up -d --scale api=3
-```
-
-#### Monitoring
-
-```bash
-# View resource usage
-docker stats
-
-# View container details
-docker inspect hookah-db-api
-
-# View container processes
-docker-compose -f docker-compose.dev.yml top
-
-# Check container health
-docker inspect --format='{{.State.Health.Status}}' hookah-db-api
-```
-
-#### Debugging
-
-```bash
-# Run container in debug mode
-docker-compose -f docker-compose.dev.yml run --rm api sh
-
-# View environment variables in container
-docker-compose -f docker-compose.dev.yml exec api env
-
-# View mounted volumes
-docker inspect --format='{{json .Mounts}}' hookah-db-api | jq
-```
-
-#### Maintenance
-
-```bash
-# Update base image
-docker-compose -f docker-compose.dev.yml pull
-
-# Backup database
-cp hookah-db.db hookah-db.db.backup
-
-# Restore database
-cp hookah-db.db.backup hookah-db.db
-
-# View disk usage
-docker system df
-```
-
-#### API Testing
-
-```bash
-# Health check
-curl http://localhost:3000/health
-
-# Detailed health check
-curl http://localhost:3000/health/detailed
-
-# Get brands (requires API key)
-curl -H "X-API-Key: your-api-key" http://localhost:3000/api/v1/brands
-
-# Search brands (requires API key)
-curl -H "X-API-Key: your-api-key" \
-  "http://localhost:3000/api/v1/brands?search=Sarma"
-
-# Get specific brand
-curl -H "X-API-Key: your-api-key" http://localhost:3000/api/v1/brands/sarma
-
-# Get flavors (requires API key)
-curl -H "X-API-Key: your-api-key" http://localhost:3000/api/v1/flavors
-
-# Search flavors (requires API key)
-curl -H "X-API-Key: your-api-key" \
-  "http://localhost:3000/api/v1/flavors?search=Зима"
-
-# Get scheduler stats
-curl -H "X-API-Key: your-api-key" http://localhost:3000/api/v1/scheduler/stats
-
-# Get scheduled jobs
-curl -H "X-API-Key: your-api-key" http://localhost:3000/api/v1/scheduler/jobs
-```
-
-#### Documentation Access
-
-```bash
-# Open Swagger UI in browser (macOS)
-open http://localhost:3000/api-docs
-
-# Open Swagger UI in browser (Linux)
-xdg-open http://localhost:3000/api-docs
-
-# Download OpenAPI specification
-curl http://localhost:3000/api-docs.json -o openapi.json
 ```
 
 ## Available Scripts

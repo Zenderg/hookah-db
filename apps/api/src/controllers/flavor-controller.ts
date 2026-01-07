@@ -75,7 +75,7 @@ export async function getFlavors(req: Request, res: Response): Promise<void> {
     const params: FlavorQueryParams = search ? { search } : {};
 
     // Parse pagination and filtering parameters
-    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const page = Math.max(1, parseInt(req.query.page as string) ||1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
     const brandSlug = req.query.brandSlug as string | undefined;
     const lineSlug = req.query.lineSlug as string | undefined;
@@ -100,15 +100,15 @@ export async function getFlavors(req: Request, res: Response): Promise<void> {
     // Apply additional filters
     if (strength) {
       flavors = flavors.filter(
-        flavor => flavor.userStrength?.toLowerCase() === strength.toLowerCase() ||
-                   flavor.officialStrength?.toLowerCase() === strength.toLowerCase()
+        (flavor: Flavor) => flavor.userStrength?.toLowerCase() === strength.toLowerCase() ||
+                    flavor.officialStrength?.toLowerCase() === strength.toLowerCase()
       );
     }
 
     if (tags) {
       const tagList = tags.split(',').map(tag => tag.trim().toLowerCase());
       flavors = flavors.filter(
-        flavor => tagList.some(tag => 
+        (flavor: Flavor) => tagList.some(tag => 
           flavor.tags.some(flavorTag => flavorTag.toLowerCase() === tag)
         )
       );
@@ -119,7 +119,7 @@ export async function getFlavors(req: Request, res: Response): Promise<void> {
       const isDescending = sort.startsWith('-');
       const sortField = isDescending ? sort.slice(1) : sort;
 
-      flavors.sort((a, b) => {
+      flavors.sort((a: Flavor, b: Flavor) => {
         let comparison = 0;
         
         if (sortField === 'name') {
@@ -181,7 +181,7 @@ export async function getFlavorBySlug(req: Request, res: Response): Promise<void
     // becomes "sarma/klassicheskaya/zima" in req.params.slug
     const slug = req.params.slug;
 
-    // Log the slug for debugging
+    // Log slug for debugging
     logger.debug('Fetching flavor by slug', { slug } as any);
 
     // Get flavor from service
@@ -259,7 +259,7 @@ export async function getFlavorsByBrand(req: Request, res: Response): Promise<vo
 
     // Apply line filter if specified
     if (lineSlug) {
-      flavors = flavors.filter(flavor => flavor.lineSlug === lineSlug);
+      flavors = flavors.filter((flavor: Flavor) => flavor.lineSlug === lineSlug);
     }
 
     // Apply sorting if specified
@@ -267,7 +267,7 @@ export async function getFlavorsByBrand(req: Request, res: Response): Promise<vo
       const isDescending = sort.startsWith('-');
       const sortField = isDescending ? sort.slice(1) : sort;
 
-      flavors.sort((a, b) => {
+      flavors.sort((a: Flavor, b: Flavor) => {
         let comparison = 0;
         
         if (sortField === 'name') {

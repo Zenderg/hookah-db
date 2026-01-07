@@ -17,7 +17,7 @@ import type {
   ScheduledTask as ScheduledTaskInterface
 } from './types';
 import { LoggerFactory } from '@hookah-db/utils';
-import type { DataService } from '@hookah-db/services';
+import { DataService } from '@hookah-db/services';
 import type { SQLiteDatabase } from '@hookah-db/database';
 
 // Initialize logger
@@ -73,7 +73,7 @@ export class Scheduler {
    * @param config Scheduler configuration
    */
   constructor(
-    private dataService: DataService,
+    private dataService: InstanceType<typeof DataService>,
     private _db: SQLiteDatabase, // Stored for future use, available via getDatabase()
     config: SchedulerConfig
   ) {
@@ -125,9 +125,9 @@ export class Scheduler {
         task.cronTask.start();
         task.isRunning = true;
         startedCount++;
-        logger.info('Task started', { 
-          taskName: task.name, 
-          taskId: task.taskId 
+        logger.info('Task started', {
+          taskName: task.name,
+          taskId: task.taskId
         } as any);
       }
     });
@@ -156,9 +156,9 @@ export class Scheduler {
         task.cronTask.stop();
         task.isRunning = false;
         stoppedCount++;
-        logger.info('Task stopped', { 
-          taskName: task.name, 
-          taskId: task.taskId 
+        logger.info('Task stopped', {
+          taskName: task.name,
+          taskId: task.taskId
         } as any);
       }
     });
@@ -227,10 +227,10 @@ export class Scheduler {
       task.isRunning = true;
     }
 
-    logger.info('Task scheduled', { 
-      taskName: config.name, 
-      taskId, 
-      cronExpression: config.cronExpression 
+    logger.info('Task scheduled', {
+      taskName: config.name,
+      taskId,
+      cronExpression: config.cronExpression
     } as any);
 
     return taskId;
@@ -255,9 +255,9 @@ export class Scheduler {
     }
 
     this.tasks.delete(taskId);
-    logger.info('Task unscheduled', { 
-      taskName: task.name, 
-      taskId 
+    logger.info('Task unscheduled', {
+      taskName: task.name,
+      taskId
     } as any);
     return true;
   }
@@ -284,9 +284,9 @@ export class Scheduler {
         task.isRunning = true;
       }
 
-      logger.info('Task enabled', { 
-        taskName: task.name, 
-        taskId 
+      logger.info('Task enabled', {
+        taskName: task.name,
+        taskId
       } as any);
     }
 
@@ -315,9 +315,9 @@ export class Scheduler {
         task.isRunning = false;
       }
 
-      logger.info('Task disabled', { 
-        taskName: task.name, 
-        taskId 
+      logger.info('Task disabled', {
+        taskName: task.name,
+        taskId
       } as any);
     }
 
@@ -500,10 +500,10 @@ export class Scheduler {
     }
 
     const startTime = new Date();
-    logger.info('Starting task', { 
-      taskName, 
-      taskId, 
-      startTime: startTime.toISOString() 
+    logger.info('Starting task', {
+      taskName,
+      taskId,
+      startTime: startTime.toISOString()
     } as any);
 
     try {
@@ -529,10 +529,10 @@ export class Scheduler {
       scheduledTask.executionHistory.push(result);
       this.trimExecutionHistory(scheduledTask);
 
-      logger.info('Task completed successfully', { 
-        taskName, 
-        taskId, 
-        duration 
+      logger.info('Task completed successfully', {
+        taskName,
+        taskId,
+        duration
       } as any);
     } catch (error) {
       const endTime = new Date();
@@ -556,11 +556,11 @@ export class Scheduler {
       scheduledTask.executionHistory.push(result);
       this.trimExecutionHistory(scheduledTask);
 
-      logger.error('Task failed', { 
-        taskName, 
-        taskId, 
-        duration, 
-        error 
+      logger.error('Task failed', {
+        taskName,
+        taskId,
+        duration,
+        error
       } as any);
     }
   }
@@ -673,10 +673,10 @@ export class Scheduler {
 
     const clearedCount = task.executionHistory.length;
     task.executionHistory = [];
-    logger.info('Cleared execution history', { 
-      taskName: task.name, 
-      taskId, 
-      count: clearedCount 
+    logger.info('Cleared execution history', {
+      taskName: task.name,
+      taskId,
+      count: clearedCount
     } as any);
   }
 
