@@ -24,7 +24,7 @@ import { rateLimitMiddleware, authMiddleware } from '../middleware';
  *   - Slug "sarma/klassicheskaya/zima" should be requested as "sarma%2Fklassicheskaya%2Fzima"
  *   - Slug "zima" (no slashes) can be requested as "zima" (no encoding needed)
  */
-const router = Router();
+const router: Router = Router();
 
 // Apply rate limiting to all flavor routes
 router.use(rateLimitMiddleware);

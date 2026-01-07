@@ -1,6 +1,6 @@
 # Multi-stage Dockerfile for Hookah DB API
 # Stage 1: Dependencies
-FROM node:22-alpine AS dependencies
+FROM node:24-alpine AS dependencies
 
 # Set working directory
 WORKDIR /app
@@ -19,7 +19,7 @@ COPY apps ./apps
 COPY tsconfig.json ./
 
 # Stage 2: Development
-FROM node:22-alpine AS development
+FROM node:24-alpine AS development
 
 # Set labels
 LABEL maintainer="Hookah DB Team"
@@ -65,7 +65,7 @@ WORKDIR /app/apps/api
 CMD ["npx", "nodemon", "--watch", "src", "--ext", "ts", "--exec", "npx", "tsx", "src/server.ts"]
 
 # Stage 3: Production Build
-FROM node:22-alpine AS production-build
+FROM node:24-alpine AS production-build
 
 # Set working directory
 WORKDIR /app
@@ -97,7 +97,7 @@ RUN pnpm add -D -w tsx
 RUN pnpm build
 
 # Stage 4: Production Runtime
-FROM node:22-alpine AS production
+FROM node:24-alpine AS production
 
 # Set labels
 LABEL maintainer="Hookah DB Team"
