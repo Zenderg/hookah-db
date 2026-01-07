@@ -18,9 +18,6 @@ COPY apps ./apps
 # Copy TypeScript configuration
 COPY tsconfig.json ./
 
-# Install dependencies with frozen lockfile for reproducible builds
-RUN pnpm install --frozen-lockfile
-
 # Stage 2: Development
 FROM node:22-alpine AS development
 
@@ -90,8 +87,8 @@ COPY apps ./apps
 COPY tsconfig.json ./
 COPY tsconfig.docker.json ./
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
+# Install dependencies (better-sqlite3 uses precompiled binaries for Alpine)
+RUN pnpm install
 
 # Install tsx for production runtime (no JSDoc YAML parsing issues)
 RUN pnpm add -D -w tsx
@@ -130,11 +127,14 @@ COPY apps ./apps
 COPY tsconfig.json ./
 COPY tsconfig.docker.json ./
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
+# Install dependencies (better-sqlite3 uses precompiled binaries for Alpine)
+RUN pnpm install
 
 # Install tsx for production runtime (no JSDoc YAML parsing issues)
 RUN pnpm add -D -w tsx
+
+# Copy node_modules from build stage (includes compiled better-sqlite3 bindings)
+COPY --from=production-build /app/node_modules ./node_modules
 
 # Copy compiled dist/ directories from build stage
 COPY --from=production-build /app/packages/*/dist ./packages/

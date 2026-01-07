@@ -11,13 +11,16 @@ services:
     image: hookah-db-api:latest
     ports:
       - "3000:3000"
+    volumes:
+      # Use named volume for database persistence in production
+      - hookah-db-data:/app/data
     env_file:
       - .env.prod
     environment:
       - NODE_ENV=production
       - PORT=3000
       - LOG_LEVEL=info
-      - DATABASE_PATH=/app/hookah-db.db
+      - DATABASE_PATH=/app/data/hookah-db.db
     restart: always
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
@@ -30,13 +33,13 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-    volumes:
-      # Mount SQLite database for persistence
-      # Create data directory on host if it doesn't exist: mkdir -p data
-      - ./data/hookah-db.db:/app/hookah-db.db
     networks:
       - hookah-db-network
 
 networks:
   hookah-db-network:
     driver: bridge
+
+volumes:
+  hookah-db-data:
+    driver: local
