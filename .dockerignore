@@ -5,6 +5,10 @@
 build/
 **/build/
 
+# Node modules (exclude to force fresh install in container)
+node_modules/
+**/node_modules
+
 # Test files
 tests/
 **/tests/
