@@ -2,7 +2,7 @@
 # Stage 1: Build
 # This stage compiles TypeScript to JavaScript using npm build
 # =============================================================================
-FROM node:22-alpine AS builder
+FROM node:24-alpine AS builder
 
 # Set working directory
 WORKDIR /app
@@ -22,20 +22,14 @@ RUN npm install
 # Build TypeScript to JavaScript
 RUN npm run build
 
-# Verify that JavaScript files were generated
-RUN find /app/dist -name "*.js" | wc -l
-
 # =============================================================================
 # Stage 2: Runtime
 # This stage runs pre-compiled JavaScript for optimal performance
 # =============================================================================
-FROM node:22-alpine AS runtime
+FROM node:24-alpine AS runtime
 
 # Set working directory
 WORKDIR /app
-
-# Install build tools needed for native module compilation
-RUN apk add --no-cache python3 make g++
 
 # Copy package files for production dependency resolution
 COPY package.json ./
@@ -45,10 +39,6 @@ RUN npm install --only=production
 
 # Copy ALL compiled files from build stage (JavaScript + TypeScript declarations + maps)
 COPY --from=builder /app/dist ./dist/
-
-# Rebuild better-sqlite3 native module for runtime platform
-RUN cd /app/node_modules/better-sqlite3 && \
-    npm rebuild --build-from-source
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
