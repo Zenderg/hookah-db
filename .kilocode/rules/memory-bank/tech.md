@@ -219,7 +219,7 @@ hookah-db/
 ├── docs/                       # Documentation
 ├── package.json              # Single package.json
 ├── Dockerfile                  # Docker configuration
-├── docker-compose.yml          # Docker Compose configuration
+├── docker-compose.yaml          # Docker Compose configuration
 ├── jest.config.js             # Jest configuration
 ├── tsconfig.json             # TypeScript configuration
 ├── .nvmrc                  # Node.js version (22)
@@ -247,7 +247,7 @@ The Docker setup uses a 2-stage multi-stage build approach:
 
 **Volumes**:
 - **hookah-db-data**: Named volume for SQLite database persistence
-  - Mount path: /app/hookah-db.db (container)
+  - Mount path: /app/data/hookah-db.db (container)
 
 ### Package Naming Convention
 
@@ -420,7 +420,7 @@ All modules use relative imports (no workspace packages):
 - `NODE_ENV`: Environment (development/production)
 - `PORT`: Container port (default: 3000)
 - `LOG_LEVEL`: Container log level (debug for dev, info for prod)
-- `DATABASE_PATH`: Database path (./hookah-db.db for dev, /app/hookah-db.db for prod)
+- `DATABASE_PATH`: Database path (./hookah-db.db for dev, /app/data/hookah-db.db for prod)
 
 ### Scheduler Configuration
 - `SCHEDULER_ENABLED`: Enable/disable scheduler (default: true)
@@ -447,7 +447,7 @@ All modules use relative imports (no workspace packages):
 - Build all packages with `npm run build`
 - Use Docker Compose for containerized deployment: `docker-compose up -d`
 - Use process manager (PM2, systemd) if not using Docker
-- SQLite database in data directory (/app/hookah-db.db)
+- SQLite database in data directory (/app/data/hookah-db.db)
 - In-memory caching for frequently accessed data
 - Implement proper logging (winston, pino)
 - Set up health check endpoints
@@ -455,11 +455,11 @@ All modules use relative imports (no workspace packages):
 - Use environment-specific configurations (.env)
 
 ### Docker Deployment
-- **Single Configuration**: Use docker-compose.yml for both development and production
+- **Single Configuration**: Use docker-compose.yaml for both development and production
 - **2-Stage Build**: Build stage compiles TypeScript, runtime stage runs pre-compiled JavaScript
 - **Named Volumes**: Use named Docker volumes for database persistence (not bind mounts)
 - **Health Checks**: Configured for Coolify monitoring (30s interval, 10s timeout, 3 retries)
-- **Coolify Deployment**: Single docker-compose.yml required, environment variables via Coolify UI
+- **Coolify Deployment**: Single docker-compose.yaml required, environment variables via Coolify UI
 - **Image Registry**: Push images to Docker Hub or private registry for CI/CD
 - **Orchestration**: Consider Kubernetes or Docker Swarm for larger deployments
 - **Monitoring**: Use container health checks and log aggregation

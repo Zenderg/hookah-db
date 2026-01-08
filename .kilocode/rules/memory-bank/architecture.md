@@ -136,7 +136,7 @@ graph TB
 
 **Volume Management**:
 - **Named Volume**: `hookah-db-data` for SQLite database persistence
-- **Mount Path**: `/app/hookah-db.db` (container)
+- **Mount Path**: `/app/data/hookah-db.db` (container)
 - **Purpose**: Persist database across container restarts
 
 ### Dockerfile Architecture
@@ -167,7 +167,7 @@ The project uses a 2-stage Dockerfile for optimized builds:
 
 ### Docker Compose Configuration
 
-The project uses a single `docker-compose.yml` file for both development and production:
+The project uses a single `docker-compose.yaml` file for both development and production:
 
 **Service Definition**:
 - **API Service**: Single service for API server
@@ -184,7 +184,7 @@ The project uses a single `docker-compose.yml` file for both development and pro
 - **Named Volume**: hookah-db-data
   - Driver: local
   - Purpose: Persistent SQLite database storage
-  - Mount: /app/hookah-db.db
+  - Mount: /app/data/hookah-db.db
 
 **Network Configuration**:
 - **Network**: hookah-db-network
@@ -217,7 +217,7 @@ hookah-db/
 ├── docs/                       # Documentation
 ├── package.json              # Single package.json
 ├── Dockerfile                  # Docker configuration
-├── docker-compose.yml          # Docker Compose configuration
+├── docker-compose.yaml          # Docker Compose configuration
 ├── jest.config.js             # Jest configuration
 ├── tsconfig.json             # TypeScript configuration
 ├── .nvmrc                  # Node.js version (22)
@@ -693,7 +693,7 @@ The API includes comprehensive Swagger/OpenAPI documentation:
   - **Stage 1 - Build**: Installs dependencies and compiles TypeScript to JavaScript
   - **Stage 2 - Runtime**: Copies compiled JavaScript and production dependencies for minimal runtime image
 
-**Docker Compose** ([`docker-compose.yml`](docker-compose.yml:1)):
+**Docker Compose** ([`docker-compose.yaml`](docker-compose.yaml:1)):
   - Single service for API server
   - Named Docker volume for database persistence
   - Health checks for API service

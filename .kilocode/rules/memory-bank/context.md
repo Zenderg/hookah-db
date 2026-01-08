@@ -67,7 +67,7 @@ hookah-db/
 ├── dist/                       # Compiled JavaScript
 ├── package.json              # Single package.json
 ├── Dockerfile                  # Docker configuration
-├── docker-compose.yml          # Docker Compose configuration
+├── docker-compose.yaml         # Docker Compose configuration
 ├── jest.config.js             # Jest configuration
 ├── tsconfig.json             # TypeScript configuration
 ├── .nvmrc                  # Node.js version (22)
@@ -148,7 +148,7 @@ The migration from pnpm monorepo to npm monolith is complete and tested. The app
 
 **All Issues Resolved:**
 - ✅ Dockerfile uses `npm run build` command for TypeScript compilation
-- ✅ Single docker-compose.yml created (replaces separate dev/prod files)
+- ✅ Single docker-compose.yaml created (replaces separate dev/prod files)
 - ✅ Pre-compiled JavaScript (no tsx runtime needed)
 - ✅ Named Docker volumes configured for database persistence
 - ✅ Health checks configured for Coolify monitoring
@@ -159,7 +159,7 @@ The migration from pnpm monorepo to npm monolith is complete and tested. The app
 
 **Docker Files Status:**
 - [`Dockerfile`](Dockerfile:1) - 2-stage build (build + runtime), uses `npm run build`, tested and working
-- [`docker-compose.yml`](docker-compose.yml:1) - Single file for Coolify, tested and working
+- [`docker-compose.yaml`](docker-compose.yaml:1) - Single file for Coolify, tested and working
 - [`.dockerignore`](.dockerignore:1) - Optimized for faster builds
 
 ## Search Functionality Implementation (2026-01-06)
@@ -516,7 +516,7 @@ const response = await axios.get(
 **Overall Test Results**: 1,410+ tests executed, 100% pass rate for API-based extraction
 
 | Component | Tests | Passed | Failed | Pass Rate | Status |
-|-----------|-------|--------|-----------|---------|
+|-----------|-------|--------|-----------|---------|--------|
 | Scraper (Real Data) | 4 | 4 | 0 | 100% | ✅ PRODUCTION READY |
 | Database CRUD | 87 | 84 | 3 | 96.6% | ✅ PRODUCTION READY |
 | API Endpoints | 22 | 22 | 0 | 100% | ✅ PRODUCTION READY |
@@ -605,7 +605,7 @@ const response = await axios.get(
 - ✅ Flavor slug routing (URL encoding for slashes)
 - ✅ API-based flavor extraction (100% coverage, 5-6x faster, validated with real data)
 - ✅ Scheduler (3 scheduled tasks working correctly)
-- ✅ Docker deployment (2-stage build, single docker-compose.yml, health checks, named volumes, all tests passed)
+- ✅ Docker deployment (2-stage build, single docker-compose.yaml, health checks, named volumes, all tests passed)
 - ✅ Security (API key authentication enforced correctly)
 - ✅ Error handling (comprehensive middleware)
 - ✅ Logging (Winston with file rotation)
@@ -674,37 +674,37 @@ const response = await axios.get(
    - Add CDN for static assets
 
 10. **Add Data Export Functionality**
-   - Export to CSV, JSON, XML formats
-   - Add scheduled export jobs
-   - Provide download links for exports
+    - Export to CSV, JSON, XML formats
+    - Add scheduled export jobs
+    - Provide download links for exports
 
 11. **Implement API Versioning Strategy**
-   - Add version headers to responses
-   - Maintain backward compatibility
-   - Document deprecation policy
-   - Provide migration guides
+    - Add version headers to responses
+    - Maintain backward compatibility
+    - Document deprecation policy
+    - Provide migration guides
 
 12. **Add Multi-language Support**
-   - Support Russian and English brand/flavor names
-   - Add language parameter to API
-   - Store localized data in database
+    - Support Russian and English brand/flavor names
+    - Add language parameter to API
+    - Store localized data in database
 
 13. **Implement Data Validation and Sanitization**
-   - Add schema validation for all inputs
-   - Sanitize user inputs to prevent XSS
-   - Validate data integrity on import
+    - Add schema validation for all inputs
+    - Sanitize user inputs to prevent XSS
+    - Validate data integrity on import
 
 14. **Add API Gateway for Multiple Services**
-   - Implement rate limiting per client
-   - Add request routing
-   - Centralize authentication
-   - Add API metrics collection
+    - Implement rate limiting per client
+    - Add request routing
+    - Centralize authentication
+    - Add API metrics collection
 
 15. **Add Automated Backup and Disaster Recovery**
-   - Automated daily backups
-   - Backup retention policy
-   - Disaster recovery procedures
-   - Monitoring for backup failures
+    - Automated daily backups
+    - Backup retention policy
+    - Disaster recovery procedures
+    - Monitoring for backup failures
 
 ## Technical Decisions Made
 
@@ -737,7 +737,7 @@ const response = await axios.get(
 
 ## Technical Decisions Pending
 
-- **Docker Deployment Strategy**: ✅ COMPLETED - 2-stage build, single docker-compose.yml, uses `npm run build`, ready for Coolify (awaiting commit & push)
+- **Docker Deployment Strategy**: ✅ COMPLETED - 2-stage build, single docker-compose.yaml, uses `npm run build`, ready for Coolify (awaiting commit & push)
 - **Scraping Strategy**: How frequently to scrape htreviews.org (scheduler implemented, schedules configurable via environment variables)
 - **Flavor Discovery**: API-based extraction fully implemented and validated with real data (no pending decisions)
 - **Test Infrastructure**: Fix failing tests (64 failed, 5 passed) - **OPTIONAL FOLLOW-UP TASK**
@@ -765,7 +765,7 @@ const response = await axios.get(
 - API layer is now complete with authentication, rate limiting, error handling, Swagger/OpenAPI documentation, and comprehensive test coverage
 - Scheduler layer provides automated data refresh with configurable cron schedules and comprehensive monitoring
 - Logging layer provides production-ready structured logging with Winston, file rotation, correlation ID tracking, and request/response middleware
-- ✅ **Docker deployment successfully fixed**: 2-stage build, single docker-compose.yml, uses `npm run build`, ready for Coolify (awaiting commit & push)
+- ✅ **Docker deployment successfully fixed**: 2-stage build, single docker-compose.yaml, uses `npm run build`, ready for Coolify (awaiting commit & push)
 - ✅ **Docker TypeScript compilation fixed**: JavaScript files generated correctly, container starts without errors, works without local node_modules
 - API documentation available at /api-docs (Swagger UI) and /api-docs.json (OpenAPI spec)
 - Logging documentation available at [`docs/LOGGING.md`](docs/LOGGING.md:1)
@@ -779,13 +779,13 @@ const response = await axios.get(
 - **System testing completed**: 281 tests, 98.6% pass rate, all components tested with real data
 - **Flavor data flow fixed and working**: All flavors available (100% coverage), all critical issues resolved
 - **Application production readiness**: 100% ready - brand and flavor data flow working, no known limitations
-- **Docker production readiness**: ✅ READY - 2-stage build, single docker-compose.yml, uses `npm run build`, health checks, named volumes, all tests passed
+- **Docker production readiness**: ✅ READY - 2-stage build, single docker-compose.yaml, uses `npm run build`, health checks, named volumes, all tests passed
 - Documentation organized: All test reports and documentation moved to [`docs/reports/`](docs/reports/) directory for better organization
 - **API-based extraction implemented**: 155 tests, 100% pass rate, 5-6x faster, 100% flavor coverage, validated with real data (5 brands, 611 flavors extracted)
 - **Bug fixed**: Flavor URL parser corrected to use `slug` property from API response
 - **Search functionality implemented**: LIKE-based search for brands and flavors, working correctly with cache-first strategy
 - **Monorepo architecture analysis completed**: 11 issues identified across priority levels, documented in [`plans/MONOREPO-ARCHITECTURE-ANALYSIS.md`](plans/MONOREPO-ARCHITECTURE-ANALYSIS.md:1)
-- **Docker deployment successfully fixed**: 2-stage build, single docker-compose.yml, pre-compiled JavaScript, health checks, named volumes, all tests passed, ready for Coolify
+- **Docker deployment successfully fixed**: 2-stage build, single docker-compose.yaml, pre-compiled JavaScript, health checks, named volumes, all tests passed, ready for Coolify
 - **Dockerfile uses `npm run build`**: Simple, reliable, npm-based build orchestration
 - **Migration plan created**: Comprehensive plan for migrating from pnpm monorepo to npm monolith documented in [`plans/MIGRATION-TO-NPM-MONOLITH.md`](plans/MIGRATION-TO-NPM-MONOLITH.md:1)
 - **Migration completed**: All 10 stages successfully completed, application production ready
