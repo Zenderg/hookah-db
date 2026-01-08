@@ -2,7 +2,7 @@
 # Stage 1: Build
 # This stage compiles TypeScript to JavaScript using npm build
 # =============================================================================
-FROM node:24-alpine AS builder
+FROM node:22-alpine AS builder
 
 # Set working directory
 WORKDIR /app
@@ -29,7 +29,7 @@ RUN find /app/dist -name "*.js" | wc -l
 # Stage 2: Runtime
 # This stage runs pre-compiled JavaScript for optimal performance
 # =============================================================================
-FROM node:24-alpine AS runtime
+FROM node:22-alpine AS runtime
 
 # Set working directory
 WORKDIR /app
