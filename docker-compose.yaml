@@ -45,7 +45,7 @@ services:
       - EXECUTION_HISTORY_LIMIT=100
       
       # API keys (configure in Coolify UI or .env file)
-      - API_KEY_PRODUCTION=f5cc633145ec9995aaa8ba9f889ee472fe3b32c3a6e2793b426ab5f6f198031d
+      # - API_KEY_PRODUCTION=f5cc633145ec9995aaa8ba9f889ee472fe3b32c3a6e2793b426ab5f6f198031d
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
