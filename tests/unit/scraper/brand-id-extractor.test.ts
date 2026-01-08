@@ -4,12 +4,12 @@
  * Tests for extracting brand ID from brand detail page HTML.
  */
 
-import { BrandIdExtractor } from '@hookah-db/scraper';
-import { Scraper } from '@hookah-db/scraper';
+import { BrandIdExtractor } from '../../src/scraper';
+import { Scraper } from '../../src/scraper';
 import * as cheerio from 'cheerio';
 
 // Mock logger factory
-jest.mock('@hookah-db/utils', () => ({
+jest.mock('../../src/utils', () => ({
   LoggerFactory: {
     createEnvironmentLogger: jest.fn(() => ({
       debug: jest.fn(),
@@ -200,10 +200,10 @@ describe('BrandIdExtractor', () => {
       const mockFetchAndParse = jest.spyOn(mockScraper, 'fetchAndParse')
         .mockResolvedValue(mockCheerioAPI);
 
-      // Create a new extractor with the mocked scraper
+      // Create a new extractor with mocked scraper
       const testExtractor = new BrandIdExtractor();
 
-      // Mock the Scraper constructor to return our mock
+      // Mock Scraper constructor to return our mock
       jest.spyOn<any, any>(testExtractor as any, 'constructor')
         .mockImplementation(function(this: any) {
           this.scraper = mockScraper;

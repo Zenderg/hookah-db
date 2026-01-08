@@ -15,18 +15,18 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { createRequestLoggingMiddleware } from '@hookah-db/api/src/middleware/request-logging-middleware';
-import { createResponseLoggingMiddleware } from '@hookah-db/api/src/middleware/response-logging-middleware';
-import { createLoggingMiddleware } from '@hookah-db/api/src/middleware/logging-middleware';
-import { LoggerFactory } from '@hookah-db/utils';
-import { LogLevel } from '@hookah-db/types';
+import { createRequestLoggingMiddleware } from '../../src/middleware/request-logging-middleware';
+import { createResponseLoggingMiddleware } from '../../src/middleware/response-logging-middleware';
+import { createLoggingMiddleware } from '../../src/middleware/logging-middleware';
+import { LoggerFactory } from '../../src/utils';
+import { LogLevel } from '../../src/types';
 
 // ============================================================================
 // Mock Setup
 // ============================================================================
 
 // Mock LoggerFactory
-jest.mock('@hookah-db/utils', () => {
+jest.mock('../../src/utils', () => {
   return {
     LoggerFactory: {
       createEnvironmentLogger: jest.fn(),

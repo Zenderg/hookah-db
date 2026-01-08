@@ -7,10 +7,8 @@
 - **TypeScript**: Superset of JavaScript for type safety and better developer experience
 
 ### Package Management
-- **pnpm**: Fast, disk space efficient package manager (preferred over npm/yarn)
-- **pnpm Workspaces**: Monorepo workspace management
-- **Turborepo**: Build system for monorepo with intelligent caching and task orchestration
-- **@changesets/cli**: Version management and changelog generation for monorepo packages
+- **npm**: Standard, widely-supported package manager
+- **Single Package**: No workspaces, no Turborepo
 
 ### Containerization
 - **Docker**: Container platform for consistent development and production environments
@@ -39,6 +37,7 @@
 - **Rate Limiting**: express-rate-limit for IP-based rate limiting
 
 ### Database & Caching
+
 **Primary Database**:
 - **SQLite**: Lightweight, self-contained SQL database for persistent storage
 - **better-sqlite3**: Synchronous SQLite driver for Node.js with WAL mode support
@@ -81,6 +80,9 @@
 ### Development Tools
 - **ts-node**: TypeScript execution and REPL
 - **nodemon**: Automatically restart server on file changes during development
+- **jest**: JavaScript testing framework
+- **ts-jest**: TypeScript preprocessor for Jest
+- **supertest**: HTTP assertion library for testing Express.js servers
 - **eslint**: Linting utility for JavaScript/TypeScript (planned)
 - **prettier**: Code formatter (planned)
 
@@ -96,30 +98,33 @@
 
 ### Prerequisites
 - Node.js (LTS version recommended, e.g., 22.x or 24.x)
-- pnpm (install via `npm install -g pnpm`)
+- npm (standard Node.js package manager)
 - Docker (for containerized development and production)
 - Docker Compose (for multi-container orchestration)
 - Git
 
 ### Initial Setup Commands
 ```bash
-# Install all dependencies across workspace
-pnpm install
+# Install dependencies
+npm install
 
-# Build all packages
-pnpm build
+# Build project
+npm run build
 
-# Run specific app in development mode
-pnpm --filter @hookah-db/api dev
+# Run in development mode
+npm run dev
 
-# Run CLI app
-pnpm --filter @hookah-db/cli start
+# Run in production mode
+npm run start
 
-# Type-check all packages
-pnpm type-check
+# Run tests
+npm test
 
-# Clean all build artifacts
-pnpm clean
+# Type check
+npm run type-check
+
+# Clean build artifacts
+npm run clean
 ```
 
 ### Docker Setup
@@ -152,7 +157,7 @@ docker run -p 3000:3000 --env-file .env hookah-db-api:latest
 
 # Execute commands in running container
 docker exec -it hookah-db-api sh
-docker exec -it hookah-db-api node apps/api/dist/server.js
+docker exec -it hookah-db-api node dist/server.js
 
 # View container logs
 docker logs hookah-db-api
@@ -178,49 +183,47 @@ Comprehensive logging documentation is available at [`docs/LOGGING.md`](docs/LOG
 
 ### TypeScript Configuration
 - **tsconfig.json**: Root TypeScript configuration
-- **tsconfig.docker.json**: Docker-specific TypeScript configuration (CommonJS, ES2022, ts-node settings)
-- **packages/tsconfig/base.json**: Base TypeScript config shared across packages
-- **packages/tsconfig/node.json**: Node.js-specific TypeScript config
 - **Strict mode**: Enabled for maximum type safety
-- **Target**: ES2024 or newer
-- **Module system**: CommonJS or ESNext (depending on Node.js version)
+- **Target**: ES2022 or newer
+- **Module system**: CommonJS
+- **rootDir**: ./src (monolithic structure)
+- **outDir**: ./dist (compiled output)
 
 ## Project Structure
 
-### Monorepo Organization
+### Monolithic Organization
 
-The project uses a monorepo structure with pnpm workspaces and Turborepo for build orchestration:
+The project uses a monolithic structure with a single npm package:
 
 ```
 hookah-db/
-├── apps/                  # Application packages
-│   ├── api/               # REST API server
-│   │   ├── src/
-│   │   ├── package.json
-│   │   └── tsconfig.json
-│   └── cli/               # CLI application
-│       ├── src/
-│       ├── package.json
-│       └── tsconfig.json
-├── packages/              # Shared packages
-│   ├── types/             # TypeScript interfaces and types
-│   ├── scraper/           # Web scraping module
-│   ├── parser/            # Data parsing and transformation
-│   ├── cache/             # In-memory caching layer
-│   ├── database/          # SQLite database layer
-│   ├── services/          # Business logic
-│   ├── scheduler/         # Cron job scheduler
-│   ├── utils/             # Utility functions
-│   ├── config/            # Shared configuration
-│   └── tsconfig/          # Shared TypeScript configurations
-├── docs/                 # Documentation
-│   └── LOGGING.md        # Comprehensive logging documentation
-├── Dockerfile             # 2-stage Docker build configuration
-├── docker-compose.yml      # Single Docker Compose configuration
-├── tsconfig.docker.json   # Docker-specific TypeScript configuration
-├── pnpm-workspace.yaml    # pnpm workspace configuration
-├── turbo.json             # Turborepo configuration
-└── package.json           # Root package.json
+├── src/                        # All source code
+│   ├── types/                  # TypeScript types and interfaces
+│   ├── utils/                  # Utilities and logging system
+│   ├── scraper/                # Web scraping module
+│   ├── parser/                 # Data parsing and transformation
+│   ├── cache/                  # In-memory caching layer
+│   ├── database/               # SQLite database layer
+│   ├── services/               # Business logic
+│   ├── scheduler/              # Cron job scheduler
+│   ├── middleware/             # Express middleware
+│   ├── controllers/            # API controllers
+│   ├── routes/                 # API routes
+│   ├── swagger.ts              # Swagger configuration
+│   └── server.ts              # Express server
+├── tests/                      # Tests
+├── dist/                       # Compiled JavaScript
+├── logs/                       # Logs
+├── data/                       # Data (if needed)
+├── examples/                   # Example HTML files
+├── docs/                       # Documentation
+├── package.json              # Single package.json
+├── Dockerfile                  # Docker configuration
+├── docker-compose.yml          # Docker Compose configuration
+├── jest.config.js             # Jest configuration
+├── tsconfig.json             # TypeScript configuration
+├── .nvmrc                  # Node.js version (22)
+└── README.md                # Documentation
 ```
 
 ### Docker Architecture
@@ -228,7 +231,7 @@ hookah-db/
 The Docker setup uses a 2-stage multi-stage build approach:
 
 **Stages**:
-1. **Build**: Installs all dependencies and compiles TypeScript to JavaScript using `pnpm build`
+1. **Build**: Installs all dependencies and compiles TypeScript to JavaScript using `npm run build`
 2. **Runtime**: Copies compiled JavaScript and production dependencies for minimal runtime image
 
 **Services** (Docker Compose):
@@ -236,7 +239,7 @@ The Docker setup uses a 2-stage multi-stage build approach:
   - Pre-compiled JavaScript for fast startup
   - Health checks configured (30s interval, 10s timeout, 3 retries)
   - SQLite database in named volume for persistence
-  - Non-root user (nodejs:nodejs) for security
+  - Non-root user (nodejs:nodejs)
   - Restart policy: unless-stopped
 
 **Networks**:
@@ -248,38 +251,23 @@ The Docker setup uses a 2-stage multi-stage build approach:
 
 ### Package Naming Convention
 
-All packages use the `@hookah-db/*` naming convention:
-- `@hookah-db/api` - REST API server
-- `@hookah-db/cli` - CLI application
-- `@hookah-db/types` - TypeScript types and interfaces
-- `@hookah-db/scraper` - Web scraping module
-- `@hookah-db/parser` - Data parsing module
-- `@hookah-db/cache` - In-memory caching layer
-- `@hookah-db/database` - SQLite database layer
-- `@hookah-db/services` - Business logic services
-- `@hookah-db/scheduler` - Cron job scheduler
-- `@hookah-db/utils` - Utility functions and logging system
-- `@hookah-db/config` - Shared configuration
-- `@hookah-db/tsconfig` - Shared TypeScript configurations
-
-### Workspace Dependencies
-
-Packages use `workspace:*` protocol to reference other packages in monorepo:
-
-```json
-{
-  "dependencies": {
-    "@hookah-db/types": "workspace:*",
-    "@hookah-db/utils": "workspace:*"
-  }
-}
-```
+All modules use relative imports (no workspace packages):
+- Types: `../types`
+- Utils: `../utils`
+- Scraper: `../scraper`
+- Parser: `../parser`
+- Cache: `../cache`
+- Database: `../database`
+- Services: `../services`
+- Scheduler: `../scheduler`
+- Middleware: `../middleware`
+- Controllers: `../controllers`
+- Routes: `../routes`
 
 ### Build Process
 
 **Local Development**:
-- Use `pnpm --filter @hookah-db/api dev` to run specific apps in development mode
-- Turborepo handles dependency graph and parallel execution
+- Use `npm run dev` to run in development mode
 - Automatic rebuilds on file changes (via nodemon/ts-node)
 
 **Docker Development**:
@@ -295,16 +283,14 @@ Packages use `workspace:*` protocol to reference other packages in monorepo:
 - Pre-compiled JavaScript for fast startup (~20-30 seconds)
 
 **Build All**:
-- `pnpm build` - Builds all packages in dependency order
-- Turborepo caches build artifacts for faster subsequent builds
+- `npm run build` - Compiles TypeScript to JavaScript
 - TypeScript compilation to JavaScript
 
 **Type Checking**:
-- `pnpm type-check` - Type-checks all packages
-- Can be run on individual packages: `pnpm --filter @hookah-db/api type-check`
+- `npm run type-check` - Type-checks all source code
 
 **Clean**:
-- `pnpm clean` - Removes all build artifacts and cache
+- `npm run clean` - Removes all build artifacts and cache
 
 ## Technical Constraints
 
@@ -379,11 +365,11 @@ Packages use `workspace:*` protocol to reference other packages in monorepo:
 - Pagination for large datasets
 - Filtering and sorting capabilities
 
-### Monorepo Development
-- Use `pnpm --filter <package>` to run commands on specific packages
-- Turborepo automatically handles dependency ordering
-- Shared types and utilities are imported via `@hookah-db/*` packages
-- Changes to shared packages trigger rebuilds of dependent packages
+### Monolithic Development
+- Use `npm run dev` to run in development mode
+- Use relative imports instead of workspace packages
+- Changes to any module require rebuilding
+- All source code in src/ directory
 
 ### Logging Best Practices
 - Use appropriate log levels (error, warn, info, http, verbose, debug, silly)
@@ -451,14 +437,14 @@ Packages use `workspace:*` protocol to reference other packages in monorepo:
 ## Deployment Considerations
 
 ### Development
-- Use `pnpm --filter @hookah-db/api dev` for hot-reloading
+- Use `npm run dev` for hot-reloading
 - Run with `ts-node` for TypeScript support
 - SQLite database in project root (./hookah-db.db)
 - In-memory caching for frequently accessed data
 - Or use Docker: `docker-compose up`
 
 ### Production
-- Build all packages with `pnpm build`
+- Build all packages with `npm run build`
 - Use Docker Compose for containerized deployment: `docker-compose up -d`
 - Use process manager (PM2, systemd) if not using Docker
 - SQLite database in data directory (/app/hookah-db.db)
@@ -493,7 +479,7 @@ Packages use `workspace:*` protocol to reference other packages in monorepo:
 - Monitor container health and restarts
 - Track Docker resource usage (CPU, memory, disk I/O)
 
-## Installed Dependencies (as of 2026-01-06)
+## Installed Dependencies (as of 2026-01-08)
 
 ### Core Dependencies
 - cheerio: 1.1.2
@@ -503,53 +489,29 @@ Packages use `workspace:*` protocol to reference other packages in monorepo:
 - winston: 3.19.0
 - winston-daily-rotate-file: 5.0.0
 - better-sqlite3: Latest
+- node-cache: 5.1.2
+- node-cron: 3.0.3
+- uuid: 9.0.1
+- express-rate-limit: 7.5.0
+- swagger-ui-express: 5.0.1
+- swagger-jsdoc: 6.2.8
+- dotenv: 17.2.3
 
 ### Build & Workspace Tools
-- turbo: 2.4.4
-- @changesets/cli: 2.27.1
-
-### TypeScript & Type Definitions
 - typescript: 5.9.3
 - @types/node: 25.0.3
 - @types/express: 5.0.6
 - @types/jest: 30.0.0
 - @types/supertest: 6.0.3
 - @types/winston: 2.4.4
-
-### Development Tools
-- nodemon: 3.1.11
+- @types/uuid: 9.0.8
+- @types/swagger-jsdoc: 6.0.4
+- @types/swagger-ui-express: 4.1.7
+- @types/express-rate-limit: 7.1.0
+- @types/node-cron: 3.0.11
+- @types/node-cache: 4.2.5
 - ts-node: 10.9.2
+- nodemon: 3.1.11
 - jest: 30.2.0
 - ts-jest: 29.4.6
 - supertest: 7.1.4
-
-### API Documentation
-- swagger-jsdoc: 6.2.8
-- swagger-ui-express: 5.0.1
-- @types/swagger-jsdoc: 6.0.4
-- @types/swagger-ui-express: 4.1.7
-
-### Security & Rate Limiting
-- express-rate-limit: 7.5.0
-- @types/express-rate-limit: 7.1.0
-
-### Caching
-- node-cache: 5.1.2
-- @types/node-cache: 4.2.5
-
-### Database
-- better-sqlite3: Latest
-
-### Scheduler
-- node-cron: 3.0.3
-- @types/node-cron: 3.0.11
-
-### Logging
-- winston: 3.19.0
-- winston-daily-rotate-file: 5.0.0
-- @types/winston: 2.4.4
-- uuid: 9.0.1
-- @types/uuid: 9.0.8
-
-### Environment & Configuration
-- dotenv: latest

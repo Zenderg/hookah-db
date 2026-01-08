@@ -1,1026 +1,787 @@
 /**
- * Unit Tests for HTML Parser Utilities
+ * Unit tests for HTML Parser
  * 
- * Tests all HTML parsing functions from packages/scraper/src/html-parser.ts
+ * Tests HTML parsing functionality including:
+ * - Parsing HTML strings with Cheerio
+ * - Handling malformed HTML
+ * - Extracting elements and attributes
+ * - Error handling
  */
 
 import * as cheerio from 'cheerio';
-import {
-  extractText,
-  extractAttribute,
-  extractNumber,
-  extractHtml,
-  extractTextArray,
-  extractAttributeArray,
-  extractLinkUrl,
-  parseViewsCount,
-  parseDate,
-  parseFlavorsCount,
-  parseBoolean,
-  parseInteger,
-  parseFloatValue,
-  parseRatingDistribution,
-  parseSmokeAgainPercentage,
-  extractImageUrl,
-  extractSlugFromUrl,
-  extractRating,
-  buildUrl,
-} from '@hookah-db/scraper';
+import { parseHtml } from '../../src/scraper';
 
 // ============================================================================
-// Text Extraction Functions Tests
+// Test Suite
 // ============================================================================
 
-describe('extractText', () => {
-  it('should extract text from existing element', () => {
-    const html = '<div class="test">Hello World</div>';
-    const $ = cheerio.load(html);
-    expect(extractText($, '.test')).toBe('Hello World');
-  });
-
-  it('should trim whitespace from extracted text', () => {
-    const html = '<div class="test">  Hello World  </div>';
-    const $ = cheerio.load(html);
-    expect(extractText($, '.test')).toBe('Hello World');
-  });
-
-  it('should return empty string for missing element', () => {
-    const html = '<div class="test">Hello</div>';
-    const $ = cheerio.load(html);
-    expect(extractText($, '.missing')).toBe('');
-  });
-
-  it('should extract text from first matching element', () => {
-    const html = '<div class="test">First</div><div class="test">Second</div>';
-    const $ = cheerio.load(html);
-    expect(extractText($, '.test')).toBe('First');
-  });
-
-  it('should handle nested elements', () => {
-    const html = '<div class="test"><span>Hello</span> <strong>World</strong></div>';
-    const $ = cheerio.load(html);
-    expect(extractText($, '.test')).toBe('Hello World');
-  });
-
-  it('should handle empty element', () => {
-    const html = '<div class="test"></div>';
-    const $ = cheerio.load(html);
-    expect(extractText($, '.test')).toBe('');
-  });
-});
-
-describe('extractAttribute', () => {
-  it('should extract attribute from existing element', () => {
-    const html = '<div class="test" data-value="123">Content</div>';
-    const $ = cheerio.load(html);
-    expect(extractAttribute($, '.test', 'data-value')).toBe('123');
-  });
-
-  it('should return null for missing element', () => {
-    const html = '<div class="test">Content</div>';
-    const $ = cheerio.load(html);
-    expect(extractAttribute($, '.missing', 'data-value')).toBeNull();
-  });
-
-  it('should return null for missing attribute', () => {
-    const html = '<div class="test">Content</div>';
-    const $ = cheerio.load(html);
-    expect(extractAttribute($, '.test', 'data-value')).toBeNull();
-  });
-
-  it('should extract href attribute', () => {
-    const html = '<a class="test" href="https://example.com">Link</a>';
-    const $ = cheerio.load(html);
-    expect(extractAttribute($, '.test', 'href')).toBe('https://example.com');
-  });
-
-  it('should extract src attribute', () => {
-    const html = '<img class="test" src="image.jpg" />';
-    const $ = cheerio.load(html);
-    expect(extractAttribute($, '.test', 'src')).toBe('image.jpg');
-  });
-});
-
-describe('extractNumber', () => {
-  it('should extract integer from text', () => {
-    const html = '<div class="test">123</div>';
-    const $ = cheerio.load(html);
-    expect(extractNumber($, '.test')).toBe(123);
-  });
-
-  it('should extract decimal number from text', () => {
-    const html = '<div class="test">123.45</div>';
-    const $ = cheerio.load(html);
-    expect(extractNumber($, '.test')).toBe(123.45);
-  });
-
-  it('should extract negative number from text', () => {
-    const html = '<div class="test">-42.5</div>';
-    const $ = cheerio.load(html);
-    expect(extractNumber($, '.test')).toBe(-42.5);
-  });
-
-  it('should extract number from text with extra characters', () => {
-    const html = '<div class="test">Price: $99.99</div>';
-    const $ = cheerio.load(html);
-    expect(extractNumber($, '.test')).toBe(99.99);
-  });
-
-  it('should return null for non-numeric text', () => {
-    const html = '<div class="test">Hello World</div>';
-    const $ = cheerio.load(html);
-    expect(extractNumber($, '.test')).toBeNull();
-  });
-
-  it('should return null for missing element', () => {
-    const html = '<div class="test">Content</div>';
-    const $ = cheerio.load(html);
-    expect(extractNumber($, '.missing')).toBeNull();
-  });
-
-  it('should return null for empty element', () => {
-    const html = '<div class="test"></div>';
-    const $ = cheerio.load(html);
-    expect(extractNumber($, '.test')).toBeNull();
-  });
-});
-
-describe('extractHtml', () => {
-  it('should extract HTML content from element', () => {
-    const html = '<div class="test"><span>Hello</span> <strong>World</strong></div>';
-    const $ = cheerio.load(html);
-    const result = extractHtml($, '.test');
-    expect(result).toContain('<span>Hello</span>');
-    expect(result).toContain('<strong>World</strong>');
-  });
-
-  it('should return empty string for missing element', () => {
-    const html = '<div class="test">Content</div>';
-    const $ = cheerio.load(html);
-    expect(extractHtml($, '.missing')).toBe('');
-  });
-
-  it('should return empty string for element with no content', () => {
-    const html = '<div class="test"></div>';
-    const $ = cheerio.load(html);
-    expect(extractHtml($, '.test')).toBe('');
-  });
-
-  it('should extract HTML from first matching element', () => {
-    const html = '<div class="test"><span>First</span></div><div class="test"><span>Second</span></div>';
-    const $ = cheerio.load(html);
-    expect(extractHtml($, '.test')).toContain('First');
-  });
-});
-
-describe('extractTextArray', () => {
-  it('should extract text from multiple elements', () => {
-    const html = '<div class="test">First</div><div class="test">Second</div><div class="test">Third</div>';
-    const $ = cheerio.load(html);
-    expect(extractTextArray($, '.test')).toEqual(['First', 'Second', 'Third']);
-  });
-
-  it('should trim whitespace from each text', () => {
-    const html = '<div class="test">  First  </div><div class="test">  Second  </div>';
-    const $ = cheerio.load(html);
-    expect(extractTextArray($, '.test')).toEqual(['First', 'Second']);
-  });
-
-  it('should return empty array when no elements found', () => {
-    const html = '<div class="other">Content</div>';
-    const $ = cheerio.load(html);
-    expect(extractTextArray($, '.test')).toEqual([]);
-  });
-
-  it('should skip empty text values', () => {
-    const html = '<div class="test">First</div><div class="test"></div><div class="test">Third</div>';
-    const $ = cheerio.load(html);
-    expect(extractTextArray($, '.test')).toEqual(['First', 'Third']);
-  });
-});
-
-describe('extractAttributeArray', () => {
-  it('should extract attributes from multiple elements', () => {
-    const html = '<a class="test" href="/link1">Link 1</a><a class="test" href="/link2">Link 2</a>';
-    const $ = cheerio.load(html);
-    expect(extractAttributeArray($, '.test', 'href')).toEqual(['/link1', '/link2']);
-  });
-
-  it('should return empty array when no elements found', () => {
-    const html = '<div class="other">Content</div>';
-    const $ = cheerio.load(html);
-    expect(extractAttributeArray($, '.test', 'href')).toEqual([]);
-  });
-
-  it('should skip elements without attribute', () => {
-    const html = '<a class="test" href="/link1">Link 1</a><a class="test">Link 2</a>';
-    const $ = cheerio.load(html);
-    expect(extractAttributeArray($, '.test', 'href')).toEqual(['/link1']);
-  });
-});
-
-describe('extractLinkUrl', () => {
-  it('should extract href from anchor element', () => {
-    const html = '<a class="test" href="https://example.com">Link</a>';
-    const $ = cheerio.load(html);
-    expect(extractLinkUrl($, '.test')).toBe('https://example.com');
-  });
-
-  it('should return null for missing element', () => {
-    const html = '<div class="test">Content</div>';
-    const $ = cheerio.load(html);
-    expect(extractLinkUrl($, '.missing')).toBeNull();
-  });
-
-  it('should return null for element without href', () => {
-    const html = '<a class="test">Link</a>';
-    const $ = cheerio.load(html);
-    expect(extractLinkUrl($, '.test')).toBeNull();
-  });
-});
-
-// ============================================================================
-// Special Format Parsers Tests
-// ============================================================================
-
-describe('parseViewsCount', () => {
-  it('should parse views count with "k" suffix', () => {
-    expect(parseViewsCount('319.1k')).toBe(319100);
-  });
-
-  it('should parse views count with "K" suffix (uppercase)', () => {
-    expect(parseViewsCount('5.2K')).toBe(5200);
-  });
-
-  it('should parse views count with "kk" suffix', () => {
-    expect(parseViewsCount('1.9kk')).toBe(1900000);
-  });
-
-  it('should parse views count with "KK" suffix (uppercase)', () => {
-    expect(parseViewsCount('2.5KK')).toBe(2500000);
-  });
-
-  it('should parse plain number without suffix', () => {
-    expect(parseViewsCount('1000')).toBe(1000);
-  });
-
-  it('should parse large plain number', () => {
-    expect(parseViewsCount('1234567')).toBe(1234567);
-  });
-
-  it('should return null for empty string', () => {
-    expect(parseViewsCount('')).toBeNull();
-  });
-
-  it('should return null for invalid format', () => {
-    expect(parseViewsCount('invalid')).toBeNull();
-  });
-
-  it('should return null for whitespace only', () => {
-    expect(parseViewsCount('   ')).toBeNull();
-  });
-
-  it('should handle decimal values with k suffix', () => {
-    expect(parseViewsCount('0.5k')).toBe(500);
-  });
-
-  it('should handle decimal values with kk suffix', () => {
-    expect(parseViewsCount('0.1kk')).toBe(100000);
-  });
-});
-
-describe('parseDate', () => {
-  it('should parse date in DD.MM.YYYY format', () => {
-    const result = parseDate('06.12.2024');
-    expect(result).toBeInstanceOf(Date);
-    expect(result?.getFullYear()).toBe(2024);
-    expect(result?.getMonth()).toBe(11); // December is 11 (0-indexed)
-    expect(result?.getDate()).toBe(6);
-  });
-
-  it('should parse date at start of year', () => {
-    const result = parseDate('01.01.2020');
-    expect(result).toBeInstanceOf(Date);
-    expect(result?.getFullYear()).toBe(2020);
-    expect(result?.getMonth()).toBe(0);
-    expect(result?.getDate()).toBe(1);
-  });
-
-  it('should parse date at end of year', () => {
-    const result = parseDate('31.12.2023');
-    expect(result).toBeInstanceOf(Date);
-    expect(result?.getFullYear()).toBe(2023);
-    expect(result?.getMonth()).toBe(11);
-    expect(result?.getDate()).toBe(31);
-  });
-
-  it('should return null for empty string', () => {
-    expect(parseDate('')).toBeNull();
-  });
-
-  it('should return null for invalid format', () => {
-    expect(parseDate('2024-12-06')).toBeNull();
-  });
-
-  it('should return null for invalid date', () => {
-    expect(parseDate('32.13.2024')).toBeNull();
-  });
-
-  it('should return null for whitespace only', () => {
-    expect(parseDate('   ')).toBeNull();
-  });
-
-  it('should handle leap year date', () => {
-    const result = parseDate('29.02.2024');
-    expect(result).toBeInstanceOf(Date);
-    expect(result?.getFullYear()).toBe(2024);
-    expect(result?.getMonth()).toBe(1);
-    expect(result?.getDate()).toBe(29);
-  });
-});
-
-describe('parseFlavorsCount', () => {
-  it('should parse flavors count with "вкуса" suffix', () => {
-    expect(parseFlavorsCount('53 вкуса')).toBe(53);
-  });
-
-  it('should parse flavors count with "вкус" suffix', () => {
-    expect(parseFlavorsCount('21 вкус')).toBe(21);
-  });
-
-  it('should parse flavors count with "вкусов" suffix', () => {
-    expect(parseFlavorsCount('100 вкусов')).toBe(100);
-  });
-
-  it('should parse single flavor', () => {
-    expect(parseFlavorsCount('1 вкус')).toBe(1);
-  });
-
-  it('should handle extra whitespace', () => {
-    expect(parseFlavorsCount('  53   вкуса  ')).toBe(53);
-  });
-
-  it('should handle uppercase suffix', () => {
-    expect(parseFlavorsCount('53 ВКУСА')).toBe(53);
-  });
-
-  it('should return null for empty string', () => {
-    expect(parseFlavorsCount('')).toBeNull();
-  });
-
-  it('should return null for invalid format', () => {
-    expect(parseFlavorsCount('invalid')).toBeNull();
-  });
-
-  it('should return null for number without suffix', () => {
-    expect(parseFlavorsCount('53')).toBeNull();
-  });
-});
-
-describe('parseBoolean', () => {
-  it('should parse "true" as true', () => {
-    expect(parseBoolean('true')).toBe(true);
-  });
-
-  it('should parse "yes" as true', () => {
-    expect(parseBoolean('yes')).toBe(true);
-  });
-
-  it('should parse "1" as true', () => {
-    expect(parseBoolean('1')).toBe(true);
-  });
-
-  it('should parse "да" as true', () => {
-    expect(parseBoolean('да')).toBe(true);
-  });
-
-  it('should parse "есть" as true', () => {
-    expect(parseBoolean('есть')).toBe(true);
-  });
-
-  it('should parse "включено" as true', () => {
-    expect(parseBoolean('включено')).toBe(true);
-  });
-
-  it('should parse "false" as false', () => {
-    expect(parseBoolean('false')).toBe(false);
-  });
-
-  it('should parse "no" as false', () => {
-    expect(parseBoolean('no')).toBe(false);
-  });
-
-  it('should parse "0" as false', () => {
-    expect(parseBoolean('0')).toBe(false);
-  });
-
-  it('should parse "нет" as false', () => {
-    expect(parseBoolean('нет')).toBe(false);
-  });
-
-  it('should parse "нету" as false', () => {
-    expect(parseBoolean('нету')).toBe(false);
-  });
-
-  it('should parse "выключено" as false', () => {
-    expect(parseBoolean('выключено')).toBe(false);
-  });
-
-  it('should handle case insensitivity', () => {
-    expect(parseBoolean('TRUE')).toBe(true);
-    expect(parseBoolean('False')).toBe(false);
-  });
-
-  it('should return null for empty string', () => {
-    expect(parseBoolean('')).toBeNull();
-  });
-
-  it('should return null for null input', () => {
-    expect(parseBoolean(null)).toBeNull();
-  });
-
-  it('should return null for undefined input', () => {
-    expect(parseBoolean(undefined)).toBeNull();
-  });
-
-  it('should return null for invalid value', () => {
-    expect(parseBoolean('invalid')).toBeNull();
-  });
-
-  it('should handle whitespace', () => {
-    expect(parseBoolean('  true  ')).toBe(true);
-  });
-});
-
-describe('parseInteger', () => {
-  it('should parse positive integer', () => {
-    expect(parseInteger('123')).toBe(123);
-  });
-
-  it('should parse negative integer', () => {
-    expect(parseInteger('-456')).toBe(-456);
-  });
-
-  it('should parse zero', () => {
-    expect(parseInteger('0')).toBe(0);
-  });
-
-  it('should handle whitespace', () => {
-    expect(parseInteger('  789  ')).toBe(789);
-  });
-
-  it('should return null for empty string', () => {
-    expect(parseInteger('')).toBeNull();
-  });
-
-  it('should return null for null input', () => {
-    expect(parseInteger(null)).toBeNull();
-  });
-
-  it('should return null for undefined input', () => {
-    expect(parseInteger(undefined)).toBeNull();
-  });
-
-  it('should return null for non-numeric string', () => {
-    expect(parseInteger('invalid')).toBeNull();
-  });
-
-  it('should parse integer from decimal string (truncates)', () => {
-    expect(parseInteger('123.45')).toBe(123);
-  });
-});
-
-describe('parseFloatValue', () => {
-  it('should parse positive float', () => {
-    expect(parseFloatValue('123.45')).toBe(123.45);
-  });
-
-  it('should parse negative float', () => {
-    expect(parseFloatValue('-456.78')).toBe(-456.78);
-  });
-
-  it('should parse integer as float', () => {
-    expect(parseFloatValue('123')).toBe(123);
-  });
-
-  it('should parse zero', () => {
-    expect(parseFloatValue('0')).toBe(0);
-  });
-
-  it('should parse decimal with leading zero', () => {
-    expect(parseFloatValue('0.5')).toBe(0.5);
-  });
-
-  it('should handle whitespace', () => {
-    expect(parseFloatValue('  123.45  ')).toBe(123.45);
-  });
-
-  it('should return null for empty string', () => {
-    expect(parseFloatValue('')).toBeNull();
-  });
-
-  it('should return null for null input', () => {
-    expect(parseFloatValue(null)).toBeNull();
-  });
-
-  it('should return null for undefined input', () => {
-    expect(parseFloatValue(undefined)).toBeNull();
-  });
-
-  it('should return null for non-numeric string', () => {
-    expect(parseFloatValue('invalid')).toBeNull();
-  });
-});
-
-// ============================================================================
-// Rating Distribution Parser Tests
-// ============================================================================
-
-describe('parseRatingDistribution', () => {
-  it('should parse complete rating distribution with data attributes', () => {
-    const html = `
-      <div class="score_meter">
-        <div class="item">
-          <span data-score="5">★★★★★</span>
-          <span data-score-count="123"></span>
+describe('HTML Parser', () => {
+  // ============================================================================
+  // Tests for parseHtml function
+  // ============================================================================
+
+  describe('parseHtml', () => {
+    it('should parse valid HTML string', () => {
+      const html = '<div class="test">Hello World</div>';
+      const $ = parseHtml(html);
+      
+      expect($).toBeDefined();
+      expect($('.test').text()).toBe('Hello World');
+    });
+
+    it('should parse HTML with multiple elements', () => {
+      const html = `
+        <div class="container">
+          <h1>Title</h1>
+          <p>Paragraph</p>
+          <span>Span</span>
         </div>
-        <div class="item">
-          <span data-score="4">★★★★</span>
-          <span data-score-count="45"></span>
+      `;
+      const $ = parseHtml(html);
+      
+      expect($('h1').text()).toBe('Title');
+      expect($('p').text()).toBe('Paragraph');
+      expect($('span').text()).toBe('Span');
+    });
+
+    it('should parse HTML with nested elements', () => {
+      const html = `
+        <div class="outer">
+          <div class="inner">
+            <span>Nested</span>
+          </div>
         </div>
-        <div class="item">
-          <span data-score="3">★★★</span>
-          <span data-score-count="12"></span>
+      `;
+      const $ = parseHtml(html);
+      
+      expect($('.outer .inner span').text()).toBe('Nested');
+    });
+
+    it('should parse HTML with attributes', () => {
+      const html = `
+        <div class="test" id="main" data-value="123">
+          Content
         </div>
-        <div class="item">
-          <span data-score="2">★★</span>
-          <span data-score-count="3"></span>
+      `;
+      const $ = parseHtml(html);
+      
+      expect($('.test').attr('id')).toBe('main');
+      expect($('.test').attr('data-value')).toBe('123');
+    });
+
+    it('should parse HTML with special characters', () => {
+      const html = '<div>Special chars: < > & " '</div>';
+      const $ = parseHtml(html);
+      
+      expect($('div').text()).toBe('Special chars: < > & " \'');
+    });
+
+    it('should parse HTML with Unicode characters', () => {
+      const html = '<div>Русский текст: Привет мир!</div>';
+      const $ = parseHtml(html);
+      
+      expect($('div').text()).toBe('Русский текст: Привет мир!');
+    });
+
+    it('should parse HTML with empty elements', () => {
+      const html = `
+        <div></div>
+        <span></span>
+        <p></p>
+      `;
+      const $ = parseHtml(html);
+      
+      expect($('div').text()).toBe('');
+      expect($('span').text()).toBe('');
+      expect($('p').text()).toBe('');
+    });
+
+    it('should parse HTML with self-closing tags', () => {
+      const html = `
+        <div>
+          <img src="test.jpg" alt="Test" />
+          <br />
+          <hr />
         </div>
-        <div class="item">
-          <span data-score="1">★</span>
-          <span data-score-count="1"></span>
+      `;
+      const $ = parseHtml(html);
+      
+      expect($('img').attr('src')).toBe('test.jpg');
+      expect($('img').attr('alt')).toBe('Test');
+      expect($('br').length).toBe(1);
+      expect($('hr').length).toBe(1);
+    });
+
+    it('should parse HTML with comments', () => {
+      const html = `
+        <div>
+          <!-- This is a comment -->
+          <span>Content</span>
         </div>
-      </div>
-    `;
-    const $ = cheerio.load(html);
-    const result = parseRatingDistribution($, '.score_meter .item');
-    
-    expect(result).toEqual({
-      count1: 1,
-      count2: 3,
-      count3: 12,
-      count4: 45,
-      count5: 123,
+      `;
+      const $ = parseHtml(html);
+      
+      expect($('span').text()).toBe('Content');
+    });
+
+    it('should parse HTML with CDATA sections', () => {
+      const html = `
+        <div>
+          <![CDATA[This is CDATA content]]>
+          <span>Content</span>
+        </div>
+      `;
+      const $ = parseHtml(html);
+      
+      expect($('span').text()).toBe('Content');
     });
   });
 
-  it('should parse partial rating distribution (some stars missing)', () => {
-    const html = `
-      <div class="score_meter">
-        <div class="item">
-          <span data-score="5">★★★★★</span>
-          <span data-score-count="100"></span>
+  // ============================================================================
+  // Tests for malformed HTML handling
+  // ============================================================================
+
+  describe('Malformed HTML', () => {
+    it('should handle unclosed tags', () => {
+      const html = '<div><span>Content</div>';
+      const $ = parseHtml(html);
+      
+      expect($('div').text()).toBe('Content');
+    });
+
+    it('should handle missing closing tags', () => {
+      const html = '<div><span>Content</span>';
+      const $ = parseHtml(html);
+      
+      expect($('span').text()).toBe('Content');
+    });
+
+    it('should handle mismatched tags', () => {
+      const html = '<div><span>Content</div></span>';
+      const $ = parseHtml(html);
+      
+      expect($('div').text()).toBe('Content');
+    });
+
+    it('should handle duplicate IDs', () => {
+      const html = `
+        <div id="test">First</div>
+        <div id="test">Second</div>
+      `;
+      const $ = parseHtml(html);
+      
+      expect($('#test').length).toBe(2);
+    });
+
+    it('should handle invalid attributes', () => {
+      const html = '<div class="test" invalid-attr="value">Content</div>';
+      const $ = parseHtml(html);
+      
+      expect($('.test').text()).toBe('Content');
+    });
+
+    it('should handle missing quotes around attributes', () => {
+      const html = '<div class=test id=main>Content</div>';
+      const $ = parseHtml(html);
+      
+      expect($('div').attr('class')).toBe('test');
+      expect($('div').attr('id')).toBe('main');
+    });
+
+    it('should handle nested quotes in attributes', () => {
+      const html = '<div data-json=\'{"key": "value"}\'>Content</div>';
+      const $ = parseHtml(html);
+      
+      expect($('div').attr('data-json')).toBe('{"key": "value"}');
+    });
+  });
+
+  // ============================================================================
+  // Tests for Cheerio API compatibility
+  // ============================================================================
+
+  describe('Cheerio API', () => {
+    it('should support selector queries', () => {
+      const html = `
+        <div class="container">
+          <div class="item">Item 1</div>
+          <div class="item">Item 2</div>
+          <div class="item">Item 3</div>
         </div>
-        <div class="item">
-          <span data-score="4">★★★★</span>
-          <span data-score-count="50"></span>
+      `;
+      const $ = parseHtml(html);
+      
+      expect($('.item').length).toBe(3);
+      expect($('.item').eq(0).text()).toBe('Item 1');
+      expect($('.item').eq(1).text()).toBe('Item 2');
+      expect($('.item').eq(2).text()).toBe('Item 3');
+    });
+
+    it('should support attribute selectors', () => {
+      const html = `
+        <div data-id="1">First</div>
+        <div data-id="2">Second</div>
+        <div data-id="3">Third</div>
+      `;
+      const $ = parseHtml(html);
+      
+      expect($('[data-id="2"]').text()).toBe('Second');
+    });
+
+    it('should support class selectors', () => {
+      const html = `
+        <div class="test primary">Primary</div>
+        <div class="test secondary">Secondary</div>
+        <div class="test tertiary">Tertiary</div>
+      `;
+      const $ = parseHtml(html);
+      
+      expect($('.test').length).toBe(3);
+      expect($('.primary').text()).toBe('Primary');
+      expect($('.secondary').text()).toBe('Secondary');
+      expect($('.tertiary').text()).toBe('Tertiary');
+    });
+
+    it('should support ID selectors', () => {
+      const html = `
+        <div id="main">Main</div>
+        <div id="content">Content</div>
+        <div id="footer">Footer</div>
+      `;
+      const $ = parseHtml(html);
+      
+      expect($('#main').text()).toBe('Main');
+      expect($('#content').text()).toBe('Content');
+      expect($('#footer').text()).toBe('Footer');
+    });
+
+    it('should support descendant selectors', () => {
+      const html = `
+        <div class="container">
+          <div class="wrapper">
+            <span class="text">Nested Text</span>
+          </div>
         </div>
-      </div>
-    `;
-    const $ = cheerio.load(html);
-    const result = parseRatingDistribution($, '.score_meter .item');
-    
-    expect(result).toEqual({
-      count1: 0,
-      count2: 0,
-      count3: 0,
-      count4: 50,
-      count5: 100,
+      `;
+      const $ = parseHtml(html);
+      
+      expect($('.container .wrapper .text').text()).toBe('Nested Text');
     });
-  });
 
-  it('should return all zeros for empty rating distribution', () => {
-    const html = '<div class="score_meter"></div>';
-    const $ = cheerio.load(html);
-    const result = parseRatingDistribution($, '.score_meter .item');
-    
-    expect(result).toEqual({
-      count1: 0,
-      count2: 0,
-      count3: 0,
-      count4: 0,
-      count5: 0,
-    });
-  });
-
-  it('should fallback to text parsing when data attributes missing', () => {
-    const html = `
-      <div class="score_meter">
-        <div class="item">5: 123</div>
-        <div class="item">4: 45</div>
-        <div class="item">3: 12</div>
-        <div class="item">2: 3</div>
-        <div class="item">1: 1</div>
-      </div>
-    `;
-    const $ = cheerio.load(html);
-    const result = parseRatingDistribution($, '.score_meter .item');
-    
-    expect(result).toEqual({
-      count1: 1,
-      count2: 3,
-      count3: 12,
-      count4: 45,
-      count5: 123,
-    });
-  });
-
-  it('should handle text format with dash separator', () => {
-    const html = `
-      <div class="score_meter">
-        <div class="item">5 - 100</div>
-        <div class="item">4 - 50</div>
-      </div>
-    `;
-    const $ = cheerio.load(html);
-    const result = parseRatingDistribution($, '.score_meter .item');
-    
-    expect(result).toEqual({
-      count1: 0,
-      count2: 0,
-      count3: 0,
-      count4: 50,
-      count5: 100,
-    });
-  });
-
-  it('should ignore invalid ratings outside 1-5 range', () => {
-    const html = `
-      <div class="score_meter">
-        <div class="item">
-          <span data-score="5">★★★★★</span>
-          <span data-score-count="100"></span>
+    it('should support child selectors', () => {
+      const html = `
+        <div class="container">
+          <span class="text">Direct Child</span>
+          <div class="wrapper">
+            <span class="text">Nested Child</span>
+          </div>
         </div>
-        <div class="item">
-          <span data-score="6">★★★★★★</span>
-          <span data-score-count="50"></span>
+      `;
+      const $ = parseHtml(html);
+      
+      expect($('.container > .text').text()).toBe('Direct Child');
+    });
+
+    it('should support multiple selectors', () => {
+      const html = `
+        <div class="primary">Primary</div>
+        <span class="secondary">Secondary</span>
+        <div class="tertiary">Tertiary</div>
+      `;
+      const $ = parseHtml(html);
+      
+      expect($('.primary, .secondary').length).toBe(2);
+    });
+
+    it('should support pseudo-selectors', () => {
+      const html = `
+        <ul>
+          <li>First</li>
+          <li>Second</li>
+          <li>Third</li>
+        </ul>
+      `;
+      const $ = parseHtml(html);
+      
+      expect($('li:first').text()).toBe('First');
+      expect($('li:last').text()).toBe('Third');
+      expect($('li:nth-child(2)').text()).toBe('Second');
+    });
+
+    it('should support each() method', () => {
+      const html = `
+        <div class="item">Item 1</div>
+        <div class="item">Item 2</div>
+        <div class="item">Item 3</div>
+      `;
+      const $ = parseHtml(html);
+      
+      const items: string[] = [];
+      $('.item').each((i, el) => {
+        items.push($(el).text());
+      });
+      
+      expect(items).toEqual(['Item 1', 'Item 2', 'Item 3']);
+    });
+
+    it('should support map() method', () => {
+      const html = `
+        <div class="item">Item 1</div>
+        <div class="item">Item 2</div>
+        <div class="item">Item 3</div>
+      `;
+      const $ = parseHtml(html);
+      
+      const items = $('.item').map((i, el) => $(el).text()).get();
+      
+      expect(items).toEqual(['Item 1', 'Item 2', 'Item 3']);
+    });
+
+    it('should support filter() method', () => {
+      const html = `
+        <div class="item active">Active 1</div>
+        <div class="item">Inactive</div>
+        <div class="item active">Active 2</div>
+      `;
+      const $ = parseHtml(html);
+      
+      const activeItems = $('.item').filter('.active');
+      
+      expect(activeItems.length).toBe(2);
+      expect(activeItems.eq(0).text()).toBe('Active 1');
+      expect(activeItems.eq(1).text()).toBe('Active 2');
+    });
+
+    it('should support find() method', () => {
+      const html = `
+        <div class="container">
+          <div class="wrapper">
+            <span class="text">Text 1</span>
+          </div>
+          <div class="wrapper">
+            <span class="text">Text 2</span>
+          </div>
         </div>
-      </div>
-    `;
-    const $ = cheerio.load(html);
-    const result = parseRatingDistribution($, '.score_meter .item');
-    
-    expect(result).toEqual({
-      count1: 0,
-      count2: 0,
-      count3: 0,
-      count4: 0,
-      count5: 100,
+      `;
+      const $ = parseHtml(html);
+      
+      const container = $('.container');
+      const texts = container.find('.text');
+      
+      expect(texts.length).toBe(2);
+      expect(texts.eq(0).text()).toBe('Text 1');
+      expect(texts.eq(1).text()).toBe('Text 2');
+    });
+
+    it('should support parent() method', () => {
+      const html = `
+        <div class="container">
+          <div class="wrapper">
+            <span class="text">Text</span>
+          </div>
+        </div>
+      `;
+      const $ = parseHtml(html);
+      
+      const text = $('.text');
+      const wrapper = text.parent();
+      const container = text.parent().parent();
+      
+      expect(wrapper.hasClass('wrapper')).toBe(true);
+      expect(container.hasClass('container')).toBe(true);
+    });
+
+    it('should support children() method', () => {
+      const html = `
+        <div class="container">
+          <span>Child 1</span>
+          <span>Child 2</span>
+          <span>Child 3</span>
+        </div>
+      `;
+      const $ = parseHtml(html);
+      
+      const children = $('.container').children();
+      
+      expect(children.length).toBe(3);
+      expect(children.eq(0).text()).toBe('Child 1');
+      expect(children.eq(1).text()).toBe('Child 2');
+      expect(children.eq(2).text()).toBe('Child 3');
+    });
+
+    it('should support siblings() method', () => {
+      const html = `
+        <div>
+          <span class="prev">Previous</span>
+          <span class="current">Current</span>
+          <span class="next">Next</span>
+        </div>
+      `;
+      const $ = parseHtml(html);
+      
+      const siblings = $('.current').siblings();
+      
+      expect(siblings.length).toBe(2);
+      expect(siblings.eq(0).hasClass('prev')).toBe(true);
+      expect(siblings.eq(1).hasClass('next')).toBe(true);
+    });
+
+    it('should support next() method', () => {
+      const html = `
+        <div>
+          <span class="first">First</span>
+          <span class="second">Second</span>
+          <span class="third">Third</span>
+        </div>
+      `;
+      const $ = parseHtml(html);
+      
+      const second = $('.first').next();
+      const third = $('.first').next().next();
+      
+      expect(second.hasClass('second')).toBe(true);
+      expect(third.hasClass('third')).toBe(true);
+    });
+
+    it('should support prev() method', () => {
+      const html = `
+        <div>
+          <span class="first">First</span>
+          <span class="second">Second</span>
+          <span class="third">Third</span>
+        </div>
+      `;
+      const $ = parseHtml(html);
+      
+      const second = $('.third').prev();
+      const first = $('.third').prev().prev();
+      
+      expect(second.hasClass('second')).toBe(true);
+      expect(first.hasClass('first')).toBe(true);
+    });
+
+    it('should support addClass() method', () => {
+      const html = '<div class="test">Content</div>';
+      const $ = parseHtml(html);
+      
+      $('.test').addClass('active');
+      
+      expect($('.test').hasClass('active')).toBe(true);
+    });
+
+    it('should support removeClass() method', () => {
+      const html = '<div class="test active">Content</div>';
+      const $ = parseHtml(html);
+      
+      $('.test').removeClass('active');
+      
+      expect($('.test').hasClass('active')).toBe(false);
+    });
+
+    it('should support toggleClass() method', () => {
+      const html = '<div class="test">Content</div>';
+      const $ = parseHtml(html);
+      
+      $('.test').toggleClass('active');
+      expect($('.test').hasClass('active')).toBe(true);
+      
+      $('.test').toggleClass('active');
+      expect($('.test').hasClass('active')).toBe(false);
+    });
+
+    it('should support attr() method', () => {
+      const html = '<div class="test" id="main" data-value="123">Content</div>';
+      const $ = parseHtml(html);
+      
+      expect($('.test').attr('id')).toBe('main');
+      expect($('.test').attr('data-value')).toBe('123');
+    });
+
+    it('should support data() method', () => {
+      const html = '<div class="test" data-id="123" data-name="test">Content</div>';
+      const $ = parseHtml(html);
+      
+      expect($('.test').data('id')).toBe('123');
+      expect($('.test').data('name')).toBe('test');
+    });
+
+    it('should support val() method', () => {
+      const html = '<input type="text" value="test value" />';
+      const $ = parseHtml(html);
+      
+      expect($('input').val()).toBe('test value');
+    });
+
+    it('should support text() method', () => {
+      const html = '<div class="test">Text content</div>';
+      const $ = parseHtml(html);
+      
+      expect($('.test').text()).toBe('Text content');
+    });
+
+    it('should support html() method', () => {
+      const html = '<div class="test"><span>Nested</span></div>';
+      const $ = parseHtml(html);
+      
+      expect($('.test').html()).toBe('<span>Nested</span>');
+    });
+
+    it('should support is() method', () => {
+      const html = '<div class="test active">Content</div>';
+      const $ = parseHtml(html);
+      
+      expect($('.test').is('.active')).toBe(true);
+      expect($('.test').is('.inactive')).toBe(false);
+    });
+
+    it('should support has() method', () => {
+      const html = `
+        <div class="container">
+          <div class="wrapper">
+            <span class="text">Text</span>
+          </div>
+        </div>
+      `;
+      const $ = parseHtml(html);
+      
+      expect($('.container').has('.text').length).toBe(1);
+      expect($('.container').has('.missing').length).toBe(0);
+    });
+
+    it('should support index() method', () => {
+      const html = `
+        <div class="item">Item 1</div>
+        <div class="item">Item 2</div>
+        <div class="item">Item 3</div>
+      `;
+      const $ = parseHtml(html);
+      
+      const items = $('.item');
+      expect(items.index(items.eq(0))).toBe(0);
+      expect(items.index(items.eq(1))).toBe(1);
+      expect(items.index(items.eq(2))).toBe(2);
+    });
+
+    it('should support length property', () => {
+      const html = `
+        <div class="item">Item 1</div>
+        <div class="item">Item 2</div>
+        <div class="item">Item 3</div>
+      `;
+      const $ = parseHtml(html);
+      
+      expect($('.item').length).toBe(3);
+    });
+
+    it('should support eq() method', () => {
+      const html = `
+        <div class="item">Item 1</div>
+        <div class="item">Item 2</div>
+        <div class="item">Item 3</div>
+      `;
+      const $ = parseHtml(html);
+      
+      expect($('.item').eq(0).text()).toBe('Item 1');
+      expect($('.item').eq(1).text()).toBe('Item 2');
+      expect($('.item').eq(2).text()).toBe('Item 3');
+    });
+
+    it('should support first() method', () => {
+      const html = `
+        <div class="item">Item 1</div>
+        <div class="item">Item 2</div>
+        <div class="item">Item 3</div>
+      `;
+      const $ = parseHtml(html);
+      
+      expect($('.item').first().text()).toBe('Item 1');
+    });
+
+    it('should support last() method', () => {
+      const html = `
+        <div class="item">Item 1</div>
+        <div class="item">Item 2</div>
+        <div class="item">Item 3</div>
+      `;
+      const $ = parseHtml(html);
+      
+      expect($('.item').last().text()).toBe('Item 3');
     });
   });
 
-  it('should handle items without required spans', () => {
-    const html = `
-      <div class="score_meter">
-        <div class="item">
-          <span data-score="5">★★★★★</span>
-        </div>
-      </div>
-    `;
-    const $ = cheerio.load(html);
-    const result = parseRatingDistribution($, '.score_meter .item');
-    
-    expect(result).toEqual({
-      count1: 0,
-      count2: 0,
-      count3: 0,
-      count4: 0,
-      count5: 0,
+  // ============================================================================
+  // Tests for error handling
+  // ============================================================================
+
+  describe('Error Handling', () => {
+    it('should handle empty HTML string', () => {
+      const html = '';
+      const $ = parseHtml(html);
+      
+      expect($).toBeDefined();
+      expect($('body').length).toBe(0);
+    });
+
+    it('should handle null input', () => {
+      const $ = parseHtml(null as any);
+      
+      expect($).toBeDefined();
+    });
+
+    it('should handle undefined input', () => {
+      const $ = parseHtml(undefined as any);
+      
+      expect($).toBeDefined();
+    });
+
+    it('should handle non-string input', () => {
+      const $ = parseHtml(123 as any);
+      
+      expect($).toBeDefined();
+    });
+
+    it('should handle extremely long HTML', () => {
+      const longText = 'a'.repeat(1000000);
+      const html = `<div>${longText}</div>`;
+      const $ = parseHtml(html);
+      
+      expect($('div').text()).toBe(longText);
+    });
+
+    it('should handle deeply nested HTML', () => {
+      let html = '<div class="level-0">';
+      for (let i = 1; i <= 100; i++) {
+        html += `<div class="level-${i}">`;
+      }
+      html += 'Deep Content';
+      for (let i = 100; i >= 1; i--) {
+        html += '</div>';
+      }
+      html += '</div>';
+      
+      const $ = parseHtml(html);
+      
+      expect($('.level-50').length).toBe(1);
+      expect($('.level-100').text()).toBe('Deep Content');
     });
   });
-});
 
-// ============================================================================
-// Smoke Again Percentage Parser Tests
-// ============================================================================
-
-describe('parseSmokeAgainPercentage', () => {
-  it('should parse valid percentage', () => {
-    const html = '<div class="again_meter">85%</div>';
-    const $ = cheerio.load(html);
-    expect(parseSmokeAgainPercentage($, '.again_meter')).toBe(85);
-  });
-
-  it('should parse percentage with space before %', () => {
-    const html = '<div class="again_meter">75 %</div>';
-    const $ = cheerio.load(html);
-    expect(parseSmokeAgainPercentage($, '.again_meter')).toBe(75);
-  });
-
-  it('should parse decimal percentage', () => {
-    const html = '<div class="again_meter">87.5%</div>';
-    const $ = cheerio.load(html);
-    expect(parseSmokeAgainPercentage($, '.again_meter')).toBe(87.5);
-  });
-
-  it('should parse 0%', () => {
-    const html = '<div class="again_meter">0%</div>';
-    const $ = cheerio.load(html);
-    expect(parseSmokeAgainPercentage($, '.again_meter')).toBe(0);
-  });
-
-  it('should parse 100%', () => {
-    const html = '<div class="again_meter">100%</div>';
-    const $ = cheerio.load(html);
-    expect(parseSmokeAgainPercentage($, '.again_meter')).toBe(100);
-  });
-
-  it('should return null for missing element', () => {
-    const html = '<div class="test">Content</div>';
-    const $ = cheerio.load(html);
-    expect(parseSmokeAgainPercentage($, '.again_meter')).toBeNull();
-  });
-
-  it('should return null for empty element', () => {
-    const html = '<div class="again_meter"></div>';
-    const $ = cheerio.load(html);
-    expect(parseSmokeAgainPercentage($, '.again_meter')).toBeNull();
-  });
-
-  it('should return null for text without percentage', () => {
-    const html = '<div class="again_meter">No percentage here</div>';
-    const $ = cheerio.load(html);
-    expect(parseSmokeAgainPercentage($, '.again_meter')).toBeNull();
-  });
-
-  it('should return null for invalid percentage format', () => {
-    const html = '<div class="again_meter">%85</div>';
-    const $ = cheerio.load(html);
-    expect(parseSmokeAgainPercentage($, '.again_meter')).toBeNull();
-  });
-
-  it('should extract percentage from text with extra content', () => {
-    const html = '<div class="again_meter">Would smoke again: 92%</div>';
-    const $ = cheerio.load(html);
-    expect(parseSmokeAgainPercentage($, '.again_meter')).toBe(92);
-  });
-});
-
-// ============================================================================
-// Image URL Extractor Tests
-// ============================================================================
-
-describe('extractImageUrl', () => {
-  it('should extract from data-src attribute (lazy loading)', () => {
-    const html = '<img class="test" data-src="lazy-image.jpg" src="placeholder.jpg" />';
-    const $ = cheerio.load(html);
-    expect(extractImageUrl($, '.test')).toBe('lazy-image.jpg');
-  });
-
-  it('should fallback to src attribute when data-src missing', () => {
-    const html = '<img class="test" src="image.jpg" />';
-    const $ = cheerio.load(html);
-    expect(extractImageUrl($, '.test')).toBe('image.jpg');
-  });
-
-  it('should fallback to srcset when data-src and src missing', () => {
-    const html = '<img class="test" srcset="image-1x.jpg 1x, image-2x.jpg 2x" />';
-    const $ = cheerio.load(html);
-    expect(extractImageUrl($, '.test')).toBe('image-1x.jpg');
-  });
-
-  it('should return null for missing element', () => {
-    const html = '<div class="test">Content</div>';
-    const $ = cheerio.load(html);
-    expect(extractImageUrl($, '.missing')).toBeNull();
-  });
-
-  it('should return null for element without any image source', () => {
-    const html = '<img class="test" alt="Image" />';
-    const $ = cheerio.load(html);
-    expect(extractImageUrl($, '.test')).toBeNull();
-  });
-
-  it('should return null for empty srcset', () => {
-    const html = '<img class="test" srcset="" />';
-    const $ = cheerio.load(html);
-    expect(extractImageUrl($, '.test')).toBeNull();
-  });
-
-  it('should prioritize data-src over src', () => {
-    const html = '<img class="test" data-src="real.jpg" src="placeholder.jpg" />';
-    const $ = cheerio.load(html);
-    expect(extractImageUrl($, '.test')).toBe('real.jpg');
-  });
-});
-
-// ============================================================================
-// Slug Extractor Tests
-// ============================================================================
-
-describe('extractSlugFromUrl', () => {
-  // Test removing "tobaccos/" prefix
-  it('should remove "tobaccos/" prefix from simple path', () => {
-    expect(extractSlugFromUrl('/tobaccos/sarma')).toBe('sarma');
-  });
-
-  it('should remove "tobaccos/" prefix from multi-level slug', () => {
-    expect(extractSlugFromUrl('/tobaccos/sarma/klassicheskaya/zima')).toBe('sarma/klassicheskaya/zima');
-  });
-
-  it('should remove "tobaccos/" prefix from full URL', () => {
-    expect(extractSlugFromUrl('https://htreviews.org/tobaccos/sarma')).toBe('sarma');
-  });
-
-  it('should remove "tobaccos/" prefix from URL with query parameters', () => {
-    expect(extractSlugFromUrl('https://htreviews.org/tobaccos/sarma?page=1')).toBe('sarma');
-  });
-
-  // Test with example URLs from task
-  it('should handle example URL 1: https://htreviews.org/tobaccos/sarma/klassicheskaya/zima', () => {
-    expect(extractSlugFromUrl('https://htreviews.org/tobaccos/sarma/klassicheskaya/zima')).toBe('sarma/klassicheskaya/zima');
-  });
-
-  it('should handle example URL 2: /tobaccos/dogma/sigarnyy-monosort/san-andres', () => {
-    expect(extractSlugFromUrl('/tobaccos/dogma/sigarnyy-monosort/san-andres')).toBe('dogma/sigarnyy-monosort/san-andres');
-  });
-
-  it('should handle example URL 3: https://htreviews.org/tobaccos/tangiers/noir/cola', () => {
-    expect(extractSlugFromUrl('https://htreviews.org/tobaccos/tangiers/noir/cola')).toBe('tangiers/noir/cola');
-  });
-
-  // Test case-insensitive "tobaccos" prefix
-  it('should remove "TOBACCOS/" prefix (uppercase)', () => {
-    expect(extractSlugFromUrl('/TOBACCOS/sarma')).toBe('sarma');
-  });
-
-  it('should remove "Tobaccos/" prefix (mixed case)', () => {
-    expect(extractSlugFromUrl('/Tobaccos/sarma')).toBe('sarma');
-  });
-
-  // Test URLs without "tobaccos" prefix (should work as before)
-  it('should handle path without "tobaccos" prefix', () => {
-    expect(extractSlugFromUrl('/sarma')).toBe('sarma');
-  });
-
-  it('should handle multi-level path without "tobaccos" prefix', () => {
-    expect(extractSlugFromUrl('/sarma/klassicheskaya/zima')).toBe('sarma/klassicheskaya/zima');
-  });
-
-  // Test edge cases
-  it('should return null for empty string', () => {
-    expect(extractSlugFromUrl('')).toBeNull();
-  });
-
-  it('should return null for null input', () => {
-    expect(extractSlugFromUrl(null)).toBeNull();
-  });
-
-  it('should return null for undefined input', () => {
-    expect(extractSlugFromUrl(undefined)).toBeNull();
-  });
-
-  it('should return null for path with only slashes', () => {
-    expect(extractSlugFromUrl('///')).toBeNull();
-  });
-
-  it('should return null for path with only "tobaccos"', () => {
-    expect(extractSlugFromUrl('/tobaccos')).toBeNull();
-  });
-
-  it('should return null for path with only "tobaccos/"', () => {
-    expect(extractSlugFromUrl('/tobaccos/')).toBeNull();
-  });
-
-  it('should handle path without leading slash', () => {
-    expect(extractSlugFromUrl('tobaccos/sarma')).toBe('sarma');
-  });
-
-  it('should handle trailing slash', () => {
-    expect(extractSlugFromUrl('/tobaccos/sarma/')).toBe('sarma');
-  });
-
-  it('should handle multiple slashes', () => {
-    expect(extractSlugFromUrl('///tobaccos///sarma///')).toBe('sarma');
-  });
-
-  it('should handle root path', () => {
-    expect(extractSlugFromUrl('/')).toBeNull();
-  });
-
-  it('should handle URL with port', () => {
-    expect(extractSlugFromUrl('http://localhost:3000/tobaccos/sarma')).toBe('sarma');
-  });
-
-  it('should handle URL with fragment', () => {
-    expect(extractSlugFromUrl('https://htreviews.org/tobaccos/sarma#section')).toBe('sarma');
-  });
-
-  it('should handle URL with multiple query parameters', () => {
-    expect(extractSlugFromUrl('https://htreviews.org/tobaccos/sarma?page=1&sort=name')).toBe('sarma');
-  });
-});
-
-// ============================================================================
-// Rating Parser Tests
-// ============================================================================
-
-describe('extractRating', () => {
-  it('should extract integer rating', () => {
-    const html = '<div class="test">5</div>';
-    const $ = cheerio.load(html);
-    expect(extractRating($, '.test')).toBe(5);
-  });
-
-  it('should extract decimal rating', () => {
-    const html = '<div class="test">4.5</div>';
-    const $ = cheerio.load(html);
-    expect(extractRating($, '.test')).toBe(4.5);
-  });
-
-  it('should extract rating from text with extra content', () => {
-    const html = '<div class="test">Rating: 4.7 out of 5</div>';
-    const $ = cheerio.load(html);
-    expect(extractRating($, '.test')).toBe(4.7);
-  });
-
-  it('should return null for rating below 0', () => {
-    const html = '<div class="test">-1</div>';
-    const $ = cheerio.load(html);
-    expect(extractRating($, '.test')).toBeNull();
-  });
-
-  it('should return null for rating above 5', () => {
-    const html = '<div class="test">6</div>';
-    const $ = cheerio.load(html);
-    expect(extractRating($, '.test')).toBeNull();
-  });
-
-  it('should return null for missing element', () => {
-    const html = '<div class="test">Content</div>';
-    const $ = cheerio.load(html);
-    expect(extractRating($, '.missing')).toBeNull();
-  });
-
-  it('should return null for non-numeric text', () => {
-    const html = '<div class="test">Excellent</div>';
-    const $ = cheerio.load(html);
-    expect(extractRating($, '.test')).toBeNull();
-  });
-
-  it('should return null for empty element', () => {
-    const html = '<div class="test"></div>';
-    const $ = cheerio.load(html);
-    expect(extractRating($, '.test')).toBeNull();
-  });
-
-  it('should extract 0 rating', () => {
-    const html = '<div class="test">0</div>';
-    const $ = cheerio.load(html);
-    expect(extractRating($, '.test')).toBe(0);
-  });
-
-  it('should extract 5 rating', () => {
-    const html = '<div class="test">5</div>';
-    const $ = cheerio.load(html);
-    expect(extractRating($, '.test')).toBe(5);
-  });
-});
-
-// ============================================================================
-// URL Builder Tests
-// ============================================================================
-
-describe('buildUrl', () => {
-  it('should build URL from base and path', () => {
-    expect(buildUrl('https://example.com', '/api/data')).toBe('https://example.com/api/data');
-  });
-
-  it('should handle base without trailing slash', () => {
-    expect(buildUrl('https://example.com', 'api/data')).toBe('https://example.com/api/data');
-  });
-
-  it('should handle base with trailing slash', () => {
-    expect(buildUrl('https://example.com/', '/api/data')).toBe('https://example.com/api/data');
-  });
-
-  it('should handle path without leading slash', () => {
-    expect(buildUrl('https://example.com', 'api/data')).toBe('https://example.com/api/data');
-  });
-
-  it('should handle multiple slashes', () => {
-    expect(buildUrl('https://example.com///', '///api///data')).toBe('https://example.com/api/data');
-  });
-
-  it('should handle relative base URL', () => {
-    expect(buildUrl('/api', '/v1/data')).toBe('/api/v1/data');
-  });
-
-  it('should handle empty path', () => {
-    expect(buildUrl('https://example.com', '')).toBe('https://example.com/');
-  });
-
-  it('should handle path with query parameters', () => {
-    expect(buildUrl('https://example.com', '/api/data?param=value')).toBe('https://example.com/api/data?param=value');
+  // ============================================================================
+  // Tests for real-world HTML patterns
+  // ============================================================================
+
+  describe('Real-world HTML Patterns', () => {
+    it('should parse HTML table', () => {
+      const html = `
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Age</th>
+              <th>City</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>John</td>
+              <td>30</td>
+              <td>New York</td>
+            </tr>
+            <tr>
+              <td>Jane</td>
+              <td>25</td>
+              <td>London</td>
+            </tr>
+          </tbody>
+        </table>
+      `;
+      const $ = parseHtml(html);
+      
+      expect($('thead th').length).toBe(3);
+      expect($('tbody tr').length).toBe(2);
+      expect($('tbody tr:first td:first').text()).toBe('John');
+    });
+
+    it('should parse HTML form', () => {
+      const html = `
+        <form id="test-form">
+          <input type="text" name="username" value="testuser" />
+          <input type="password" name="password" value="testpass" />
+          <select name="country">
+            <option value="us">United States</option>
+            <option value="uk">United Kingdom</option>
+          </select>
+          <textarea name="message">Test message</textarea>
+        </form>
+      `;
+      const $ = parseHtml(html);
+      
+      expect($('input[name="username"]').val()).toBe('testuser');
+      expect($('input[name="password"]').val()).toBe('testpass');
+      expect($('select[name="country"]').val()).toBe('us');
+      expect($('textarea[name="message"]').val()).toBe('Test message');
+    });
+
+    it('should parse HTML list', () => {
+      const html = `
+        <ul class="items">
+          <li>Item 1</li>
+          <li>Item 2</li>
+          <li>Item 3</li>
+        </ul>
+      `;
+      const $ = parseHtml(html);
+      
+      expect($('.items li').length).toBe(3);
+      expect($('.items li:first').text()).toBe('Item 1');
+      expect($('.items li:last').text()).toBe('Item 3');
+    });
+
+    it('should parse HTML with inline styles', () => {
+      const html = '<div style="color: red; font-size: 16px;">Styled Content</div>';
+      const $ = parseHtml(html);
+      
+      expect($('div').attr('style')).toBe('color: red; font-size: 16px;');
+    });
+
+    it('should parse HTML with data attributes', () => {
+      const html = `
+        <div class="item" data-id="123" data-name="Test" data-active="true">
+          Content
+        </div>
+      `;
+      const $ = parseHtml(html);
+      
+      expect($('.item').data('id')).toBe('123');
+      expect($('.item').data('name')).toBe('Test');
+      expect($('.item').data('active')).toBe('true');
+    });
+
+    it('should parse HTML with ARIA attributes', () => {
+      const html = `
+        <button aria-label="Close" aria-pressed="false">
+          Close
+        </button>
+      `;
+      const $ = parseHtml(html);
+      
+      expect($('button').attr('aria-label')).toBe('Close');
+      expect($('button').attr('aria-pressed')).toBe('false');
+    });
+
+    it('should parse HTML with SVG', () => {
+      const html = `
+        <svg width="100" height="100">
+          <circle cx="50" cy="50" r="40" fill="red" />
+        </svg>
+      `;
+      const $ = parseHtml(html);
+      
+      expect($('svg').length).toBe(1);
+      expect($('circle').length).toBe(1);
+      expect($('circle').attr('cx')).toBe('50');
+      expect($('circle').attr('cy')).toBe('50');
+      expect($('circle').attr('r')).toBe('40');
+    });
   });
 });

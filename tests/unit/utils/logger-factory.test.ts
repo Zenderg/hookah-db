@@ -15,9 +15,9 @@
  * - createCombinedLogger() combined logger
  */
 
-import { LoggerFactory } from '@hookah-db/utils';
-import { Logger } from '@hookah-db/utils';
-import { LogLevel, LogFormat, TransportType } from '@hookah-db/types';
+import { LoggerFactory } from '../../../src/utils';
+import { Logger } from '../../../src/utils';
+import { LogLevel, LogFormat, TransportType } from '../../../src/types';
 
 // ============================================================================
 // Mock Setup
@@ -35,8 +35,8 @@ const mockLoggerInstance = {
 };
 
 // Mock Logger class
-jest.mock('@hookah-db/utils', () => {
-  const actualModule = jest.requireActual('@hookah-db/utils');
+jest.mock('../../../src/utils', () => {
+  const actualModule = jest.requireActual('../../../src/utils');
   return {
     ...actualModule,
     Logger: {

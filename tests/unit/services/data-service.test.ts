@@ -12,18 +12,18 @@
  * - Error handling and fallback behavior
  */
 
-import { DataService } from '@hookah-db/services';
-import { BrandService } from '@hookah-db/services';
-import { FlavorService } from '@hookah-db/services';
-import { Brand, Flavor } from '@hookah-db/types';
+import { DataService } from '../../src/services';
+import { BrandService } from '../../src/services';
+import { FlavorService } from '../../src/services';
+import { Brand, Flavor } from '../../src/types';
 
 // ============================================================================
 // Mock Setup
 // ============================================================================
 
 // Mock services
-jest.mock('@hookah-db/services', () => {
-  const originalModule = jest.requireActual('@hookah-db/services');
+jest.mock('../../src/services', () => {
+  const originalModule = jest.requireActual('../../src/services');
   return {
     ...originalModule,
     BrandService: jest.fn().mockImplementation(() => ({
@@ -933,7 +933,7 @@ describe('DataService', () => {
 
       // Assert
       expect(result).toHaveLength(1);
-      expect(result[0].slug).toBe('sarma/klassicheskaya/zima');
+      expect(result[0].slug).toBe('sarma/klassicheskaya/zима');
     });
   });
 

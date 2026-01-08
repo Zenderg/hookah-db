@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
-import { SQLiteDatabase } from '@hookah-db/database';
-import type { Brand, Flavor } from '@hookah-db/types';
+import { SQLiteDatabase } from '../../src/database';
+import type { Brand, Flavor } from '../../src/types';
 
 describe('SQLiteDatabase', () => {
   const testDbPath = path.join(__dirname, '../../test-data', 'test-hookah-db.db');
@@ -265,7 +265,7 @@ describe('SQLiteDatabase', () => {
 
       expect(retrieved).not.toBeNull();
       expect(retrieved?.dateAdded).toBeInstanceOf(Date);
-      
+
       // Test date formatting
       const isoString = retrieved?.dateAdded.toISOString();
       expect(isoString).toBe('2024-01-15T10:30:00.000Z');
@@ -274,7 +274,7 @@ describe('SQLiteDatabase', () => {
     test('should support date comparison after deserialization', () => {
       const pastDate = new Date('2024-01-01');
       const futureDate = new Date('2025-01-01');
-      
+
       const flavorPast: Flavor = {
         ...mockFlavor,
         slug: 'test-flavor-past',

@@ -12,7 +12,7 @@
  * - Edge cases and error scenarios
  */
 
-import { Scheduler } from '@hookah-db/scheduler';
+import { Scheduler } from '../../src/scheduler';
 
 // ============================================================================
 // Test Suite

@@ -12,8 +12,8 @@
 import * as cheerio from 'cheerio';
 import * as fs from 'fs';
 import * as path from 'path';
-import { scrapeFlavorDetails, extractDetailedTags, Scraper } from '@hookah-db/scraper';
-import { Flavor } from '@hookah-db/types';
+import { scrapeFlavorDetails, extractDetailedTags, Scraper } from '../../src/scraper';
+import { Flavor } from '../../src/types';
 
 describe('Flavor Details Scraper', () => {
   let exampleHtml: string;
@@ -436,7 +436,7 @@ describe('Flavor Details Scraper', () => {
       expect(flavor).not.toBeNull();
       expect(flavor?.dateAdded).toBeInstanceOf(Date);
       // Note: parseDate creates date as "2024-12-06" which is parsed as June 12, 2026
-      // This is a known issue with the current implementation
+      // This is a known issue with current implementation
       expect(flavor?.dateAdded.getFullYear()).toBeGreaterThanOrEqual(2024);
 
       fetchAndParseSpy.mockRestore();

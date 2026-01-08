@@ -18,9 +18,9 @@ import {
   scrapeBrandsList,
   scrapeBrandDetails,
   scrapeFlavorDetails,
-} from '@hookah-db/scraper';
-import type { BrandSummary } from '@hookah-db/scraper';
-import type { Brand, Flavor } from '@hookah-db/types';
+} from '../../src/scraper';
+import type { BrandSummary } from '../../src/scraper';
+import type { Brand, Flavor } from '../../src/types';
 
 // ============================================================================
 // Test Configuration

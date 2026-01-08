@@ -13,10 +13,10 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from '@jest/globals';
-import { SQLiteDatabase } from '@hookah-db/database';
-import { DataService } from '@hookah-db/services';
-import { scrapeBrandDetails, scrapeFlavorDetails } from '@hookah-db/scraper';
-import { Brand, Flavor } from '@hookah-db/types';
+import { SQLiteDatabase } from '../../src/database';
+import { DataService } from '../../src/services';
+import { scrapeBrandDetails, scrapeFlavorDetails } from '../../src/scraper';
+import { Brand, Flavor } from '../../src/types';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -158,7 +158,7 @@ describe('Flavor Data Flow Integration Tests', () => {
       console.log('\n--- Step 2: Extracting Flavor URLs ---');
 
       // Import Scraper to fetch page
-      const { Scraper } = await import('@hookah-db/scraper');
+      const { Scraper } = await import('../../src/scraper');
       const scraper = new Scraper();
 
       // Fetch brand page HTML
@@ -209,7 +209,7 @@ describe('Flavor Data Flow Integration Tests', () => {
       console.log('\n--- Step 3: Scraping Flavor Details (Sample) ---');
 
       // Import Scraper to fetch page
-      const { Scraper } = await import('@hookah-db/scraper');
+      const { Scraper } = await import('../../src/scraper');
       const scraper = new Scraper();
 
       // Fetch brand page HTML
@@ -314,7 +314,7 @@ describe('Flavor Data Flow Integration Tests', () => {
       console.log('\n--- Step 4: Saving Flavors to Database ---');
 
       // Import Scraper to fetch page
-      const { Scraper } = await import('@hookah-db/scraper');
+      const { Scraper } = await import('../../src/scraper');
       const scraper = new Scraper();
 
       // Fetch brand page HTML
@@ -491,7 +491,7 @@ describe('Flavor Data Flow Integration Tests', () => {
 
       // Step 3: Extract flavor URLs
       console.log('\n[3/5] Extracting flavor URLs...');
-      const { Scraper } = await import('@hookah-db/scraper');
+      const { Scraper } = await import('../../src/scraper');
       const scraper = new Scraper();
       const $ = await scraper.fetchAndParse(`/tobaccos/${TEST_BRAND_SLUG}`);
 

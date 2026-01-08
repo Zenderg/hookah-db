@@ -1,34 +1,29 @@
 # =============================================================================
 # Stage 1: Build
-# This stage compiles TypeScript to JavaScript using pnpm build
+# This stage compiles TypeScript to JavaScript using npm build
 # =============================================================================
 FROM node:22-alpine AS builder
 
 # Set working directory
 WORKDIR /app
 
-# Install pnpm globally
-RUN npm install -g pnpm@latest
-
 # Copy package files
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json ./
 
-# Copy tsconfig files for build orchestration
-COPY tsconfig.json tsconfig.docker.json turbo.json ./
+# Copy TypeScript configuration
+COPY tsconfig.json ./
 
 # Copy all source code
-COPY apps/ ./apps/
-COPY packages/ ./packages/
+COPY src ./src/
 
 # Install all dependencies (including devDependencies for building)
-RUN pnpm install --frozen-lockfile
+RUN npm install
 
-# Build all packages using pnpm workspaces
-# This leverages Turborepo's build orchestration and handles all dependencies
-RUN pnpm build
+# Build TypeScript to JavaScript
+RUN npm run build
 
 # Verify that JavaScript files were generated
-RUN find /app/apps/api/dist -name "*.js" | wc -l
+RUN find /app/dist -name "*.js" | wc -l
 
 # =============================================================================
 # Stage 2: Runtime
@@ -42,35 +37,17 @@ WORKDIR /app
 # Install build tools needed for native module compilation
 RUN apk add --no-cache python3 make g++
 
-# Install pnpm globally
-RUN npm install -g pnpm@latest
-
 # Copy package files for production dependency resolution
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-
-# Copy package.json files from each package for dependency resolution
-COPY apps/api/package.json ./apps/api/package.json
-COPY apps/cli/package.json ./apps/cli/package.json
-COPY packages/cache/package.json ./packages/cache/package.json
-COPY packages/config/package.json ./packages/config/package.json
-COPY packages/database/package.json ./packages/database/package.json
-COPY packages/parser/package.json ./packages/parser/package.json
-COPY packages/scheduler/package.json ./packages/scheduler/package.json
-COPY packages/scraper/package.json ./packages/scraper/package.json
-COPY packages/services/package.json ./packages/services/package.json
-COPY packages/types/package.json ./packages/types/package.json
-COPY packages/utils/package.json ./packages/utils/package.json
-COPY packages/tsconfig/package.json ./packages/tsconfig/package.json
+COPY package.json ./
 
 # Install production dependencies only
-RUN pnpm install --prod --frozen-lockfile
+RUN npm install --only=production
 
 # Copy ALL compiled files from build stage (JavaScript + TypeScript declarations + maps)
-COPY --from=builder /app/apps ./apps/
-COPY --from=builder /app/packages ./packages/
+COPY --from=builder /app/dist ./dist/
 
 # Rebuild better-sqlite3 native module for runtime platform
-RUN cd /app/node_modules/.pnpm/better-sqlite3@11.10.0/node_modules/better-sqlite3 && \
+RUN cd /app/node_modules/better-sqlite3 && \
     npm rebuild --build-from-source
 
 # Create non-root user for security
@@ -96,8 +73,5 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV DATABASE_PATH=/app/data/hookah-db.db
 
-# Set NODE_PATH to help Node.js find workspace packages
-ENV NODE_PATH=/app/node_modules:/app/packages/*/node_modules
-
 # Start API server using pre-compiled JavaScript
-CMD ["node", "apps/api/dist/server.js"]
+CMD ["node", "dist/server.js"]

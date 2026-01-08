@@ -1,5 +1,5 @@
-import { InMemoryCache } from '@hookah-db/cache';
-import { Brand, Flavor, Line } from '@hookah-db/types';
+import { InMemoryCache } from '../../src/cache';
+import { Brand, Flavor, Line } from '../../src/types';
 
 describe('InMemoryCache', () => {
   let cache: InMemoryCache;

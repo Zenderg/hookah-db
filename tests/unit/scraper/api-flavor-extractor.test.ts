@@ -5,13 +5,13 @@
  */
 
 import { AxiosResponse, AxiosHeaders } from 'axios';
-import { ApiFlavorExtractor, resetLogger } from '@hookah-db/scraper';
-import { HttpClient, HttpClientError } from '@hookah-db/scraper';
-import { LoggerFactory } from '@hookah-db/utils';
+import { ApiFlavorExtractor, resetLogger } from '../../src/scraper';
+import { HttpClient, HttpClientError } from '../../src/scraper';
+import { LoggerFactory } from '../../src/utils';
 
 // Mock logger factory
-jest.mock('@hookah-db/utils', () => {
-  const utilsModule = jest.requireActual('@hookah-db/utils');
+jest.mock('../../src/utils', () => {
+  const utilsModule = jest.requireActual('../../src/utils');
   return {
     ...utilsModule,
     LoggerFactory: {
@@ -556,7 +556,7 @@ describe('ApiFlavorExtractor', () => {
       const result = await extractor.extractFlavorUrls('brand-123', 'sarma');
 
       // Assert - Note: Logger is lazy-loaded, so we can't easily mock it
-      // This test just verifies the method completes without errors
+      // This test just verifies method completes without errors
       expect(result.flavorUrls).toEqual(['/tobaccos/sarma/zima']);
     });
 
@@ -571,7 +571,7 @@ describe('ApiFlavorExtractor', () => {
       const result = await extractor.extractFlavorUrls('brand-123', 'sarma');
 
       // Assert - Note: Logger is lazy-loaded, so we can't easily mock it
-      // This test just verifies the method completes without errors
+      // This test just verifies method completes without errors
       expect(result.flavorUrls).toEqual(['/tobaccos/sarma/zima']);
       expect(result.totalCount).toBe(1);
     });
@@ -589,7 +589,7 @@ describe('ApiFlavorExtractor', () => {
       const result = await extractor.extractFlavorUrls('brand-123', 'sarma');
 
       // Assert - Note: Logger is lazy-loaded, so we can't easily mock it
-      // This test just verifies the method completes without errors
+      // This test just verifies method completes without errors
       expect(result.flavorUrls).toEqual(['/tobaccos/sarma/zima']);
     });
 
@@ -601,7 +601,7 @@ describe('ApiFlavorExtractor', () => {
       const result = await extractor.extractFlavorUrls('brand-123', 'sarma');
 
       // Assert - Note: Logger is lazy-loaded, so we can't easily mock it
-      // This test just verifies the method completes without errors
+      // This test just verifies method completes without errors
       expect(result.flavorUrls).toEqual([]);
       expect(result.usedFallback).toBe(true);
     });

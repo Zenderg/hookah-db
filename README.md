@@ -62,7 +62,7 @@ ENABLE_API_FALLBACK=true
 ### Usage Example
 
 ```typescript
-import { BrandDetailsScraper } from '@hookah-db/scraper';
+import { BrandDetailsScraper } from './scraper';
 
 const scraper = new BrandDetailsScraper();
 
@@ -87,22 +87,22 @@ console.log(`Extracted ${flavors.length} flavors`);
 
 The API extraction consists of four new modules:
 
-1. **Brand ID Extractor** ([`brand-id-extractor.ts`](packages/scraper/src/brand-id-extractor.ts:1))
+1. **Brand ID Extractor** ([`src/scraper/brand-id-extractor.ts`](src/scraper/brand-id-extractor.ts:1))
    - Extracts brand ID from brand detail page HTML
    - Required for API requests
 
-2. **API Flavor Extractor** ([`api-flavor-extractor.ts`](packages/scraper/src/api-flavor-extractor.ts:1))
+2. **API Flavor Extractor** ([`src/scraper/api-flavor-extractor.ts`](src/scraper/api-flavor-extractor.ts:1))
    - Orchestrates API requests to `/postData` endpoint
    - Handles pagination with configurable delay
    - Implements retry logic with exponential backoff
    - Tracks extraction metrics (time, requests, count)
 
-3. **Flavor URL Parser** ([`flavor-url-parser.ts`](packages/scraper/src/flavor-url-parser.ts:1))
+3. **Flavor URL Parser** ([`src/scraper/flavor-url-parser.ts`](src/scraper/flavor-url-parser.ts:1))
    - Parses API response and extracts flavor URLs
    - Validates URL format
    - Removes duplicates
 
-4. **API Response Validator** ([`api-response-validator.ts`](packages/scraper/src/api-response-validator.ts:1))
+4. **API Response Validator** ([`src/scraper/api-response-validator.ts`](src/scraper/api-response-validator.ts:1))
    - Validates API response structure
    - Checks data integrity
    - Provides detailed error messages
@@ -240,65 +240,64 @@ curl -H "X-API-Key: your-api-key" \
 - Add search analytics to track popular queries
 - Add autocomplete/suggestion functionality
 
-## Monorepo Structure
+## Project Structure
 
-This project uses a monorepo structure with pnpm workspaces and Turborepo for efficient development and building.
+This project uses a monolithic structure with npm for efficient development and building.
 
 ### Structure
 
 ```
 hookah-db/
-├── apps/                    # Applications
-│   ├── api/               # REST API server
-│   └── cli/               # CLI tool
-├── packages/                 # Shared packages
-│   ├── types/              # TypeScript types and interfaces
-│   ├── utils/              # Utility functions (includes logging)
-│   ├── scraper/            # Web scraping logic
-│   │   ├── brand-id-extractor.ts          # API-based: Extract brand ID
-│   │   ├── api-flavor-extractor.ts        # API-based: Extract flavors
-│   │   ├── flavor-url-parser.ts           # API-based: Parse URLs
-│   │   ├── api-response-validator.ts      # API-based: Validate responses
-│   │   ├── brand-details-scraper.ts      # Hybrid: API + HTML
-│   │   ├── brand-scraper.ts              # HTML-based: Brand list
-│   │   └── flavor-details-scraper.ts     # HTML-based: Flavor details
-│   ├── parser/             # HTML parsing logic
-│   ├── cache/              # In-memory caching layer
-│   ├── database/           # SQLite database layer
-│   ├── services/           # Business logic
-│   ├── scheduler/          # Cron job scheduler
-│   ├── config/             # Shared configuration
-│   └── tsconfig/           # TypeScript configurations
-├── docs/                   # Documentation
-│   └── LOGGING.md          # Comprehensive logging documentation
-├── examples/                # Example HTML files
-└── .kilocode/             # Kilo Code configuration
+├── src/                        # All source code
+│   ├── types/                  # TypeScript types
+│   ├── utils/                  # Utilities and logger
+│   ├── scraper/                # Web scraper
+│   ├── parser/                 # Data parser
+│   ├── cache/                  # In-memory cache
+│   ├── database/               # SQLite database
+│   ├── services/               # Business logic
+│   ├── scheduler/              # Cron scheduler
+│   ├── middleware/             # Express middleware
+│   ├── controllers/            # API controllers
+│   ├── routes/                 # API routes
+│   ├── swagger.ts              # Swagger configuration
+│   └── server.ts              # Express server
+├── tests/                      # Tests
+├── dist/                       # Compiled JavaScript
+├── logs/                       # Logs
+├── data/                       # Data (if needed)
+├── examples/                   # Example HTML files
+├── docs/                       # Documentation
+├── package.json              # Single package.json
+├── Dockerfile                  # Docker configuration
+├── docker-compose.yml          # Docker Compose configuration
+├── jest.config.js             # Jest configuration
+├── tsconfig.json             # TypeScript configuration
+└── README.md                # Documentation
 ```
 
-### Packages
+### Modules
 
-- **@hookah-db/types**: Shared TypeScript types and interfaces
-- **@hookah-db/utils**: Utility functions and logging system
-- **@hookah-db/scraper**: Web scraping logic for htreviews.org (API + HTML)
-- **@hookah-db/parser**: HTML parsing with Cheerio
-- **@hookah-db/cache**: In-memory caching for frequently accessed data
-- **@hookah-db/database**: SQLite database for persistent storage
-- **@hookah-db/services**: Business logic orchestration
-- **@hookah-db/scheduler**: Cron job scheduler for automated data refresh
-- **@hookah-db/config**: Shared configuration presets
-- **@hookah-db/tsconfig**: Shared TypeScript configurations
-
-### Applications
-
-- **@hookah-db/api**: REST API server (Express.js)
-- **@hookah-db/cli**: CLI tool for data management
+- **src/types**: TypeScript types and interfaces
+- **src/utils**: Utility functions and logging system
+- **src/scraper**: Web scraping logic for htreviews.org (API + HTML)
+- **src/parser**: HTML parsing with Cheerio
+- **src/cache**: In-memory caching for frequently accessed data
+- **src/database**: SQLite database for persistent storage
+- **src/services**: Business logic orchestration
+- **src/scheduler**: Cron job scheduler for automated data refresh
+- **src/middleware**: Express middleware (auth, rate limiting, error handling, logging)
+- **src/controllers**: API request handlers
+- **src/routes**: API route definitions
+- **src/swagger**: Swagger/OpenAPI configuration
+- **src/server**: Express server setup
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js (LTS version)
-- pnpm (install via `npm install -g pnpm`)
+- Node.js (LTS version, 22.x or higher recommended)
+- npm (comes with Node.js)
 - Docker (for containerized development and production)
 - Docker Compose (for multi-container orchestration)
 
@@ -306,16 +305,16 @@ hookah-db/
 
 ```bash
 # Install dependencies
-pnpm install
+npm install
 
-# Build all packages
-pnpm build
+# Build project
+npm run build
 
 # Run API in development
-pnpm --filter @hookah-db/api dev
+npm run dev
 
-# Run CLI
-pnpm --filter @hookah-db/cli dev
+# Run tests
+npm test
 ```
 
 ## Docker
@@ -365,7 +364,7 @@ The project uses a 2-stage Dockerfile for optimized builds:
 # Stage 1: Build
 FROM node:22-alpine AS builder
 WORKDIR /app
-# Install pnpm and dependencies
+# Install npm and dependencies
 # Build TypeScript to JavaScript
 
 # Stage 2: Runtime
@@ -376,7 +375,7 @@ WORKDIR /app
 # Set up non-root user
 # Configure health check
 # Start Node.js with pre-compiled code
-CMD ["node", "apps/api/dist/server.js"]
+CMD ["node", "dist/server.js"]
 ```
 
 **Key Features**:
@@ -876,45 +875,55 @@ API_KEY_CLIENT3=lmn345opq678
 
 ## Available Scripts
 
-- `pnpm build` - Build all packages and applications
-- `pnpm dev` - Run all packages in development mode
-- `pnpm test` - Run all tests
-- `pnpm type-check` - Type-check all packages
-- `pnpm lint` - Lint all packages
-- `pnpm clean` - Clean all build artifacts
+- `npm install` - Install all dependencies
+- `npm run build` - Build TypeScript to JavaScript
+- `npm run dev` - Run API server in development mode
+- `npm run start` - Run API server in production mode
+- `npm test` - Run all tests
+- `npm run type-check` - Type-check TypeScript code
+- `npm run lint` - Lint code (if ESLint is configured)
+- `npm run clean` - Clean build artifacts
 
 ## Development
 
-### Building a specific package
+### Building the project
 
 ```bash
-pnpm --filter @hookah-db/types build
+# Build TypeScript to JavaScript
+npm run build
 ```
 
-### Running a specific application
+### Running the application
 
 ```bash
-pnpm --filter @hookah-db/api dev
+# Development mode with hot reload
+npm run dev
+
+# Production mode
+npm run start
 ```
 
 ### Adding dependencies
 
 ```bash
-# Add to a specific package
-pnpm --filter @hookah-db/scraper add axios
+# Add production dependency
+npm install axios
 
-# Add as dev dependency
-pnpm --filter @hookah-db/scraper add -D @types/axios
+# Add development dependency
+npm install -D @types/axios
 ```
 
 ### Running tests
 
 ```bash
 # Run all tests
-pnpm test
+npm test
 
-# Run scheduler tests
-pnpm test scheduler
+# Run tests in watch mode
+npm test -- --watch
+
+# Run tests with coverage
+npm test -- --coverage
 ```
 
 ## Logging
@@ -924,7 +933,7 @@ The project includes a comprehensive logging system built on Winston for product
 ### Quick Start
 
 ```typescript
-import { LoggerFactory } from '@hookah-db/utils';
+import { LoggerFactory } from './utils';
 
 // Get logger configured for current environment
 const logger = LoggerFactory.createEnvironmentLogger('my-service');
@@ -974,8 +983,7 @@ For comprehensive logging documentation, see [docs/LOGGING.md](docs/LOGGING.md).
 
 - **Runtime**: Node.js
 - **Language**: TypeScript
-- **Package Manager**: pnpm
-- **Build System**: Turborepo
+- **Package Manager**: npm
 - **Web Scraping**: Cheerio, axios
 - **API Framework**: Express.js
 - **Database**: SQLite with WAL mode
@@ -1024,6 +1032,12 @@ GET /api/v1/flavors/:slug
 
 POST /api/v1/flavors/refresh
   Returns: Refreshed flavor data
+
+GET /api/v1/scheduler/stats
+  Returns: Scheduler statistics
+
+GET /api/v1/scheduler/jobs
+  Returns: List of all scheduled jobs
 ```
 
 ## Scheduler Configuration

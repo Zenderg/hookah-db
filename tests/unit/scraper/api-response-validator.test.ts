@@ -4,10 +4,10 @@
  * Tests for validating API responses from htreviews.org.
  */
 
-import { ApiResponseValidator } from '@hookah-db/scraper';
+import { ApiResponseValidator } from '../../src/scraper';
 
 // Mock logger factory
-jest.mock('@hookah-db/utils', () => ({
+jest.mock('../../src/utils', () => ({
   LoggerFactory: {
     createEnvironmentLogger: jest.fn(() => ({
       debug: jest.fn(),

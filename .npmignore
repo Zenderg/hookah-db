@@ -1,0 +1,35 @@
+# Ignore pnpm-specific files
+pnpm-lock.yaml
+pnpm-workspace.yaml
+turbo.json
+
+# Ignore old monorepo structure
+apps/
+packages/
+
+# Ignore development files
+.env
+.env.local
+.env.*.local
+
+# Ignore build artifacts
+dist/
+build/
+
+# Ignore test coverage
+coverage/
+
+# Ignore logs
+logs/
+*.log
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

@@ -11,7 +11,7 @@
 import * as cheerio from 'cheerio';
 import * as fs from 'fs';
 import * as path from 'path';
-import { HttpClient, Scraper, scrapeBrandsList } from '@hookah-db/scraper';
+import { HttpClient, Scraper, scrapeBrandsList } from '../../src/scraper';
 
 // ============================================================================
 // Test Suite
@@ -25,10 +25,10 @@ describe('Brand Scraper', () => {
     // Clear all mocks
     jest.clearAllMocks();
     
-    // Create a mock for the HTTP client's get method
+    // Create a mock for HTTP client's get method
     mockHttpClientGet = jest.spyOn(HttpClient.prototype, 'get');
     
-    // Mock the Scraper's fetchAndParse to return Cheerio instance
+    // Mock Scraper's fetchAndParse to return Cheerio instance
     mockFetchAndParse = jest.spyOn(Scraper.prototype, 'fetchAndParse');
   });
 
@@ -775,7 +775,10 @@ describe('Brand Scraper', () => {
                 </a>
               </div>
               <div>
-                <div class="list_item_rating"><span>4.0</span></div>
+                <div class="list_item_rating">
+                  <img src="/images/star.svg" alt="">
+                  <span>4.0</span>
+                </div>
                 <div class="list_item_ratings_count">
                   <img src="/images/star2.svg" alt="">
                   <span>1234</span>
@@ -810,7 +813,10 @@ describe('Brand Scraper', () => {
                 </a>
               </div>
               <div>
-                <div class="list_item_rating"><span>4.0</span></div>
+                <div class="list_item_rating">
+                  <img src="/images/star.svg" alt="">
+                  <span>4.0</span>
+                </div>
                 <div class="list_item_ratings_count"><span>100</span></div>
                 <div class="list_item_reviews">
                   <img src="/images/chat.svg" alt="">
@@ -1191,6 +1197,9 @@ describe('Brand Scraper', () => {
                 <div class="list_item_reviews"><span>50</span></div>
                 <div class="list_item_stats"><span>10k</span></div>
               </div>
+              <div content>
+                <div class="description_content"><span>Test</span></div>
+              </div>
             </div>
           </div>
         </div>
@@ -1272,15 +1281,15 @@ describe('Brand Scraper', () => {
             <div class="tobacco_list_item">
               <!-- Missing required fields - will cause parsing error -->
               <div class="tobacco_list_item_name">
-                <a class="tobacco_list_item_slug" href="">
+                <a class="tobacco_list_item_slug" href="/tobaccos/brand2">
                   <span>Invalid Brand</span>
                 </a>
               </div>
             </div>
             <div class="tobacco_list_item">
               <div class="tobacco_list_item_name">
-                <a class="tobacco_list_item_slug" href="/tobaccos/brand2">
-                  <span>Brand 2</span>
+                <a class="tobacco_list_item_slug" href="/tobaccos/brand3">
+                  <span>Brand 3</span>
                   <span class="country">США</span>
                 </a>
               </div>
@@ -1291,7 +1300,7 @@ describe('Brand Scraper', () => {
                 <div class="list_item_stats"><span>5k</span></div>
               </div>
               <div content>
-                <div class="description_content"><span>Brand 2</span></div>
+                <div class="description_content"><span>Brand 3</span></div>
               </div>
             </div>
           </div>
@@ -1304,7 +1313,7 @@ describe('Brand Scraper', () => {
       
       expect(brands.length).toBeGreaterThanOrEqual(1);
       expect(brands.some((b: any) => b.slug === 'brand1')).toBe(true);
-      expect(brands.some((b: any) => b.slug === 'brand2')).toBe(true);
+      expect(brands.some((b: any) => b.slug === 'brand3')).toBe(true);
       
       consoleErrorSpy.mockRestore();
     });

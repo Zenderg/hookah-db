@@ -145,10 +145,10 @@ The project uses a 2-stage Dockerfile for optimized builds:
 
 **Stage 1 - Build**:
 - Base image: node:22-alpine
-- Installs pnpm globally
+- Installs npm globally
 - Copies package files, TypeScript configs, and source code
 - Installs all dependencies with frozen lockfile
-- Compiles TypeScript to JavaScript using `pnpm build`
+- Compiles TypeScript to JavaScript using `npm run build`
 
 **Stage 2 - Runtime**:
 - Base image: node:22-alpine
@@ -157,7 +157,7 @@ The project uses a 2-stage Dockerfile for optimized builds:
 - Creates non-root user (nodejs:nodejs)
 - Configures health checks
 - Sets environment variables
-- Starts server with `node apps/api/dist/server.js`
+- Starts server with `node dist/server.js`
 
 **Key Benefits**:
 - Pre-compiled JavaScript for faster startup
@@ -191,219 +191,37 @@ The project uses a single `docker-compose.yml` file for both development and pro
   - Driver: bridge
   - Purpose: Container communication
 
-### Docker TypeScript Compilation Fix (2026-01-08)
-
-#### Problem Identified
-
-The Docker build was failing because TypeScript project references with `composite: true` were only generating declaration files (`.d.ts`), not actual JavaScript files (`.js`). This caused the container to fail at startup because the runtime stage couldn't find the compiled JavaScript files needed to run the application.
-
-**Root Cause**:
-- TypeScript project references (`composite: true`) are designed for incremental builds in development
-- When used in Docker build context, they only generate `.d.ts` files for type checking
-- The `tsc --build` command with project references doesn't emit JavaScript files by default
-- The Docker runtime stage expected JavaScript files but only found declaration files
-
-#### Solution Implemented
-
-The fix involved modifying the Docker build process to ensure JavaScript files are generated:
-
-1. **Modified Dockerfile** ([`Dockerfile`](Dockerfile:1)):
-   - Created a standalone TypeScript configuration without project references
-   - Built each package individually using the standalone configuration
-   - Copied all compiled files (JavaScript + TypeScript declarations + source maps) to the runtime stage
-   - Set `composite: false` in [`apps/api/tsconfig.json`](apps/api/tsconfig.json:1) to allow standalone compilation
-
-2. **Key Changes**:
-   - Build stage: Uses `pnpm build` which compiles TypeScript to JavaScript for all packages
-   - Runtime stage: Copies compiled JavaScript from build stage instead of trying to compile at runtime
-   - Pre-compiled JavaScript ensures faster startup and more reliable container execution
-   - No tsx runtime needed - uses `node apps/api/dist/server.js` directly
-
-3. **Benefits**:
-   - ✅ JavaScript files are generated correctly during build stage
-   - ✅ Container starts without TypeScript compilation errors
-   - ✅ Faster container startup (no compilation at runtime)
-   - ✅ Smaller runtime image (no TypeScript compiler)
-   - ✅ More reliable production deployment
-   - ✅ Works without local node_modules (Docker build is self-contained)
-
-#### Technical Details
-
-**Before Fix**:
-```dockerfile
-# Build stage with project references
-RUN pnpm build  # Only generates .d.ts files with composite: true
-```
-
-**After Fix**:
-```dockerfile
-# Build stage with standalone compilation
-RUN pnpm install --frozen-lockfile
-RUN pnpm build  # Compiles TypeScript to JavaScript for all packages
-
-# Runtime stage
-COPY --from=builder /app/apps/api/dist ./apps/api/dist
-COPY --from=builder /app/packages ./packages
-RUN npm install -g pnpm@latest && \
-    pnpm install --prod --frozen-lockfile
-CMD ["node", "apps/api/dist/server.js"]
-```
-
-**TypeScript Configuration Changes**:
-- [`apps/api/tsconfig.json`](apps/api/tsconfig.json:1): Set `composite: false` to allow standalone compilation
-- Build process now generates `.js`, `.d.ts`, and `.js.map` files for all packages
-- All compiled files are copied to runtime stage for execution
-
-#### Testing Results
-
-After implementing the fix, all Docker tests passed:
-
-| Test | Status | Details |
-|------|--------|---------|
-| Docker Build | ✅ PASSED | JavaScript files generated correctly |
-| Container Startup | ✅ PASSED | Container starts in <30s, no errors |
-| Health Check | ✅ PASSED | Health endpoint returns 200 OK |
-| API Endpoints | ✅ PASSED | All endpoints working correctly |
-| Database Persistence | ✅ PASSED | Data persists across restarts |
-| Docker Compose | ✅ PASSED | All services start successfully |
-
-**Key Success Indicators**:
-- ✅ No TypeScript compilation errors in Docker build
-- ✅ Container starts without relying on local node_modules
-- ✅ All compiled JavaScript files are present in runtime stage
-- ✅ Application runs correctly with pre-compiled JavaScript
-- ✅ Health checks pass consistently
-- ✅ API endpoints respond correctly
-- ✅ Database persists across container restarts
-
 ## Source Code Structure
 
 ```
 hookah-db/
-├── apps/                  # Application packages
-│   ├── api/               # REST API server
-│   │   ├── src/
-│   │   │   ├── server.ts  # Express server setup
-│   │   │   ├── swagger.ts # Swagger/OpenAPI configuration
-│   │   │   ├── routes/    # API route definitions
-│   │   │   │   ├── index.ts
-│   │   │   │   ├── brand-routes.ts
-│   │   │   │   ├── flavor-routes.ts
-│   │   │   │   └── health-routes.ts
-│   │   │   ├── middleware/# Express middleware
-│   │   │   │   ├── index.ts
-│   │   │   │   ├── auth-middleware.ts
-│   │   │   │   ├── rate-limit-middleware.ts
-│   │   │   │   └── error-handler-middleware.ts
-│   │   │   └── controllers/# Request handlers
-│   │   │       ├── index.ts
-│   │   │       ├── brand-controller.ts
-│   │   │       ├── flavor-controller.ts
-│   │   │       └── health-controller.ts
-│   │   ├── package.json
-│   │   └── tsconfig.json
-│   └── cli/               # CLI application
-│       ├── src/
-│       │   └── index.ts   # CLI entry point
-│       ├── package.json
-│       └── tsconfig.json
-├── packages/              # Shared packages
-│   ├── types/             # TypeScript interfaces and types
-│   │   ├── src/
-│   │   │   ├── brand.ts   # Brand interface
-│   │   │   ├── flavor.ts  # Flavor interface
-│   │   │   ├── line.ts    # Line interface
-│   │   │   ├── rating.ts  # RatingDistribution interface
-│   │   │   ├── query-params.ts # Query parameter interfaces (search, pagination, filters)
-│   │   │   └── index.ts   # Type exports
-│   │   ├── package.json
-│   │   └── tsconfig.json
-│   ├── scraper/           # Web scraping module
-│   │   ├── src/
-│   │   │   ├── index.ts   # Main scraper entry point
-│   │   │   ├── http-client.ts
-│   │   │   ├── html-parser.ts
-│   │   │   ├── scraper.ts
-│   │   │   ├── brand-scraper.ts
-│   │   │   ├── brand-details-scraper.ts
-│   │   │   ├── flavor-details-scraper.ts
-│   │   │   ├── brand-id-extractor.ts          # API-based: Extract brand ID
-│   │   │   ├── api-flavor-extractor.ts        # API-based: Extract flavors
-│   │   │   ├── flavor-url-parser.ts           # API-based: Parse URLs
-│   │   │   └── api-response-validator.ts      # API-based: Validate responses
-│   │   ├── package.json
-│   │   └── tsconfig.json
-│   ├── parser/            # Data parsing and transformation
-│   │   ├── src/
-│   │   │   └── index.ts   # Data parser entry point
-│   │   ├── package.json
-│   │   └── tsconfig.json
-│   ├── cache/             # In-memory caching layer
-│   │   ├── src/
-│   │   │   ├── index.ts   # Cache interface and implementations
-│   │   │   ├── types.ts
-│   │   │   ├── in-memory-cache.ts
-│   │   │   └── cache-factory.ts
-│   │   ├── package.json
-│   │   └── tsconfig.json
-│   ├── database/          # SQLite database layer
-│   │   ├── src/
-│   │   │   ├── index.ts   # Database interface and implementations
-│   │   │   ├── types.ts
-│   │   │   └── sqlite-database.ts
-│   │   ├── package.json
-│   │   └── tsconfig.json
-│   ├── services/          # Business logic
-│   │   ├── src/
-│   │   │   ├── index.ts   # Service orchestration
-│   │   │   ├── brand-service.ts
-│   │   │   ├── flavor-service.ts
-│   │   │   └── data-service.ts
-│   │   ├── package.json
-│   │   └── tsconfig.json
-│   ├── scheduler/         # Cron job scheduler
-│   │   ├── src/
-│   │   │   ├── index.ts   # Package exports
-│   │   │   ├── scheduler.ts # Scheduler class
-│   │   │   └── types.ts   # Scheduler types
-│   │   ├── package.json
-│   │   └── tsconfig.json
-│   ├── utils/             # Utility functions
-│   │   ├── src/
-│   │   │   └── index.ts   # Utility functions
-│   │   ├── package.json
-│   │   └── tsconfig.json
-│   ├── config/            # Shared configuration
-│   │   └── package.json
-│   └── tsconfig/          # Shared TypeScript configurations
-│       ├── base.json      # Base TypeScript config
-│       ├── node.json      # Node.js TypeScript config
-│       └── package.json
-├── examples/              # Example HTML files for reference
-│   ├── htreviews.org_tobaccos_brands.html
-│   ├── htreviews.org_tobaccos_sarma.html
-│   └── htreviews.org_tobaccos_sarma_klassicheskaya_zima.html
-├── tests/                 # Test files
-│   ├── unit/
-│   │   ├── api/           # API tests (119 tests)
-│   │   ├── cache/         # Cache tests (73 tests)
-│   │   ├── database/      # Database tests
-│   │   ├── scraper/       # Scraper tests (563 tests: 408 HTML + 155 API)
-│   │   ├── services/      # Service tests (198 tests)
-│   │   └── scheduler/     # Scheduler tests (117 tests)
-│   └── integration/
-│       └── scraper.test.ts
-├── .kilocode/             # Kilo Code configuration
-│   └── rules/
-│       └── memory-bank/   # Memory bank files
-├── Dockerfile             # 2-stage Docker build configuration
-├── docker-compose.yml      # Single Docker Compose configuration
-├── pnpm-workspace.yaml    # pnpm workspace configuration
-├── turbo.json             # Turborepo configuration
-├── .npmrc                 # npm/pnpm configuration
-├── package.json           # Root package.json
-├── tsconfig.json          # Root TypeScript config
-└── README.md
+├── src/                        # All source code
+│   ├── types/                  # TypeScript types
+│   ├── utils/                  # Utilities and logger
+│   ├── scraper/                # Web scraper
+│   ├── parser/                 # Data parser
+│   ├── cache/                  # In-memory cache
+│   ├── database/               # SQLite database
+│   ├── services/               # Business logic
+│   ├── scheduler/              # Cron scheduler
+│   ├── middleware/             # Express middleware
+│   ├── controllers/            # API controllers
+│   ├── routes/                 # API routes
+│   ├── swagger.ts              # Swagger configuration
+│   └── server.ts              # Express server
+├── tests/                      # Tests
+├── dist/                       # Compiled JavaScript
+├── logs/                       # Logs
+├── data/                       # Data (if needed)
+├── examples/                   # Example HTML files
+├── docs/                       # Documentation
+├── package.json              # Single package.json
+├── Dockerfile                  # Docker configuration
+├── docker-compose.yml          # Docker Compose configuration
+├── jest.config.js             # Jest configuration
+├── tsconfig.json             # TypeScript configuration
+├── .nvmrc                  # Node.js version (22)
+└── README.md                # Documentation
 ```
 
 ## Key Technical Decisions
@@ -430,7 +248,7 @@ Based on HTML structure analysis, following data models are identified:
 - `flavors`: Array of Flavor objects
 
 **Line Model**:
-- `slug`: Unique identifier (e.g., "klassicheskaya")
+- `slug`: Unique identifier (e.g., "классическая")
 - `name`: Display name (e.g., "Классическая")
 - `description`: Line description
 - `strength`: Strength level (e.g., "Средняя", "Лёгкая", "Крепкая")
@@ -514,25 +332,25 @@ graph TB
 
 **Components**:
 
-1. **Brand ID Extractor** ([`brand-id-extractor.ts`](packages/scraper/src/brand-id-extractor.ts:1))
+1. **Brand ID Extractor** ([`src/scraper/brand-id-extractor.ts`](src/scraper/brand-id-extractor.ts:1))
    - Extracts brand ID from brand detail page HTML
    - Required for API requests to `/postData` endpoint
    - 39 unit tests (100% pass rate)
 
-2. **API Flavor Extractor** ([`api-flavor-extractor.ts`](packages/scraper/src/api-flavor-extractor.ts:1))
+2. **API Flavor Extractor** ([`src/scraper/api-flavor-extractor.ts`](src/scraper/api-flavor-extractor.ts:1))
    - Orchestrates API requests to `/postData` endpoint
    - Handles pagination with configurable delay
    - Implements retry logic with exponential backoff
    - Tracks extraction metrics (time, requests, count)
    - 42 unit tests (100% pass rate)
 
-3. **Flavor URL Parser** ([`flavor-url-parser.ts`](packages/scraper/src/flavor-url-parser.ts:1))
+3. **Flavor URL Parser** ([`src/scraper/flavor-url-parser.ts`](src/scraper/flavor-url-parser.ts:1))
    - Parses API response and extracts flavor URLs
    - Validates URL format
    - Removes duplicates
    - 38 unit tests (100% pass rate)
 
-4. **API Response Validator** ([`api-response-validator.ts`](packages/scraper/src/api-response-validator.ts:1))
+4. **API Response Validator** ([`src/scraper/api-response-validator.ts`](src/scraper/api-response-validator.ts:1))
    - Validates API response structure
    - Checks data integrity
    - Provides detailed error messages
@@ -753,27 +571,20 @@ The API includes comprehensive Swagger/OpenAPI documentation:
 ### API Layer Implementation
 
 **Middleware**:
-- **Authentication Middleware** ([`auth-middleware.ts`](apps/api/src/middleware/auth-middleware.ts:1)):
+- **Authentication Middleware** ([`src/middleware/auth-middleware.ts`](src/middleware/auth-middleware.ts:1)):
   - Validates API key from X-API-Key header
   - Supports multiple API keys via environment variables (API_KEY_*)
   - Returns 401 for missing or invalid API keys
   - Consistent JSON error responses
 
-- **Authentication Middleware Updates** (2026-01-05):
-  - Fixed authentication enforcement on all API v1 endpoints
-  - Previously only applied to POST refresh endpoints
-  - Now correctly applied to GET endpoints (brands, flavors, brand by slug, flavor by slug)
-  - Added dotenv integration for environment variable loading
-  - Security posture improved from CRITICAL to SECURE
-
-- **Rate Limiting Middleware** ([`rate-limit-middleware.ts`](apps/api/src/middleware/rate-limit-middleware.ts:1)):
+- **Rate Limiting Middleware** ([`src/middleware/rate-limit-middleware.ts`](src/middleware/rate-limit-middleware.ts:1)):
   - Uses express-rate-limit package
   - Configurable window (default: 60 seconds) and max requests (default: 100)
   - IP-based rate limiting
   - Returns 429 with retry-after header on rate limit exceeded
   - Custom error responses with JSON format
 
-- **Error Handler Middleware** ([`error-handler-middleware.ts`](apps/api/src/middleware/error-handler-middleware.ts:1)):
+- **Error Handler Middleware** ([`src/middleware/error-handler-middleware.ts`](src/middleware/error-handler-middleware.ts:1)):
   - Centralized error handling for all routes
   - Consistent JSON error responses with message and status
   - Proper HTTP status codes (400, 401, 404, 429, 500)
@@ -781,29 +592,29 @@ The API includes comprehensive Swagger/OpenAPI documentation:
   - Handles both known error types and unexpected errors
 
 **Controllers**:
-- **Brand Controller** ([`brand-controller.ts`](apps/api/src/controllers/brand-controller.ts:1)):
+- **Brand Controller** ([`src/controllers/brand-controller.ts`](src/controllers/brand-controller.ts:1)):
   - `getBrands()`: List all brands with pagination and search support
   - `getBrandBySlug()`: Get detailed brand information by slug
   - `refreshBrands()`: Trigger brand data refresh from scraper
 
-- **Flavor Controller** ([`flavor-controller.ts`](apps/api/src/controllers/flavor-controller.ts:1)):
+- **Flavor Controller** ([`src/controllers/flavor-controller.ts`](src/controllers/flavor-controller.ts:1)):
   - `getFlavors()`: List all flavors with filtering, pagination, and search support
   - `getFlavorBySlug()`: Get detailed flavor information by slug
   - `getFlavorsByBrand()`: Get all flavors for a specific brand
   - `refreshFlavors()`: Trigger flavor data refresh from scraper
 
-- **Health Controller** ([`health-controller.ts`](apps/api/src/controllers/health-controller.ts:1)):
+- **Health Controller** ([`src/controllers/health-controller.ts`](src/controllers/health-controller.ts:1)):
   - `healthCheck()`: Basic health check endpoint
   - `healthCheckDetailed()`: Detailed health check with database statistics
 
 **Routes**:
-- **Brand Routes** ([`brand-routes.ts`](apps/api/src/routes/brand-routes.ts:1)):
+- **Brand Routes** ([`src/routes/brand-routes.ts`](src/routes/brand-routes.ts:1)):
   - GET /api/v1/brands - List brands (with search parameter)
   - GET /api/v1/brands/:slug - Get brand by slug
   - POST /api/v1/brands/refresh - Refresh brand data
   - GET /api/v1/brands/:brandSlug/flavors - Get brand flavors
 
-- **Flavor Routes** ([`flavor-routes.ts`](apps/api/src/routes/flavor-routes.ts:1)):
+- **Flavor Routes** ([`src/routes/flavor-routes.ts`](src/routes/flavor-routes.ts:1)):
   - GET /api/v1/flavors - List flavors (with search parameter)
   - GET /api/v1/flavors/:slug - Get flavor by slug
   - POST /api/v1/flavors/refresh - Refresh flavor data
@@ -816,57 +627,57 @@ The API includes comprehensive Swagger/OpenAPI documentation:
   - GET /api/v1/scheduler/stats - Get scheduler statistics
   - GET /api/v1/scheduler/jobs - List all scheduled jobs
 
-**Server Setup** ([`server.ts`](apps/api/src/server.ts:1)):
-- Express server with TypeScript
-- Middleware order:
-  1. CORS (optional, for cross-origin requests)
-  2. JSON body parsing
-  3. Rate limiting middleware
-  4. Authentication middleware
-  5. API routes
-  6. Error handler middleware
-- Health check endpoints (no auth required)
-- API v1 routes (auth required)
-- Swagger UI documentation endpoints (no auth required)
-- 404 handler for undefined routes
-- Scheduler integration with graceful shutdown
+**Server Setup** ([`src/server.ts`](src/server.ts:1)):
+  - Express server with TypeScript
+  - Middleware order:
+    1. CORS (optional, for cross-origin requests)
+    2. JSON body parsing
+    3. Rate limiting middleware
+    4. Authentication middleware
+    5. API routes
+    6. Error handler middleware
+  - Health check endpoints (no auth required)
+  - API v1 routes (auth required)
+  - Swagger UI documentation endpoints (no auth required)
+  - 404 handler for undefined routes
+  - Scheduler integration with graceful shutdown
 
-**Swagger Configuration** ([`swagger.ts`](apps/api/src/swagger.ts:1)):
-- OpenAPI 3.0 specification
-- API metadata (title, version, description, license)
-- Component schemas for data models
-- Security scheme definition
-- Tags for endpoint organization
-- JSDoc comment integration for automatic spec generation
+**Swagger Configuration** ([`src/swagger.ts`](src/swagger.ts:1)):
+  - OpenAPI 3.0 specification
+  - API metadata (title, version, description, license)
+  - Component schemas for data models
+  - Security scheme definition
+  - Tags for endpoint organization
+  - JSDoc comment integration for automatic spec generation
 
 ### Scheduler Implementation
 
-**Scheduler Class** ([`scheduler.ts`](packages/scheduler/src/scheduler.ts:1)):
-- Lifecycle management: start(), stop(), restart()
-- Task management: scheduleJob(), unscheduleJob(), enableJob(), disableJob()
-- Statistics: getStats(), getJobStatus(), getExecutionHistory()
-- Default tasks: scheduleBrandsRefresh(), scheduleFlavorsRefresh(), scheduleAllDataRefresh()
+**Scheduler Class** ([`src/scheduler/scheduler.ts`](src/scheduler/scheduler.ts:1)):
+  - Lifecycle management: start(), stop(), restart()
+  - Task management: scheduleJob(), unscheduleJob(), enableJob(), disableJob()
+  - Statistics: getStats(), getJobStatus(), getExecutionHistory()
+  - Default tasks: scheduleBrandsRefresh(), scheduleFlavorsRefresh(), scheduleAllDataRefresh()
 
 **Configuration**:
-- Environment-based configuration with sensible defaults
-- Cron expression validation
-- Enable/disable scheduler without code changes
-- Configurable execution history limit
+  - Environment-based configuration with sensible defaults
+  - Cron expression validation
+  - Enable/disable scheduler without code changes
+  - Configurable execution history limit
 
 **Integration**:
-- Seamless integration with DataService.refreshAllCache()
-- Graceful shutdown with SIGTERM/SIGINT handlers
-- Health check endpoint integration for monitoring
+  - Seamless integration with DataService.refreshAllCache()
+  - Graceful shutdown with SIGTERM/SIGINT handlers
+  - Health check endpoint integration for monitoring
 
 **Error Handling**:
-- Comprehensive error handling for job execution
-- Failed jobs don't block other jobs
-- Error tracking and statistics
+  - Comprehensive error handling for job execution
+  - Failed jobs don't block other jobs
+  - Error tracking and statistics
 
 **Testing**:
-- 117 comprehensive tests (87 unit + 30 integration)
-- 100% pass rate
-- >90% code coverage
+  - 117 comprehensive tests (87 unit + 30 integration)
+  - 100% pass rate
+  - >90% code coverage
 
 ### Authentication
 
@@ -879,38 +690,38 @@ The API includes comprehensive Swagger/OpenAPI documentation:
 ### Docker Implementation
 
 **2-Stage Dockerfile** ([`Dockerfile`](Dockerfile:1)):
-- **Stage 1 - Build**: Installs dependencies and compiles TypeScript to JavaScript
-- **Stage 2 - Runtime**: Copies compiled JavaScript and production dependencies for minimal runtime image
+  - **Stage 1 - Build**: Installs dependencies and compiles TypeScript to JavaScript
+  - **Stage 2 - Runtime**: Copies compiled JavaScript and production dependencies for minimal runtime image
 
 **Docker Compose** ([`docker-compose.yml`](docker-compose.yml:1)):
-- Single service for API server
-- Named Docker volume for database persistence
-- Health checks for API service
-- Environment configuration via environment variables
-- Restart policy: unless-stopped
+  - Single service for API server
+  - Named Docker volume for database persistence
+  - Health checks for API service
+  - Environment configuration via environment variables
+  - Restart policy: unless-stopped
 
 **Runtime Decisions**:
-- **Pre-compiled JavaScript**: TypeScript compiled during build stage, no tsx runtime needed
-- **node:22-alpine**: Lightweight base image for smaller container sizes
-- **Non-root user**: Security best practice (nodejs:nodejs)
-- **better-sqlite3**: SQLite database driver with synchronous API
+  - **Pre-compiled JavaScript**: TypeScript compiled during build stage, no runtime compilation needed
+  - **node:22-alpine**: Lightweight base image for smaller container sizes
+  - **Non-root user**: Security best practice (nodejs:nodejs)
+  - **better-sqlite3**: SQLite database driver with synchronous API
 
 ## Component Relationships
 
 ```mermaid
 graph LR
-    Scraper[@hookah-db/scraper] --> Parser[@hookah-db/parser]
-    Parser --> Types[@hookah-db/types]
-    Parser --> Database[@hookah-db/database]
-    Database --> Services[@hookah-db/services]
+    Scraper[scraper] --> Parser[parser]
+    Parser --> Types[types]
+    Parser --> Database[database]
+    Database --> Services[services]
     Services --> Controllers[API Controllers]
     Controllers --> Routes[API Routes]
-    Routes --> Server[@hookah-db/api]
+    Routes --> Server[api]
     Auth[Auth Middleware] --> Server
     RateLimit[Rate Limit Middleware] --> Server
     ErrorHandler[Error Handler Middleware] --> Server
     Swagger[Swagger UI] --> Server
-    Scheduler[@hookah-db/scheduler] --> Services
+    Scheduler[scheduler] --> Services
     Scheduler --> Server
     Cache[In-Memory Cache] --> Services
     Services --> Cache
@@ -935,7 +746,6 @@ graph LR
 - **Factory Pattern**: Parser factory for different page types
 - **Middleware Pattern**: Express middleware for cross-cutting concerns (auth, rate limiting, error handling)
 - **Strategy Pattern**: Different caching strategies (in-memory cache)
-- **Monorepo Pattern**: Shared packages organized by dependency layer
 - **Controller Pattern**: Request handlers separate from business logic
 - **Route Handler Pattern**: Route definitions separate from controller logic
 - **Documentation-First Pattern**: JSDoc comments drive API specification generation
@@ -948,25 +758,21 @@ graph LR
 ## Package Dependency Layers
 
 ```
-Application Layer
-├── @hookah-db/api (depends on: services, utils, config, express-rate-limit, swagger-ui-express)
-└── @hookah-db/cli (depends on: services, utils, config)
-
-Business Layer
-├── @hookah-db/services (depends on: scraper, parser, database, cache, types, utils)
-└── @hookah-db/scheduler (depends on: services, types, utils, config)
-
-Core Layer
-├── @hookah-db/scraper (depends on: types, utils, config)
-├── @hookah-db/parser (depends on: types, utils, config)
-├── @hookah-db/database (depends on: types, utils, config)
-└── @hookah-db/cache (depends on: types, utils, config)
-
-Utility Layer
-├── @hookah-db/types (no dependencies)
-├── @hookah-db/utils (depends on: types)
-├── @hookah-db/config (no dependencies)
-└── @hookah-db/tsconfig (no dependencies)
+Monolithic Structure
+├── src/ (all source code)
+│   ├── types/ (no dependencies)
+│   ├── utils/ (depends on: types)
+│   ├── scraper/ (depends on: types, utils)
+│   ├── parser/ (depends on: types, utils)
+│   ├── cache/ (depends on: types, utils)
+│   ├── database/ (depends on: types, utils)
+│   ├── services/ (depends on: scraper, parser, database, cache, types, utils)
+│   ├── scheduler/ (depends on: services, types, utils)
+│   ├── middleware/ (depends on: services, types, utils)
+│   ├── controllers/ (depends on: services, types, utils)
+│   ├── routes/ (depends on: controllers, services, types, utils)
+│   ├── swagger.ts (depends on: types, utils)
+│   └── server.ts (depends on: all modules)
 ```
 
 ## API Test Coverage

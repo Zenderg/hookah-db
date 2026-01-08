@@ -12,8 +12,8 @@
  * - Error handling in logger
  */
 
-import { Logger } from '@hookah-db/utils';
-import { LoggerConfig, LogLevel, LogFormat, TransportType } from '@hookah-db/types';
+import { Logger } from '../../../src/utils';
+import { LoggerConfig, LogLevel, LogFormat, TransportType } from '../../../src/types';
 import winston from 'winston';
 
 // ============================================================================
@@ -664,11 +664,11 @@ describe('Logger', () => {
       // Assert
       expect(mockWinstonLogger.error).toHaveBeenCalledWith(
         'Test error',
-        expect.objectContaining({
-          userId: '123',
-          action: 'test',
-        })
-      );
+          expect.objectContaining({
+            userId: '123',
+            action: 'test',
+          })
+        );
     });
 
     it('should NOT include correlation ID in error metadata (logError creates its own metadata)', () => {
@@ -681,13 +681,13 @@ describe('Logger', () => {
 
       // Assert
       // logError() creates its own metadata object and doesn't use buildMetadata()
-      // so it won't include the correlation ID
+      // so it won't include correlation ID
       expect(mockWinstonLogger.error).toHaveBeenCalledWith(
         'Test error',
-        expect.not.objectContaining({
-          correlationId: 'test-correlation-id',
-        })
-      );
+          expect.not.objectContaining({
+            correlationId: 'test-correlation-id',
+          })
+        );
     });
 
     it('should include timestamp in error metadata', () => {
@@ -703,7 +703,7 @@ describe('Logger', () => {
       expect(mockWinstonLogger.error).toHaveBeenCalledWith(
         'Test error',
         expect.objectContaining({
-          timestamp: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/),
+          timestamp: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{3}Z$/),
         })
       );
     });
@@ -894,12 +894,13 @@ describe('Logger', () => {
       logger.addMetadata({ userId: '123' });
 
       // Act
-      logger.addMetadata({ userId: '456' });
+      logger.addMetadata({ action: 'test' });
 
       // Assert
       expect(mockWinstonLogger.defaultMeta).toEqual(
         expect.objectContaining({
           userId: '456',
+          action: 'test',
         })
       );
     });
@@ -1180,7 +1181,7 @@ describe('Logger', () => {
 
     it('should handle very long messages', () => {
       // Arrange
-      const longMessage = 'x'.repeat(10000);
+      const longMessage = 'x'.repeat(100000);
 
       // Act & Assert - should not throw
       expect(() => logger.info(longMessage)).not.toThrow();

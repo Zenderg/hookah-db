@@ -14,16 +14,16 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { createErrorHandlerMiddleware } from '@hookah-db/api/src/middleware/error-handler-middleware';
-import { LoggerFactory } from '@hookah-db/utils';
-import { LogLevel } from '@hookah-db/types';
+import { createErrorHandlerMiddleware } from '../../src/middleware/error-handler-middleware';
+import { LoggerFactory } from '../../src/utils';
+import { LogLevel } from '../../src/types';
 
 // ============================================================================
 // Mock Setup
 // ============================================================================
 
 // Mock LoggerFactory
-jest.mock('@hookah-db/utils', () => {
+jest.mock('../../src/utils', () => {
   return {
     LoggerFactory: {
       createEnvironmentLogger: jest.fn(),

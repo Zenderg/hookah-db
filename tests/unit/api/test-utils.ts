@@ -3,8 +3,8 @@
  * Provides mock services and test setup helpers
  */
 
-import { Brand } from '@hookah-db/types';
-import { Flavor } from '@hookah-db/types';
+import { Brand } from '../../../src/types';
+import { Flavor } from '../../../src/types';
 
 // ============================================================================
 // Mock Data

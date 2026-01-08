@@ -1,6 +1,6 @@
 # Logging Documentation
 
-Comprehensive guide to the logging system in the Hookah Tobacco Database API.
+Comprehensive guide to logging system in Hookah Tobacco Database API.
 
 ## Table of Contents
 
@@ -96,7 +96,7 @@ graph TB
 ### Basic Usage
 
 ```typescript
-import { LoggerFactory } from '@hookah-db/utils';
+import { LoggerFactory } from './utils';
 
 // Get logger configured for current environment
 const logger = LoggerFactory.createEnvironmentLogger('my-service');
@@ -128,10 +128,10 @@ app.get('/api/brands', (req, res) => {
 
 ### Default Logger
 
-The default logger is automatically configured based on the `NODE_ENV` environment variable:
+The default logger is automatically configured based on `NODE_ENV` environment variable:
 
 ```typescript
-import { LoggerFactory } from '@hookah-db/utils';
+import { LoggerFactory } from './utils';
 
 // Automatically configured based on NODE_ENV
 const logger = LoggerFactory.createEnvironmentLogger('my-service');
@@ -149,7 +149,7 @@ const logger = LoggerFactory.createEnvironmentLogger('my-service');
 Create a logger with custom configuration:
 
 ```typescript
-import { LoggerFactory, LogLevel, TransportType, LogFormat } from '@hookah-db/utils';
+import { LoggerFactory, LogLevel, TransportType, LogFormat } from './utils';
 
 const customLogger = LoggerFactory.createLogger({
   level: LogLevel.DEBUG,
@@ -191,7 +191,7 @@ const customLogger = LoggerFactory.createLogger({
 Create child loggers with additional default metadata:
 
 ```typescript
-import { LoggerFactory } from '@hookah-db/utils';
+import { LoggerFactory } from './utils';
 
 const parentLogger = LoggerFactory.createEnvironmentLogger('parent');
 
@@ -207,7 +207,7 @@ childLogger.info('User logged in', { userId: 123 });
 
 ### Log Levels
 
-The logging system supports the following log levels (from most to least severe):
+The logging system supports following log levels (from most to least severe):
 
 | Level | Description | Use Case |
 |-------|-------------|----------|
@@ -222,7 +222,7 @@ The logging system supports the following log levels (from most to least severe)
 **Setting log level:**
 
 ```typescript
-import { LoggerFactory, LogLevel } from '@hookah-db/utils';
+import { LoggerFactory, LogLevel } from './utils';
 
 const logger = LoggerFactory.createEnvironmentLogger('my-service');
 
@@ -251,7 +251,7 @@ logger.silly('Variable state', { var1: 'value1', var2: 'value2' });
 Log errors with stack traces:
 
 ```typescript
-import { LoggerFactory } from '@hookah-db/utils';
+import { LoggerFactory } from './utils';
 
 const logger = LoggerFactory.createEnvironmentLogger('my-service');
 
@@ -272,7 +272,7 @@ try {
 Track requests across distributed systems using correlation IDs:
 
 ```typescript
-import { LoggerFactory } from '@hookah-db/utils';
+import { LoggerFactory } from './utils';
 
 const logger = LoggerFactory.createEnvironmentLogger('my-service');
 
@@ -291,7 +291,7 @@ logger.clearCorrelationId();
 Add metadata to all log entries:
 
 ```typescript
-import { LoggerFactory } from '@hookah-db/utils';
+import { LoggerFactory } from './utils';
 
 const logger = LoggerFactory.createEnvironmentLogger('my-service');
 
@@ -302,7 +302,7 @@ logger.addMetadata({
   sessionId: 'sess-789',
 });
 
-// All logs will include the metadata
+// All logs will include metadata
 logger.info('User action', { action: 'viewProfile' });
 ```
 
@@ -462,7 +462,7 @@ The LoggerFactory provides preset configurations for different environments:
 #### Development Logger
 
 ```typescript
-import { LoggerFactory } from '@hookah-db/utils';
+import { LoggerFactory } from './utils';
 
 const devLogger = LoggerFactory.createDevelopmentLogger('my-service');
 
@@ -477,7 +477,7 @@ const devLogger = LoggerFactory.createDevelopmentLogger('my-service');
 #### Production Logger
 
 ```typescript
-import { LoggerFactory } from '@hookah-db/utils';
+import { LoggerFactory } from './utils';
 
 const prodLogger = LoggerFactory.createProductionLogger('my-service', './logs');
 
@@ -495,7 +495,7 @@ const prodLogger = LoggerFactory.createProductionLogger('my-service', './logs');
 #### Test Logger
 
 ```typescript
-import { LoggerFactory } from '@hookah-db/utils';
+import { LoggerFactory } from './utils';
 
 const testLogger = LoggerFactory.createTestLogger('my-service');
 
@@ -510,7 +510,7 @@ const testLogger = LoggerFactory.createTestLogger('my-service');
 #### Staging Logger
 
 ```typescript
-import { LoggerFactory } from '@hookah-db/utils';
+import { LoggerFactory } from './utils';
 
 const stagingLogger = LoggerFactory.createStagingLogger('my-service', './logs');
 
@@ -529,7 +529,7 @@ const stagingLogger = LoggerFactory.createStagingLogger('my-service', './logs');
 Create a logger with custom configuration:
 
 ```typescript
-import { LoggerFactory, LogLevel, TransportType, LogFormat } from '@hookah-db/utils';
+import { LoggerFactory, LogLevel, TransportType, LogFormat } from './utils';
 
 const customLogger = LoggerFactory.createLogger({
   level: LogLevel.DEBUG,
@@ -584,7 +584,7 @@ const customLogger = LoggerFactory.createLogger({
 
 ### Error Level
 
-Use for errors that prevent normal operation but don't necessarily stop the application:
+Use for errors that prevent normal operation but don't necessarily stop application:
 
 ```typescript
 logger.error('Database connection failed', { error: err, host: 'localhost' });
@@ -873,7 +873,7 @@ const flavorServiceLogger = parentLogger.child({ module: 'flavor-service' });
 brandServiceLogger.info('Fetching brands', { count: 10 });
 flavorServiceLogger.info('Fetching flavors', { count: 100 });
 
-// Bad: Using the same logger everywhere
+// Bad: Using same logger everywhere
 const logger = LoggerFactory.createEnvironmentLogger('my-service');
 logger.info('Fetching brands', { count: 10, module: 'brand-service' });
 logger.info('Fetching flavors', { count: 100, module: 'flavor-service' });
@@ -885,7 +885,7 @@ logger.info('Fetching flavors', { count: 100, module: 'flavor-service' });
 
 ```typescript
 import express from 'express';
-import { LoggerFactory } from '@hookah-db/utils';
+import { LoggerFactory } from './utils';
 import { createLoggingMiddleware } from './middleware/logging-middleware';
 
 const app = express();
@@ -926,7 +926,7 @@ app.listen(3000, () => {
 ### Example 2: Service with Custom Logger
 
 ```typescript
-import { LoggerFactory, LogLevel, TransportType, LogFormat } from '@hookah-db/utils';
+import { LoggerFactory, LogLevel, TransportType, LogFormat } from './utils';
 
 class BrandService {
   private logger: ReturnType<typeof LoggerFactory.createLogger>;
@@ -985,7 +985,7 @@ class BrandService {
 
 ```typescript
 import express from 'express';
-import { LoggerFactory } from '@hookah-db/utils';
+import { LoggerFactory } from './utils';
 import { createRequestLoggingMiddleware } from './middleware/request-logging-middleware';
 import { createResponseLoggingMiddleware } from './middleware/response-logging-middleware';
 import { v4 as uuidv4 } from 'uuid';
@@ -1027,7 +1027,7 @@ app.get('/api/brands/:slug', async (req, res) => {
 ### Example 4: Conditional Logging
 
 ```typescript
-import { LoggerFactory, LogLevel } from '@hookah-db/utils';
+import { LoggerFactory, LogLevel } from './utils';
 
 const logger = LoggerFactory.createEnvironmentLogger('my-service');
 
@@ -1077,7 +1077,7 @@ logger.error('Critical error occurred', { error: err });
 
 ### Issue: Log Files Not Being Created
 
-**Problem:** Log files are not being created in the specified directory.
+**Problem:** Log files are not being created in specified directory.
 
 **Solutions:**
 
@@ -1264,8 +1264,8 @@ logger.error('Critical error occurred', { error: err });
 
 3. Check file permissions:
    ```bash
-   # Ensure the application has write permissions to log directory
+   # Ensure application has write permissions to log directory
    chmod 755 ./logs
    ```
 
-For more information, refer to the [Winston documentation](https://github.com/winstonjs/winston) and [winston-daily-rotate-file documentation](https://github.com/winstonjs/winston-daily-rotate-file).
+For more information, refer to [Winston documentation](https://github.com/winstonjs/winston) and [winston-daily-rotate-file documentation](https://github.com/winstonjs/winston-daily-rotate-file).

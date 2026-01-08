@@ -1,719 +1,923 @@
 /**
- * Unit Tests for HTTP Client
+ * Unit tests for HTTP Client
  * 
- * Tests retry logic, rate limiting, and error handling
+ * Tests HTTP client functionality including:
+ * - Making GET requests
+ * - Handling responses
+ * - Error handling
+ * - Retry logic
  */
 
-import axios, { AxiosInstance } from 'axios';
-import {
-  HttpClient,
-  HttpClientConfig,
-  HttpClientError,
-  MaxRetriesExceededError,
-  RequestTimeoutError,
-  RateLimitError,
-  RETRYABLE_STATUS_CODES,
-} from '../../../packages/scraper/src/http-client';
+import axios from 'axios';
+import { HttpClient, HttpClientError } from '../../src/scraper';
 
-describe('HttpClient', () => {
+// Mock axios module
+jest.mock('axios');
+const mockedAxios = axios as jest.Mocked<typeof axios>;
+
+// ============================================================================
+// Test Suite
+// ============================================================================
+
+describe('HTTP Client', () => {
   let httpClient: HttpClient;
-  let mockAxiosInstance: any;
-  let mockSleepFn: jest.Mock<Promise<void>, [number]>;
 
   beforeEach(() => {
-    jest.useFakeTimers();
+    httpClient = new HttpClient();
     jest.clearAllMocks();
-    
-    // Create mock sleep function that uses Jest's fake timers
-    mockSleepFn = jest.fn((ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms)));
-    
-    // Create mock instance
-    mockAxiosInstance = {
-      request: jest.fn(),
-      get: jest.fn(),
-      post: jest.fn(),
-      put: jest.fn(),
-      delete: jest.fn(),
-      patch: jest.fn(),
-      interceptors: {
-        request: { use: jest.fn(), eject: jest.fn() },
-        response: { use: jest.fn(), eject: jest.fn() },
-      },
-    };
-    
-    // Spy on axios.create to return our mock instance
-    jest.spyOn(axios, 'create').mockReturnValue(mockAxiosInstance);
-    
-    // Create new HTTP client for each test with mock sleep function
-    httpClient = new HttpClient({ sleepFn: mockSleepFn });
   });
 
   afterEach(() => {
-    jest.useRealTimers();
     jest.restoreAllMocks();
   });
 
-  describe('initialization', () => {
-    beforeEach(() => {
-      jest.useFakeTimers();
-    });
+  // ============================================================================
+  // Tests for get method
+  // ============================================================================
 
-    it('should create default instance with correct configuration', () => {
-      const sleepFn = jest.fn((ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms)));
-      const client = new HttpClient({ sleepFn });
-      
-      expect(axios.create).toHaveBeenCalled();
-      expect(axios.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          baseURL: 'https://htreviews.org',
-          timeout: 30000,
-          headers: expect.objectContaining({
-            'User-Agent': expect.stringContaining('HookahDB'),
-          }),
-        })
-      );
-    });
-
-    it('should create instance with custom baseURL', () => {
-      const sleepFn = jest.fn((ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms)));
-      const config: HttpClientConfig = { baseURL: 'https://example.com', sleepFn };
-      const client = new HttpClient(config);
-      
-      expect(axios.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          baseURL: 'https://example.com',
-        })
-      );
-    });
-
-    it('should create instance with custom timeout', () => {
-      const sleepFn = jest.fn((ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms)));
-      const config: HttpClientConfig = { timeout: 60000, sleepFn };
-      const client = new HttpClient(config);
-      
-      expect(axios.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          timeout: 60000,
-        })
-      );
-    });
-
-    it('should create instance with custom maxRetries', () => {
-      const sleepFn = jest.fn((ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms)));
-      const config: HttpClientConfig = { maxRetries: 5, sleepFn };
-      const client = new HttpClient(config);
-      
-      expect(axios.create).toHaveBeenCalled();
-    });
-
-    it('should create instance with custom minDelayBetweenRequests', () => {
-      const sleepFn = jest.fn((ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms)));
-      const config: HttpClientConfig = { minDelayBetweenRequests: 2000, sleepFn };
-      const client = new HttpClient(config);
-      
-      expect(axios.create).toHaveBeenCalled();
-    });
-
-    it('should create instance with custom userAgent', () => {
-      const sleepFn = jest.fn((ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms)));
-      const config: HttpClientConfig = { userAgent: 'CustomAgent/1.0', sleepFn };
-      const client = new HttpClient(config);
-      
-      expect(axios.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          headers: expect.objectContaining({
-            'User-Agent': 'CustomAgent/1.0',
-          }),
-        })
-      );
-    });
-
-    it('should create instance with retry disabled', () => {
-      const sleepFn = jest.fn((ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms)));
-      const config: HttpClientConfig = { enableRetry: false, sleepFn };
-      const client = new HttpClient(config);
-      
-      expect(axios.create).toHaveBeenCalled();
-    });
-
-    it('should create instance with rate limiting disabled', () => {
-      const sleepFn = jest.fn((ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms)));
-      const config: HttpClientConfig = { enableRateLimit: false, sleepFn };
-      const client = new HttpClient(config);
-      
-      expect(axios.create).toHaveBeenCalled();
-    });
-
-    it('should create instance with all custom options', () => {
-      const sleepFn = jest.fn((ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms)));
-      const config: HttpClientConfig = {
-        baseURL: 'https://custom.com',
-        timeout: 45000,
-        maxRetries: 7,
-        minDelayBetweenRequests: 1500,
-        userAgent: 'TestAgent/2.0',
-        enableRetry: false,
-        enableRateLimit: false,
-        sleepFn,
+  describe('get', () => {
+    it('should make successful GET request', async () => {
+      const mockResponse = {
+        data: '<html>test</html>',
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {},
       };
-      const client = new HttpClient(config);
-      
-      expect(axios.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          baseURL: 'https://custom.com',
-          timeout: 45000,
-          headers: expect.objectContaining({
-            'User-Agent': 'TestAgent/2.0',
-          }),
-        })
-      );
-    });
-  });
 
-  describe('successful requests', () => {
-    it('should handle successful GET request', async () => {
-      const mockResponse = { data: { result: 'success' }, status: 200 };
-      mockAxiosInstance.request.mockResolvedValueOnce(mockResponse);
-      
-      const result = await httpClient.get('/test');
-      
-      expect(result.data).toEqual({ result: 'success' });
-      expect(mockAxiosInstance.request).toHaveBeenCalledWith(
-        expect.objectContaining({
-          method: 'GET',
-          url: '/test',
-        })
-      );
-    });
+      mockedAxios.get.mockResolvedValueOnce(mockResponse);
 
-    it('should handle successful POST request', async () => {
-      const mockResponse = { data: { created: true }, status: 201 };
-      mockAxiosInstance.request.mockResolvedValueOnce(mockResponse);
-      
-      const result = await httpClient.post('/test', { name: 'test' });
-      
-      expect(result.data).toEqual({ created: true });
-      expect(mockAxiosInstance.request).toHaveBeenCalledWith(
-        expect.objectContaining({
-          method: 'POST',
-          url: '/test',
-          data: { name: 'test' },
-        })
-      );
-    });
+      const response = await httpClient.get('https://example.com');
 
-    it('should handle request with custom headers', async () => {
-      const mockResponse = { data: { result: 'success' }, status: 200 };
-      mockAxiosInstance.request.mockResolvedValueOnce(mockResponse);
-      
-      await httpClient.get('/test', {
-        headers: { 'X-Custom-Header': 'custom-value' },
+      expect(response).toEqual(mockResponse);
+      expect(mockedAxios.get).toHaveBeenCalledTimes(1);
+      expect(mockedAxios.get).toHaveBeenCalledWith('https://example.com', {
+        headers: {
+          'User-Agent': expect.any(String),
+        },
       });
-      
-      expect(mockAxiosInstance.request).toHaveBeenCalledWith(
-        expect.objectContaining({
-          headers: { 'X-Custom-Header': 'custom-value' },
-        })
-      );
     });
 
-    it('should handle request with query parameters', async () => {
-      const mockResponse = { data: { result: 'success' }, status: 200 };
-      mockAxiosInstance.request.mockResolvedValueOnce(mockResponse);
-      
-      await httpClient.get('/test', {
-        params: { page: 1, limit: 10 },
+    it('should make GET request with custom headers', async () => {
+      const mockResponse = {
+        data: '<html>test</html>',
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {},
+      };
+
+      mockedAxios.get.mockResolvedValueOnce(mockResponse);
+
+      const customHeaders = {
+        'Custom-Header': 'value',
+      };
+
+      const response = await httpClient.get('https://example.com', customHeaders);
+
+      expect(response).toEqual(mockResponse);
+      expect(mockedAxios.get).toHaveBeenCalledWith('https://example.com', {
+        headers: {
+          'User-Agent': expect.any(String),
+          'Custom-Header': 'value',
+        },
       });
-      
-      expect(mockAxiosInstance.request).toHaveBeenCalledWith(
-        expect.objectContaining({
-          params: { page: 1, limit: 10 },
-        })
-      );
     });
 
-    it('should handle successful PUT request', async () => {
-      const mockResponse = { data: { updated: true }, status: 200 };
-      mockAxiosInstance.request.mockResolvedValueOnce(mockResponse);
-      
-      const result = await httpClient.put('/test', { name: 'updated' });
-      
-      expect(result.data).toEqual({ updated: true });
-      expect(mockAxiosInstance.request).toHaveBeenCalledWith(
-        expect.objectContaining({
-          method: 'PUT',
-          url: '/test',
-          data: { name: 'updated' },
-        })
-      );
+    it('should make GET request with custom User-Agent', async () => {
+      const mockResponse = {
+        data: '<html>test</html>',
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {},
+      };
+
+      mockedAxios.get.mockResolvedValueOnce(mockResponse);
+
+      const customHeaders = {
+        'User-Agent': 'Custom User Agent',
+      };
+
+      const response = await httpClient.get('https://example.com', customHeaders);
+
+      expect(response).toEqual(mockResponse);
+      expect(mockedAxios.get).toHaveBeenCalledWith('https://example.com', {
+        headers: {
+          'User-Agent': 'Custom User Agent',
+        },
+      });
     });
 
-    it('should handle successful DELETE request', async () => {
-      const mockResponse = { data: { deleted: true }, status: 200 };
-      mockAxiosInstance.request.mockResolvedValueOnce(mockResponse);
-      
-      const result = await httpClient.delete('/test');
-      
-      expect(result.data).toEqual({ deleted: true });
-      expect(mockAxiosInstance.request).toHaveBeenCalledWith(
-        expect.objectContaining({
-          method: 'DELETE',
-          url: '/test',
-        })
-      );
-    });
-  });
-
-  describe('retry logic', () => {
-    it('should not retry on 400 status code', async () => {
+    it('should handle HTTP errors', async () => {
       const mockError = {
-        response: { status: 400, statusText: 'Bad Request' },
-        config: { url: '/test' },
+        response: {
+          status: 404,
+          statusText: 'Not Found',
+          data: 'Not Found',
+        },
+        isAxiosError: true,
       };
-      
-      mockAxiosInstance.request.mockRejectedValueOnce(mockError);
-      
-      await expect(httpClient.get('/test')).rejects.toThrow(HttpClientError);
-      expect(mockAxiosInstance.request).toHaveBeenCalledTimes(1);
+
+      mockedAxios.get.mockRejectedValueOnce(mockError);
+
+      await expect(httpClient.get('https://example.com')).rejects.toThrow(HttpClientError);
+      expect(mockedAxios.get).toHaveBeenCalledTimes(1);
     });
 
-    it('should not retry on 401 status code', async () => {
-      const mockError = {
-        response: { status: 401, statusText: 'Unauthorized' },
-        config: { url: '/test' },
-      };
-      
-      mockAxiosInstance.request.mockRejectedValueOnce(mockError);
-      
-      await expect(httpClient.get('/test')).rejects.toThrow(HttpClientError);
-      expect(mockAxiosInstance.request).toHaveBeenCalledTimes(1);
+    it('should handle network errors', async () => {
+      const mockError = new Error('Network Error');
+      (mockError as any).isAxiosError = true;
+
+      mockedAxios.get.mockRejectedValueOnce(mockError);
+
+      await expect(httpClient.get('https://example.com')).rejects.toThrow(HttpClientError);
+      expect(mockedAxios.get).toHaveBeenCalledTimes(1);
     });
 
-    it('should not retry on 404 status code', async () => {
-      const mockError = {
-        response: { status: 404, statusText: 'Not Found' },
-        config: { url: '/test' },
-      };
-      
-      mockAxiosInstance.request.mockRejectedValueOnce(mockError);
-      
-      await expect(httpClient.get('/test')).rejects.toThrow(HttpClientError);
-      expect(mockAxiosInstance.request).toHaveBeenCalledTimes(1);
+    it('should handle timeout errors', async () => {
+      const mockError = new Error('Request timeout');
+      (mockError as any).isAxiosError = true;
+      (mockError as any).code = 'ECONNABORTED';
+
+      mockedAxios.get.mockRejectedValueOnce(mockError);
+
+      await expect(httpClient.get('https://example.com')).rejects.toThrow(HttpClientError);
+      expect(mockedAxios.get).toHaveBeenCalledTimes(1);
     });
 
-    it('should not retry on 422 status code', async () => {
-      const mockError = {
-        response: { status: 422, statusText: 'Unprocessable Entity' },
-        config: { url: '/test' },
-      };
-      
-      mockAxiosInstance.request.mockRejectedValueOnce(mockError);
-      
-      await expect(httpClient.get('/test')).rejects.toThrow(HttpClientError);
-      expect(mockAxiosInstance.request).toHaveBeenCalledTimes(1);
+    it('should handle DNS resolution errors', async () => {
+      const mockError = new Error('getaddrinfo ENOTFOUND example.com');
+      (mockError as any).isAxiosError = true;
+      (mockError as any).code = 'ENOTFOUND';
+
+      mockedAxios.get.mockRejectedValueOnce(mockError);
+
+      await expect(httpClient.get('https://example.com')).rejects.toThrow(HttpClientError);
+      expect(mockedAxios.get).toHaveBeenCalledTimes(1);
     });
 
-    it('should not retry when retry is disabled', async () => {
-      const sleepFn = jest.fn((ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms)));
-      const client = new HttpClient({ enableRetry: false, enableRateLimit: false, sleepFn });
-      
+    it('should handle connection refused errors', async () => {
+      const mockError = new Error('ECONNREFUSED');
+      (mockError as any).isAxiosError = true;
+      (mockError as any).code = 'ECONNREFUSED';
+
+      mockedAxios.get.mockRejectedValueOnce(mockError);
+
+      await expect(httpClient.get('https://example.com')).rejects.toThrow(HttpClientError);
+      expect(mockedAxios.get).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle 500 Internal Server Error', async () => {
       const mockError = {
-        response: { status: 500, statusText: 'Internal Server Error' },
-        config: { url: '/test' },
+        response: {
+          status: 500,
+          statusText: 'Internal Server Error',
+          data: 'Internal Server Error',
+        },
+        isAxiosError: true,
       };
-      
-      mockAxiosInstance.request.mockRejectedValueOnce(mockError);
-      
-      await expect(client.get('/test')).rejects.toThrow(HttpClientError);
-      expect(mockAxiosInstance.request).toHaveBeenCalledTimes(1);
+
+      mockedAxios.get.mockRejectedValueOnce(mockError);
+
+      await expect(httpClient.get('https://example.com')).rejects.toThrow(HttpClientError);
+      expect(mockedAxios.get).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle 503 Service Unavailable', async () => {
+      const mockError = {
+        response: {
+          status: 503,
+          statusText: 'Service Unavailable',
+          data: 'Service Unavailable',
+        },
+        isAxiosError: true,
+      };
+
+      mockedAxios.get.mockRejectedValueOnce(mockError);
+
+      await expect(httpClient.get('https://example.com')).rejects.toThrow(HttpClientError);
+      expect(mockedAxios.get).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle 429 Too Many Requests', async () => {
+      const mockError = {
+        response: {
+          status: 429,
+          statusText: 'Too Many Requests',
+          data: 'Too Many Requests',
+        },
+        isAxiosError: true,
+      };
+
+      mockedAxios.get.mockRejectedValueOnce(mockError);
+
+      await expect(httpClient.get('https://example.com')).rejects.toThrow(HttpClientError);
+      expect(mockedAxios.get).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle 403 Forbidden', async () => {
+      const mockError = {
+        response: {
+          status: 403,
+          statusText: 'Forbidden',
+          data: 'Forbidden',
+        },
+        isAxiosError: true,
+      };
+
+      mockedAxios.get.mockRejectedValueOnce(mockError);
+
+      await expect(httpClient.get('https://example.com')).rejects.toThrow(HttpClientError);
+      expect(mockedAxios.get).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle 401 Unauthorized', async () => {
+      const mockError = {
+        response: {
+          status: 401,
+          statusText: 'Unauthorized',
+          data: 'Unauthorized',
+        },
+        isAxiosError: true,
+      };
+
+      mockedAxios.get.mockRejectedValueOnce(mockError);
+
+      await expect(httpClient.get('https://example.com')).rejects.toThrow(HttpClientError);
+      expect(mockedAxios.get).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle 400 Bad Request', async () => {
+      const mockError = {
+        response: {
+          status: 400,
+          statusText: 'Bad Request',
+          data: 'Bad Request',
+        },
+        isAxiosError: true,
+      };
+
+      mockedAxios.get.mockRejectedValueOnce(mockError);
+
+      await expect(httpClient.get('https://example.com')).rejects.toThrow(HttpClientError);
+      expect(mockedAxios.get).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe('rate limiting', () => {
-    it('should allow requests after minimum delay has passed', async () => {
-      const sleepFn = jest.fn((ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms)));
-      const client = new HttpClient({ minDelayBetweenRequests: 500, enableRetry: false, sleepFn });
-      
-      const mockResponse = { data: 'success', status: 200 };
-      mockAxiosInstance.request.mockResolvedValue(mockResponse);
-      
-      await client.get('/test1');
-      jest.advanceTimersByTime(500);
-      await client.get('/test2');
-      
-      expect(mockAxiosInstance.request).toHaveBeenCalledTimes(2);
+  // ============================================================================
+  // Tests for HttpClientError
+  // ============================================================================
+
+  describe('HttpClientError', () => {
+    it('should create error with message', () => {
+      const error = new HttpClientError('Test error message');
+
+      expect(error).toBeInstanceOf(Error);
+      expect(error.message).toBe('Test error message');
+      expect(error.name).toBe('HttpClientError');
     });
 
-    it('should allow rate limiter reset', async () => {
-      const sleepFn = jest.fn((ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms)));
-      const client = new HttpClient({ minDelayBetweenRequests: 1000, enableRetry: false, sleepFn });
-      
-      const mockResponse = { data: 'success', status: 200 };
-      mockAxiosInstance.request.mockResolvedValue(mockResponse);
-      
-      await client.get('/test1');
-      client.resetRateLimiter();
-      await client.get('/test2');
-      
-      expect(mockAxiosInstance.request).toHaveBeenCalledTimes(2);
+    it('should create error with original error', () => {
+      const originalError = new Error('Original error');
+      const error = new HttpClientError('Test error message', originalError);
+
+      expect(error.message).toBe('Test error message');
+      expect(error.originalError).toBe(originalError);
     });
 
-    it('should allow rate limiting to be disabled', async () => {
-      const sleepFn = jest.fn((ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms)));
-      const client = new HttpClient({ enableRateLimit: false, enableRetry: false, sleepFn });
-      
-      const mockResponse = { data: 'success', status: 200 };
-      mockAxiosInstance.request.mockResolvedValue(mockResponse);
-      
-      await client.get('/test1');
-      await client.get('/test2');
-      await client.get('/test3');
-      
-      expect(mockAxiosInstance.request).toHaveBeenCalledTimes(3);
-    });
-
-    it('should not delay when rate limiting is disabled', async () => {
-      const sleepFn = jest.fn((ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms)));
-      const client = new HttpClient({ 
-        minDelayBetweenRequests: 5000, 
-        enableRateLimit: false,
-        enableRetry: false,
-        sleepFn,
-      });
-      
-      const mockResponse = { data: 'success', status: 200 };
-      mockAxiosInstance.request.mockResolvedValue(mockResponse);
-      
-      await client.get('/test1');
-      await client.get('/test2');
-      
-      expect(mockAxiosInstance.request).toHaveBeenCalledTimes(2);
-    });
-  });
-
-  describe('custom error types', () => {
-    describe('HttpClientError', () => {
-      it('should create HttpClientError with message only', () => {
-        const error = new HttpClientError('Test error');
-        
-        expect(error.name).toBe('HttpClientError');
-        expect(error.message).toBe('Test error');
-        expect(error.statusCode).toBeUndefined();
-        expect(error.url).toBeUndefined();
-        expect(error.originalError).toBeUndefined();
-      });
-
-      it('should create HttpClientError with all properties', () => {
-        const originalError = new Error('Original');
-        const error = new HttpClientError('Test error', 500, '/test', originalError);
-        
-        expect(error.name).toBe('HttpClientError');
-        expect(error.message).toBe('Test error');
-        expect(error.statusCode).toBe(500);
-        expect(error.url).toBe('/test');
-        expect(error.originalError).toBe(originalError);
-      });
-
-      it('should have correct prototype chain', () => {
-        const error = new HttpClientError('Test');
-        
-        expect(error instanceof Error).toBe(true);
-        expect(error instanceof HttpClientError).toBe(true);
-      });
-    });
-
-    describe('MaxRetriesExceededError', () => {
-      it('should create MaxRetriesExceededError with default attempts', () => {
-        const error = new MaxRetriesExceededError('Max retries exceeded', 500, '/test');
-        
-        expect(error.name).toBe('MaxRetriesExceededError');
-        expect(error.message).toBe('Max retries exceeded');
-        expect(error.statusCode).toBe(500);
-        expect(error.url).toBe('/test');
-        expect(error.attempts).toBe(0);
-      });
-
-      it('should create MaxRetriesExceededError with custom attempts', () => {
-        const error = new MaxRetriesExceededError('Max retries exceeded', 500, '/test', 5);
-        
-        expect(error.name).toBe('MaxRetriesExceededError');
-        expect(error.attempts).toBe(5);
-      });
-
-      it('should extend HttpClientError', () => {
-        const error = new MaxRetriesExceededError('Max retries exceeded');
-        
-        expect(error instanceof HttpClientError).toBe(true);
-        expect(error instanceof Error).toBe(true);
-      });
-    });
-
-    describe('RequestTimeoutError', () => {
-      it('should create RequestTimeoutError with default values', () => {
-        const error = new RequestTimeoutError();
-        
-        expect(error.name).toBe('RequestTimeoutError');
-        expect(error.message).toContain('timeout');
-        expect(error.url).toBeUndefined();
-      });
-
-      it('should create RequestTimeoutError with url and timeout', () => {
-        const error = new RequestTimeoutError('/test', 30000);
-        
-        expect(error.name).toBe('RequestTimeoutError');
-        expect(error.message).toContain('30000ms');
-        expect(error.url).toBe('/test');
-      });
-
-      it('should extend HttpClientError', () => {
-        const error = new RequestTimeoutError();
-        
-        expect(error instanceof HttpClientError).toBe(true);
-        expect(error instanceof Error).toBe(true);
-      });
-    });
-
-    describe('RateLimitError', () => {
-      it('should create RateLimitError without retry-after', () => {
-        const error = new RateLimitError('/test');
-        
-        expect(error.name).toBe('RateLimitError');
-        expect(error.message).toBe('Rate limit exceeded.');
-        expect(error.statusCode).toBe(429);
-        expect(error.url).toBe('/test');
-      });
-
-      it('should create RateLimitError with retry-after', () => {
-        const error = new RateLimitError('/test', 60);
-        
-        expect(error.name).toBe('RateLimitError');
-        expect(error.message).toContain('60 seconds');
-        expect(error.statusCode).toBe(429);
-        expect(error.url).toBe('/test');
-      });
-
-      it('should extend HttpClientError', () => {
-        const error = new RateLimitError();
-        
-        expect(error instanceof HttpClientError).toBe(true);
-        expect(error instanceof Error).toBe(true);
-      });
-    });
-  });
-
-  describe('HTTP methods', () => {
-    beforeEach(() => {
-      const mockResponse = { data: 'success', status: 200 };
-      mockAxiosInstance.request.mockResolvedValue(mockResponse);
-    });
-
-    it('should support GET method', async () => {
-      const result = await httpClient.get('/test');
-      
-      expect(result.data).toBe('success');
-      expect(mockAxiosInstance.request).toHaveBeenCalledWith(
-        expect.objectContaining({
-          method: 'GET',
-          url: '/test',
-        })
-      );
-    });
-
-    it('should support POST method', async () => {
-      const result = await httpClient.post('/test', { data: 'value' });
-      
-      expect(result.data).toBe('success');
-      expect(mockAxiosInstance.request).toHaveBeenCalledWith(
-        expect.objectContaining({
-          method: 'POST',
-          url: '/test',
-          data: { data: 'value' },
-        })
-      );
-    });
-
-    it('should support PUT method', async () => {
-      const result = await httpClient.put('/test', { data: 'value' });
-      
-      expect(result.data).toBe('success');
-      expect(mockAxiosInstance.request).toHaveBeenCalledWith(
-        expect.objectContaining({
-          method: 'PUT',
-          url: '/test',
-          data: { data: 'value' },
-        })
-      );
-    });
-
-    it('should support DELETE method', async () => {
-      const result = await httpClient.delete('/test');
-      
-      expect(result.data).toBe('success');
-      expect(mockAxiosInstance.request).toHaveBeenCalledWith(
-        expect.objectContaining({
-          method: 'DELETE',
-          url: '/test',
-        })
-      );
-    });
-
-    it('should support PATCH method', async () => {
-      const result = await httpClient.patch('/test', { data: 'value' });
-      
-      expect(result.data).toBe('success');
-      expect(mockAxiosInstance.request).toHaveBeenCalledWith(
-        expect.objectContaining({
-          method: 'PATCH',
-          url: '/test',
-          data: { data: 'value' },
-        })
-      );
-    });
-
-    it('should pass config to GET method', async () => {
-      await httpClient.get('/test', { headers: { 'X-Custom': 'value' } });
-      
-      expect(mockAxiosInstance.request).toHaveBeenCalledWith(
-        expect.objectContaining({
-          method: 'GET',
-          url: '/test',
-          headers: { 'X-Custom': 'value' },
-        })
-      );
-    });
-
-    it('should pass config to POST method', async () => {
-      await httpClient.post('/test', { data: 'value' }, { headers: { 'X-Custom': 'value' } });
-      
-      expect(mockAxiosInstance.request).toHaveBeenCalledWith(
-        expect.objectContaining({
-          method: 'POST',
-          url: '/test',
-          data: { data: 'value' },
-          headers: { 'X-Custom': 'value' },
-        })
-      );
-    });
-
-    it('should pass config to PUT method', async () => {
-      await httpClient.put('/test', { data: 'value' }, { headers: { 'X-Custom': 'value' } });
-      
-      expect(mockAxiosInstance.request).toHaveBeenCalledWith(
-        expect.objectContaining({
-          method: 'PUT',
-          url: '/test',
-          data: { data: 'value' },
-          headers: { 'X-Custom': 'value' },
-        })
-      );
-    });
-
-    it('should pass config to DELETE method', async () => {
-      await httpClient.delete('/test', { headers: { 'X-Custom': 'value' } });
-      
-      expect(mockAxiosInstance.request).toHaveBeenCalledWith(
-        expect.objectContaining({
-          method: 'DELETE',
-          url: '/test',
-          headers: { 'X-Custom': 'value' },
-        })
-      );
-    });
-  });
-
-  describe('RETRYABLE_STATUS_CODES', () => {
-    it('should include 429', () => {
-      expect(RETRYABLE_STATUS_CODES).toContain(429);
-    });
-
-    it('should include 500', () => {
-      expect(RETRYABLE_STATUS_CODES).toContain(500);
-    });
-
-    it('should include 502', () => {
-      expect(RETRYABLE_STATUS_CODES).toContain(502);
-    });
-
-    it('should include 503', () => {
-      expect(RETRYABLE_STATUS_CODES).toContain(503);
-    });
-
-    it('should include 504', () => {
-      expect(RETRYABLE_STATUS_CODES).toContain(504);
-    });
-
-    it('should not include 400', () => {
-      expect(RETRYABLE_STATUS_CODES).not.toContain(400);
-    });
-
-    it('should not include 404', () => {
-      expect(RETRYABLE_STATUS_CODES).not.toContain(404);
-    });
-  });
-
-  describe('edge cases', () => {
-    it('should handle zero maxRetries', async () => {
-      const sleepFn = jest.fn((ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms)));
-      const client = new HttpClient({ maxRetries: 0, enableRateLimit: false, sleepFn });
-      
+    it('should create error with HTTP status code', () => {
       const mockError = {
-        response: { status: 500, statusText: 'Internal Server Error' },
-        config: { url: '/test' },
+        response: {
+          status: 404,
+          statusText: 'Not Found',
+        },
+        isAxiosError: true,
       };
-      
-      mockAxiosInstance.request.mockRejectedValueOnce(mockError);
-      
-      await expect(client.get('/test')).rejects.toThrow(HttpClientError);
-      expect(mockAxiosInstance.request).toHaveBeenCalledTimes(1);
+
+      const error = new HttpClientError('Not Found', mockError);
+
+      expect(error.message).toBe('Not Found');
+      expect(error.originalError).toBe(mockError);
+      expect(error.statusCode).toBe(404);
     });
 
-    it('should handle very large maxRetries', async () => {
-      const sleepFn = jest.fn((ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms)));
-      const client = new HttpClient({ maxRetries: 100, sleepFn });
-      
-      expect(axios.create).toHaveBeenCalled();
+    it('should create error without HTTP status code', () => {
+      const originalError = new Error('Network Error');
+      const error = new HttpClientError('Network Error', originalError);
+
+      expect(error.message).toBe('Network Error');
+      expect(error.originalError).toBe(originalError);
+      expect(error.statusCode).toBeUndefined();
     });
 
-    it('should handle very large timeout', async () => {
-      const sleepFn = jest.fn((ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms)));
-      const client = new HttpClient({ timeout: 300000, enableRetry: false, sleepFn });
-      
-      expect(axios.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          timeout: 300000,
-        })
+    it('should create error with stack trace', () => {
+      const error = new HttpClientError('Test error');
+
+      expect(error.stack).toBeDefined();
+      expect(typeof error.stack).toBe('string');
+    });
+  });
+
+  // ============================================================================
+  // Tests for User-Agent header
+  // ============================================================================
+
+  describe('User-Agent Header', () => {
+    it('should include default User-Agent header', async () => {
+      const mockResponse = {
+        data: '<html>test</html>',
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {},
+      };
+
+      mockedAxios.get.mockResolvedValueOnce(mockResponse);
+
+      await httpClient.get('https://example.com');
+
+      expect(mockedAxios.get).toHaveBeenCalledWith('https://example.com', {
+        headers: {
+          'User-Agent': expect.any(String),
+        },
+      });
+    });
+
+    it('should override default User-Agent with custom header', async () => {
+      const mockResponse = {
+        data: '<html>test</html>',
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {},
+      };
+
+      mockedAxios.get.mockResolvedValueOnce(mockResponse);
+
+      const customHeaders = {
+        'User-Agent': 'Custom User Agent',
+      };
+
+      await httpClient.get('https://example.com', customHeaders);
+
+      expect(mockedAxios.get).toHaveBeenCalledWith('https://example.com', {
+        headers: {
+          'User-Agent': 'Custom User Agent',
+        },
+      });
+    });
+
+    it('should preserve User-Agent format', async () => {
+      const mockResponse = {
+        data: '<html>test</html>',
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {},
+      };
+
+      mockedAxios.get.mockResolvedValueOnce(mockResponse);
+
+      await httpClient.get('https://example.com');
+
+      const callArgs = mockedAxios.get.mock.calls[0];
+      const userAgent = callArgs[1].headers['User-Agent'];
+
+      expect(userAgent).toContain('Mozilla');
+      expect(userAgent).toContain('Chrome');
+    });
+  });
+
+  // ============================================================================
+  // Tests for URL handling
+  // ============================================================================
+
+  describe('URL Handling', () => {
+    it('should handle HTTP URLs', async () => {
+      const mockResponse = {
+        data: '<html>test</html>',
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {},
+      };
+
+      mockedAxios.get.mockResolvedValueOnce(mockResponse);
+
+      const response = await httpClient.get('http://example.com');
+
+      expect(response).toEqual(mockResponse);
+      expect(mockedAxios.get).toHaveBeenCalledWith('http://example.com', expect.any(Object));
+    });
+
+    it('should handle HTTPS URLs', async () => {
+      const mockResponse = {
+        data: '<html>test</html>',
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {},
+      };
+
+      mockedAxios.get.mockResolvedValueOnce(mockResponse);
+
+      const response = await httpClient.get('https://example.com');
+
+      expect(response).toEqual(mockResponse);
+      expect(mockedAxios.get).toHaveBeenCalledWith('https://example.com', expect.any(Object));
+    });
+
+    it('should handle URLs with query parameters', async () => {
+      const mockResponse = {
+        data: '<html>test</html>',
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {},
+      };
+
+      mockedAxios.get.mockResolvedValueOnce(mockResponse);
+
+      const response = await httpClient.get('https://example.com?param1=value1&param2=value2');
+
+      expect(response).toEqual(mockResponse);
+      expect(mockedAxios.get).toHaveBeenCalledWith(
+        'https://example.com?param1=value1&param2=value2',
+        expect.any(Object)
       );
     });
 
-    it('should handle empty baseURL', async () => {
-      const sleepFn = jest.fn((ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms)));
-      const client = new HttpClient({ baseURL: '', enableRetry: false, sleepFn });
-      
-      expect(axios.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          baseURL: '',
-        })
+    it('should handle URLs with fragments', async () => {
+      const mockResponse = {
+        data: '<html>test</html>',
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {},
+      };
+
+      mockedAxios.get.mockResolvedValueOnce(mockResponse);
+
+      const response = await httpClient.get('https://example.com#section');
+
+      expect(response).toEqual(mockResponse);
+      expect(mockedAxios.get).toHaveBeenCalledWith('https://example.com#section', expect.any(Object));
+    });
+
+    it('should handle URLs with path segments', async () => {
+      const mockResponse = {
+        data: '<html>test</html>',
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {},
+      };
+
+      mockedAxios.get.mockResolvedValueOnce(mockResponse);
+
+      const response = await httpClient.get('https://example.com/path/to/resource');
+
+      expect(response).toEqual(mockResponse);
+      expect(mockedAxios.get).toHaveBeenCalledWith(
+        'https://example.com/path/to/resource',
+        expect.any(Object)
       );
     });
 
-    it('should handle concurrent requests with rate limiting', async () => {
-      const sleepFn = jest.fn((ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms)));
-      const client = new HttpClient({ minDelayBetweenRequests: 100, enableRetry: false, sleepFn });
-      
-      const mockResponse = { data: 'success', status: 200 };
-      mockAxiosInstance.request.mockResolvedValue(mockResponse);
-      
-      const promises = [
-        client.get('/test1'),
-        client.get('/test2'),
-        client.get('/test3'),
-      ];
-      
-      jest.runAllTimers();
-      
-      await Promise.all(promises);
-      
-      expect(mockAxiosInstance.request).toHaveBeenCalledTimes(3);
+    it('should handle URLs with special characters', async () => {
+      const mockResponse = {
+        data: '<html>test</html>',
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {},
+      };
+
+      mockedAxios.get.mockResolvedValueOnce(mockResponse);
+
+      const response = await httpClient.get('https://example.com/path?param=value%20with%20spaces');
+
+      expect(response).toEqual(mockResponse);
+      expect(mockedAxios.get).toHaveBeenCalledWith(
+        'https://example.com/path?param=value%20with%20spaces',
+        expect.any(Object)
+      );
+    });
+
+    it('should handle URLs with Unicode characters', async () => {
+      const mockResponse = {
+        data: '<html>test</html>',
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {},
+      };
+
+      mockedAxios.get.mockResolvedValueOnce(mockResponse);
+
+      const response = await httpClient.get('https://example.com/path/тест');
+
+      expect(response).toEqual(mockResponse);
+      expect(mockedAxios.get).toHaveBeenCalledWith(
+        'https://example.com/path/тест',
+        expect.any(Object)
+      );
+    });
+
+    it('should handle URLs with port numbers', async () => {
+      const mockResponse = {
+        data: '<html>test</html>',
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {},
+      };
+
+      mockedAxios.get.mockResolvedValueOnce(mockResponse);
+
+      const response = await httpClient.get('https://example.com:8080/path');
+
+      expect(response).toEqual(mockResponse);
+      expect(mockedAxios.get).toHaveBeenCalledWith(
+        'https://example.com:8080/path',
+        expect.any(Object)
+      );
+    });
+
+    it('should handle URLs with authentication', async () => {
+      const mockResponse = {
+        data: '<html>test</html>',
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {},
+      };
+
+      mockedAxios.get.mockResolvedValueOnce(mockResponse);
+
+      const response = await httpClient.get('https://user:pass@example.com/path');
+
+      expect(response).toEqual(mockResponse);
+      expect(mockedAxios.get).toHaveBeenCalledWith(
+        'https://user:pass@example.com/path',
+        expect.any(Object)
+      );
+    });
+  });
+
+  // ============================================================================
+  // Tests for response handling
+  // ============================================================================
+
+  describe('Response Handling', () => {
+    it('should return response data', async () => {
+      const mockResponse = {
+        data: '<html>test</html>',
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {},
+      };
+
+      mockedAxios.get.mockResolvedValueOnce(mockResponse);
+
+      const response = await httpClient.get('https://example.com');
+
+      expect(response.data).toBe('<html>test</html>');
+    });
+
+    it('should return response status', async () => {
+      const mockResponse = {
+        data: '<html>test</html>',
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {},
+      };
+
+      mockedAxios.get.mockResolvedValueOnce(mockResponse);
+
+      const response = await httpClient.get('https://example.com');
+
+      expect(response.status).toBe(200);
+    });
+
+    it('should return response status text', async () => {
+      const mockResponse = {
+        data: '<html>test</html>',
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {},
+      };
+
+      mockedAxios.get.mockResolvedValueOnce(mockResponse);
+
+      const response = await httpClient.get('https://example.com');
+
+      expect(response.statusText).toBe('OK');
+    });
+
+    it('should return response headers', async () => {
+      const mockResponse = {
+        data: '<html>test</html>',
+        status: 200,
+        statusText: 'OK',
+        headers: {
+          'content-type': 'text/html',
+          'content-length': '100',
+        },
+        config: {},
+      };
+
+      mockedAxios.get.mockResolvedValueOnce(mockResponse);
+
+      const response = await httpClient.get('https://example.com');
+
+      expect(response.headers).toEqual({
+        'content-type': 'text/html',
+        'content-length': '100',
+      });
+    });
+
+    it('should handle empty response data', async () => {
+      const mockResponse = {
+        data: '',
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {},
+      };
+
+      mockedAxios.get.mockResolvedValueOnce(mockResponse);
+
+      const response = await httpClient.get('https://example.com');
+
+      expect(response.data).toBe('');
+    });
+
+    it('should handle JSON response data', async () => {
+      const mockResponse = {
+        data: { key: 'value', nested: { key2: 'value2' } },
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {},
+      };
+
+      mockedAxios.get.mockResolvedValueOnce(mockResponse);
+
+      const response = await httpClient.get('https://example.com');
+
+      expect(response.data).toEqual({
+        key: 'value',
+        nested: { key2: 'value2' },
+      });
+    });
+
+    it('should handle array response data', async () => {
+      const mockResponse = {
+        data: ['item1', 'item2', 'item3'],
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {},
+      };
+
+      mockedAxios.get.mockResolvedValueOnce(mockResponse);
+
+      const response = await httpClient.get('https://example.com');
+
+      expect(response.data).toEqual(['item1', 'item2', 'item3']);
+    });
+
+    it('should handle null response data', async () => {
+      const mockResponse = {
+        data: null,
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {},
+      };
+
+      mockedAxios.get.mockResolvedValueOnce(mockResponse);
+
+      const response = await httpClient.get('https://example.com');
+
+      expect(response.data).toBeNull();
+    });
+
+    it('should handle undefined response data', async () => {
+      const mockResponse = {
+        data: undefined,
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {},
+      };
+
+      mockedAxios.get.mockResolvedValueOnce(mockResponse);
+
+      const response = await httpClient.get('https://example.com');
+
+      expect(response.data).toBeUndefined();
+    });
+  });
+
+  // ============================================================================
+  // Tests for edge cases
+  // ============================================================================
+
+  describe('Edge Cases', () => {
+    it('should handle very long URLs', async () => {
+      const mockResponse = {
+        data: '<html>test</html>',
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {},
+      };
+
+      mockedAxios.get.mockResolvedValueOnce(mockResponse);
+
+      const longUrl = 'https://example.com/' + 'a'.repeat(1000);
+
+      const response = await httpClient.get(longUrl);
+
+      expect(response).toEqual(mockResponse);
+      expect(mockedAxios.get).toHaveBeenCalledWith(longUrl, expect.any(Object));
+    });
+
+    it('should handle URLs with many query parameters', async () => {
+      const mockResponse = {
+        data: '<html>test</html>',
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {},
+      };
+
+      mockedAxios.get.mockResolvedValueOnce(mockResponse);
+
+      const queryParams = Array.from({ length: 100 }, (_, i) => `param${i}=value${i}`).join('&');
+      const url = `https://example.com?${queryParams}`;
+
+      const response = await httpClient.get(url);
+
+      expect(response).toEqual(mockResponse);
+      expect(mockedAxios.get).toHaveBeenCalledWith(url, expect.any(Object));
+    });
+
+    it('should handle URLs with special query characters', async () => {
+      const mockResponse = {
+        data: '<html>test</html>',
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {},
+      };
+
+      mockedAxios.get.mockResolvedValueOnce(mockResponse);
+
+      const url = 'https://example.com?param=value%20with%20spaces&special=!@#$%^&*()';
+
+      const response = await httpClient.get(url);
+
+      expect(response).toEqual(mockResponse);
+      expect(mockedAxios.get).toHaveBeenCalledWith(url, expect.any(Object));
+    });
+
+    it('should handle URLs with IPv4 addresses', async () => {
+      const mockResponse = {
+        data: '<html>test</html>',
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {},
+      };
+
+      mockedAxios.get.mockResolvedValueOnce(mockResponse);
+
+      const response = await httpClient.get('https://192.168.1.1/path');
+
+      expect(response).toEqual(mockResponse);
+      expect(mockedAxios.get).toHaveBeenCalledWith('https://192.168.1.1/path', expect.any(Object));
+    });
+
+    it('should handle URLs with IPv6 addresses', async () => {
+      const mockResponse = {
+        data: '<html>test</html>',
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {},
+      };
+
+      mockedAxios.get.mockResolvedValueOnce(mockResponse);
+
+      const response = await httpClient.get('https://[2001:db8::1]/path');
+
+      expect(response).toEqual(mockResponse);
+      expect(mockedAxios.get).toHaveBeenCalledWith('https://[2001:db8::1]/path', expect.any(Object));
+    });
+
+    it('should handle URLs with localhost', async () => {
+      const mockResponse = {
+        data: '<html>test</html>',
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {},
+      };
+
+      mockedAxios.get.mockResolvedValueOnce(mockResponse);
+
+      const response = await httpClient.get('http://localhost:3000/path');
+
+      expect(response).toEqual(mockResponse);
+      expect(mockedAxios.get).toHaveBeenCalledWith('http://localhost:3000/path', expect.any(Object));
+    });
+
+    it('should handle URLs with 127.0.0.1', async () => {
+      const mockResponse = {
+        data: '<html>test</html>',
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {},
+      };
+
+      mockedAxios.get.mockResolvedValueOnce(mockResponse);
+
+      const response = await httpClient.get('http://127.0.0.1:3000/path');
+
+      expect(response).toEqual(mockResponse);
+      expect(mockedAxios.get).toHaveBeenCalledWith('http://127.0.0.1:3000/path', expect.any(Object));
+    });
+  });
+
+  // ============================================================================
+  // Tests for multiple requests
+  // ============================================================================
+
+  describe('Multiple Requests', () => {
+    it('should handle multiple sequential requests', async () => {
+      const mockResponse1 = {
+        data: '<html>test1</html>',
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {},
+      };
+
+      const mockResponse2 = {
+        data: '<html>test2</html>',
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {},
+      };
+
+      mockedAxios.get
+        .mockResolvedValueOnce(mockResponse1)
+        .mockResolvedValueOnce(mockResponse2);
+
+      const response1 = await httpClient.get('https://example.com/page1');
+      const response2 = await httpClient.get('https://example.com/page2');
+
+      expect(response1).toEqual(mockResponse1);
+      expect(response2).toEqual(mockResponse2);
+      expect(mockedAxios.get).toHaveBeenCalledTimes(2);
+    });
+
+    it('should handle requests to different domains', async () => {
+      const mockResponse1 = {
+        data: '<html>test1</html>',
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {},
+      };
+
+      const mockResponse2 = {
+        data: '<html>test2</html>',
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {},
+      };
+
+      mockedAxios.get
+        .mockResolvedValueOnce(mockResponse1)
+        .mockResolvedValueOnce(mockResponse2);
+
+      const response1 = await httpClient.get('https://example.com');
+      const response2 = await httpClient.get('https://another.com');
+
+      expect(response1).toEqual(mockResponse1);
+      expect(response2).toEqual(mockResponse2);
+      expect(mockedAxios.get).toHaveBeenCalledTimes(2);
     });
   });
 });

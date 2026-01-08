@@ -9,7 +9,7 @@
  * - Successful refresh tracking
  */
 
-import { Scheduler } from '@hookah-db/scheduler';
+import { Scheduler } from '../../src/scheduler';
 
 // ============================================================================
 // Mock Setup
@@ -503,8 +503,8 @@ describe('Scheduler Integration', () => {
 
     it('should accept valid cron expressions', () => {
       const validExpressions = [
-        '0 0 * * *',      // Every minute
-        '0 * * * *',      // Every hour
+        '0 * * * *',      // Every minute
+        '* * * * *',      // Every hour
         '0 0 * * *',      // Every day at midnight
         '0 0 * * 0',      // Every Sunday at midnight
         '*/5 * * * *',    // Every 5 minutes
@@ -531,6 +531,7 @@ describe('Scheduler Integration', () => {
 
       const taskStatus = scheduler.getJobStatus(taskId);
       expect(taskStatus?.enabled).toBe(false);
+      expect(taskStatus?.running).toBe(false);
     });
 
     it('should handle task with enabled true explicitly', () => {

@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Hookah Tobacco Database API is a centralized data service that aggregates and provides structured information about hookah tobacco brands and flavors from htreviews.org. The project addresses the gap in the market by creating a comprehensive, accessible database of hookah tobacco products through web scraping and API delivery.
+Hookah Tobacco Database API is a centralized data service that aggregates and provides structured information about hookah tobacco brands and flavors from htreviews.org. The project addresses gap in the market by creating a comprehensive, accessible database of hookah tobacco products through web scraping and API delivery.
 
 ## Main Goals
 
@@ -27,13 +27,12 @@ Hookah Tobacco Database API is a centralized data service that aggregates and pr
 - **Docker Deployment**: Multi-stage Docker setup with development and production configurations
   - Development environment with hot reload and volume mounts
   - Production environment with health checks and log rotation
-  - Redis integration for distributed caching
   - Easy deployment with Docker Compose
 
 ## Technology Stack
 
 - **Runtime**: Node.js
-- **Package Manager**: pnpm
+- **Package Manager**: npm
 - **Language**: TypeScript
 - **Web Scraping**: Cheerio or similar HTML parsing library
 - **API Framework**: Express.js or Fastify

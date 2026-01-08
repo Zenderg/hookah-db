@@ -12,17 +12,17 @@
  * - Error handling and fallback behavior
  */
 
-import { FlavorService } from '@hookah-db/services';
-import { Flavor } from '@hookah-db/types';
-import { ICache } from '@hookah-db/cache';
-import { scrapeFlavorDetails } from '@hookah-db/scraper';
+import { FlavorService } from '../../src/services';
+import { Flavor } from '../../src/types';
+import { ICache } from '../../src/cache';
+import { scrapeFlavorDetails } from '../../src/scraper';
 
 // ============================================================================
 // Mock Setup
 // ============================================================================
 
 // Mock scraper function
-jest.mock('@hookah-db/scraper', () => ({
+jest.mock('../../src/scraper', () => ({
   scrapeFlavorDetails: jest.fn(),
 }));
 
