@@ -1,6 +1,6 @@
 # =============================================================================
 # Stage 1: Build
-# This stage compiles TypeScript to JavaScript using pnpm workspaces
+# This stage compiles TypeScript to JavaScript using pnpm build
 # =============================================================================
 FROM node:22-alpine AS builder
 
@@ -13,7 +13,7 @@ RUN npm install -g pnpm@latest
 # Copy package files
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
-# Copy tsconfig files and turbo.json for build orchestration
+# Copy tsconfig files for build orchestration
 COPY tsconfig.json tsconfig.docker.json turbo.json ./
 
 # Copy all source code
@@ -23,19 +23,9 @@ COPY packages/ ./packages/
 # Install all dependencies (including devDependencies for building)
 RUN pnpm install --frozen-lockfile
 
-# Create a standalone tsconfig for building without project references
-RUN echo '{"compilerOptions":{"target":"ES2024","module":"commonjs","lib":["ES2024"],"moduleResolution":"node","resolveJsonModule":true,"allowJs":true,"checkJs":false,"outDir":"dist","rootDir":"src","removeComments":false,"noEmit":false,"importHelpers":true,"downlevelIteration":true,"isolatedModules":true,"allowSyntheticDefaultImports":true,"esModuleInterop":true,"forceConsistentCasingInFileNames":true,"strict":true,"noUnusedLocals":true,"noUnusedParameters":true,"noImplicitReturns":true,"noFallthroughCasesInSwitch":true,"skipLibCheck":true,"declaration":true,"declarationMap":true,"sourceMap":true,"incremental":true},"include":["src/**/*"],"exclude":["node_modules","dist","**/*.test.ts","**/*.spec.ts"]}' > /tmp/tsconfig.build.json
-
-# Build each package individually using standalone tsconfig
-RUN cd /app/packages/types && cp /tmp/tsconfig.build.json tsconfig.build.json && npx tsc --project tsconfig.build.json
-RUN cd /app/packages/utils && cp /tmp/tsconfig.build.json tsconfig.build.json && npx tsc --project tsconfig.build.json
-RUN cd /app/packages/cache && cp /tmp/tsconfig.build.json tsconfig.build.json && npx tsc --project tsconfig.build.json
-RUN cd /app/packages/database && cp /tmp/tsconfig.build.json tsconfig.build.json && npx tsc --project tsconfig.build.json
-RUN cd /app/packages/scraper && cp /tmp/tsconfig.build.json tsconfig.build.json && npx tsc --project tsconfig.build.json
-RUN cd /app/packages/scheduler && cp /tmp/tsconfig.build.json tsconfig.build.json && npx tsc --project tsconfig.build.json
-RUN cd /app/packages/services && cp /tmp/tsconfig.build.json tsconfig.build.json && npx tsc --project tsconfig.build.json
-RUN cd /app/apps/cli && cp /tmp/tsconfig.build.json tsconfig.build.json && npx tsc --project tsconfig.build.json
-RUN cd /app/apps/api && cp /tmp/tsconfig.build.json tsconfig.build.json && npx tsc --project tsconfig.build.json
+# Build all packages using pnpm workspaces
+# This leverages Turborepo's build orchestration and handles all dependencies
+RUN pnpm build
 
 # Verify that JavaScript files were generated
 RUN find /app/apps/api/dist -name "*.js" | wc -l

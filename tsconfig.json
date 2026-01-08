@@ -8,6 +8,7 @@
     { "path": "./packages/cache" },
     { "path": "./packages/database" },
     { "path": "./packages/services" },
+    { "path": "./packages/scheduler" },
     { "path": "./apps/api" },
     { "path": "./apps/cli" }
   ]
