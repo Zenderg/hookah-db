@@ -8,7 +8,8 @@
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "skipDefaultLibCheck": true,
-    "preserveConstEnums": true
+    "preserveConstEnums": true,
+    "outDir": "/app/dist"
   },
   "ts-node": {
     "transpileOnly": true,
@@ -19,6 +20,7 @@
   },
   "include": [
     "apps/api/src/**/*",
+    "apps/cli/src/**/*",
     "packages/*/src/**/*"
   ],
   "exclude": [

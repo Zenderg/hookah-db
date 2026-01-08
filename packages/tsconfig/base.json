@@ -12,6 +12,7 @@
     "rootDir": "src",
     "removeComments": false,
     "noEmit": false,
+    "emitDeclarationOnly": false,
     "importHelpers": true,
     "downlevelIteration": true,
     "isolatedModules": true,

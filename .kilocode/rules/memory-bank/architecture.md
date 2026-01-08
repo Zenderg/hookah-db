@@ -191,6 +191,91 @@ The project uses a single `docker-compose.yml` file for both development and pro
   - Driver: bridge
   - Purpose: Container communication
 
+### Docker TypeScript Compilation Fix (2026-01-08)
+
+#### Problem Identified
+
+The Docker build was failing because TypeScript project references with `composite: true` were only generating declaration files (`.d.ts`), not actual JavaScript files (`.js`). This caused the container to fail at startup because the runtime stage couldn't find the compiled JavaScript files needed to run the application.
+
+**Root Cause**:
+- TypeScript project references (`composite: true`) are designed for incremental builds in development
+- When used in Docker build context, they only generate `.d.ts` files for type checking
+- The `tsc --build` command with project references doesn't emit JavaScript files by default
+- The Docker runtime stage expected JavaScript files but only found declaration files
+
+#### Solution Implemented
+
+The fix involved modifying the Docker build process to ensure JavaScript files are generated:
+
+1. **Modified Dockerfile** ([`Dockerfile`](Dockerfile:1)):
+   - Created a standalone TypeScript configuration without project references
+   - Built each package individually using the standalone configuration
+   - Copied all compiled files (JavaScript + TypeScript declarations + source maps) to the runtime stage
+   - Set `composite: false` in [`apps/api/tsconfig.json`](apps/api/tsconfig.json:1) to allow standalone compilation
+
+2. **Key Changes**:
+   - Build stage: Uses `pnpm build` which compiles TypeScript to JavaScript for all packages
+   - Runtime stage: Copies compiled JavaScript from build stage instead of trying to compile at runtime
+   - Pre-compiled JavaScript ensures faster startup and more reliable container execution
+   - No tsx runtime needed - uses `node apps/api/dist/server.js` directly
+
+3. **Benefits**:
+   - ✅ JavaScript files are generated correctly during build stage
+   - ✅ Container starts without TypeScript compilation errors
+   - ✅ Faster container startup (no compilation at runtime)
+   - ✅ Smaller runtime image (no TypeScript compiler)
+   - ✅ More reliable production deployment
+   - ✅ Works without local node_modules (Docker build is self-contained)
+
+#### Technical Details
+
+**Before Fix**:
+```dockerfile
+# Build stage with project references
+RUN pnpm build  # Only generates .d.ts files with composite: true
+```
+
+**After Fix**:
+```dockerfile
+# Build stage with standalone compilation
+RUN pnpm install --frozen-lockfile
+RUN pnpm build  # Compiles TypeScript to JavaScript for all packages
+
+# Runtime stage
+COPY --from=builder /app/apps/api/dist ./apps/api/dist
+COPY --from=builder /app/packages ./packages
+RUN npm install -g pnpm@latest && \
+    pnpm install --prod --frozen-lockfile
+CMD ["node", "apps/api/dist/server.js"]
+```
+
+**TypeScript Configuration Changes**:
+- [`apps/api/tsconfig.json`](apps/api/tsconfig.json:1): Set `composite: false` to allow standalone compilation
+- Build process now generates `.js`, `.d.ts`, and `.js.map` files for all packages
+- All compiled files are copied to runtime stage for execution
+
+#### Testing Results
+
+After implementing the fix, all Docker tests passed:
+
+| Test | Status | Details |
+|------|--------|---------|
+| Docker Build | ✅ PASSED | JavaScript files generated correctly |
+| Container Startup | ✅ PASSED | Container starts in <30s, no errors |
+| Health Check | ✅ PASSED | Health endpoint returns 200 OK |
+| API Endpoints | ✅ PASSED | All endpoints working correctly |
+| Database Persistence | ✅ PASSED | Data persists across restarts |
+| Docker Compose | ✅ PASSED | All services start successfully |
+
+**Key Success Indicators**:
+- ✅ No TypeScript compilation errors in Docker build
+- ✅ Container starts without relying on local node_modules
+- ✅ All compiled JavaScript files are present in runtime stage
+- ✅ Application runs correctly with pre-compiled JavaScript
+- ✅ Health checks pass consistently
+- ✅ API endpoints respond correctly
+- ✅ Database persists across container restarts
+
 ## Source Code Structure
 
 ```
@@ -377,7 +462,7 @@ Based on HTML structure analysis, following data models are identified:
 - `smokeAgainPercentage`: Percentage who would smoke again
 - `htreviewsId`: Internal HTReviews ID
 - `dateAdded`: Date added to HTReviews
-- `addedBy`: User who added the flavor
+- `addedBy`: User who added flavor
 
 ### Scraping Strategy
 

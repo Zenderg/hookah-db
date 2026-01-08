@@ -2,18 +2,10 @@
   "$schema": "https://json.schemastore.org/tsconfig",
   "extends": "../../packages/tsconfig/node.json",
   "compilerOptions": {
-    "composite": true,
+    "composite": false,
     "rootDir": "src",
     "outDir": "dist"
   },
-  "references": [
-    { "path": "../../packages/types" },
-    { "path": "../../packages/utils" },
-    { "path": "../../packages/cache" },
-    { "path": "../../packages/database" },
-    { "path": "../../packages/services" },
-    { "path": "../../packages/scheduler" }
-  ],
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "**/*.spec.ts", "**/*.test.ts"]
 }
