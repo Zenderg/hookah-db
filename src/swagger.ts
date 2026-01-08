@@ -25,7 +25,7 @@ export const swaggerOptions = {
 				description: 'Development server',
 			},
 			{
-				url: 'https://api.hookah-db.com',
+				url: 'https://hdb.coolify.dknas.org',
 				description: 'Production server',
 			},
 		],
