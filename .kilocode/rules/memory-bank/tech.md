@@ -4,7 +4,7 @@
 
 ### Backend Framework
 - **NestJS**: Progressive Node.js framework for building efficient, scalable applications
-- Version: Latest stable (to be determined during setup)
+- Version: 11.1.12 (latest stable as of 2026-01-26)
 - Rationale: Excellent TypeScript support, modular architecture, built-in dependency injection
 
 ### Package Manager
@@ -19,7 +19,7 @@
 
 ### ORM
 - **TypeORM**: TypeScript ORM for Node.js
-- Version: Latest stable
+- Version: 0.3.28 (latest stable)
 - Rationale: TypeScript-native, excellent NestJS integration, decorator-based entity definitions
 
 ### Parser
@@ -53,20 +53,20 @@
 ## Dependencies
 
 ### Core Dependencies
-- `@nestjs/common`: Core NestJS decorators and utilities
-- `@nestjs/core`: NestJS core framework
-- `@nestjs/platform-express`: Express platform adapter
-- `@nestjs/typeorm`: TypeORM integration for NestJS
-- `@nestjs/schedule`: Task scheduling (cron jobs)
-- `@nestjs/config`: Configuration management
-- `typeorm`: ORM library
-- `sqlite3`: SQLite database driver
-- `class-validator`: Request validation
-- `class-transformer`: Object transformation
-- `uuid`: UUID generation
+- `@nestjs/common`: Core NestJS decorators and utilities (v11.1.12)
+- `@nestjs/core`: NestJS core framework (v11.1.12)
+- `@nestjs/platform-express`: Express platform adapter (v11.1.12)
+- `@nestjs/typeorm`: TypeORM integration for NestJS (v11.0.0)
+- `@nestjs/schedule`: Task scheduling (cron jobs) (v6.1.0)
+- `@nestjs/config`: Configuration management (v4.0.0)
+- `typeorm`: ORM library (v0.3.28)
+- `sqlite3`: SQLite database driver (v5.1.7)
+- `class-validator`: Request validation (v0.14.3)
+- `class-transformer`: Object transformation (v0.5.1)
+- `uuid`: UUID generation (v13.0.0)
 
 ### Parser Dependencies (Playwright option)
-- `playwright`: Browser automation
+- `playwright`: Browser automation (v1.58.0)
 - Rationale: Handles JavaScript-rendered content, reliable scraping
 
 ### Parser Dependencies (Cheerio option)
@@ -75,7 +75,7 @@
 - Rationale: Lightweight, fast for static HTML
 
 ### CLI Dependencies
-- `commander`: CLI command framework
+- `commander`: CLI command framework (v14.0.0)
 - Rationale: Easy CLI command creation for API key management
 
 ### Development Dependencies
