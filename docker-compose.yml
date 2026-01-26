@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - NODE_ENV=production
+      - DATABASE_PATH=/app/data/hookah.db
+      - CORS_ORIGIN=*
+    restart: unless-stopped
