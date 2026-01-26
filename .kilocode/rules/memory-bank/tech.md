@@ -1,0 +1,265 @@
+# Technology Stack
+
+## Core Technologies
+
+### Backend Framework
+- **NestJS**: Progressive Node.js framework for building efficient, scalable applications
+- Version: Latest stable (to be determined during setup)
+- Rationale: Excellent TypeScript support, modular architecture, built-in dependency injection
+
+### Package Manager
+- **npm**: Node Package Manager
+- Version: Latest stable
+- Rationale: Standard package manager for Node.js projects
+
+### Database
+- **SQLite**: Lightweight, file-based SQL database
+- Version: Latest stable (via TypeORM)
+- Rationale: Zero-configuration, perfect for local deployment, sufficient for expected data volume
+
+### ORM
+- **TypeORM**: TypeScript ORM for Node.js
+- Version: Latest stable
+- Rationale: TypeScript-native, excellent NestJS integration, decorator-based entity definitions
+
+### Parser
+- **Playwright** OR **Cheerio** (decision pending based on htreviews.org structure)
+- Playwright: Full browser automation, handles JavaScript-rendered content
+- Cheerio: Fast, lightweight, HTML parsing only
+
+### Containerization
+- **Docker**: Container platform
+- **Docker Compose**: Multi-container orchestration
+- Version: Latest stable
+- Rationale: Consistent deployment, easy local server setup
+
+## Development Tools
+
+### Language
+- **TypeScript**: JavaScript with static typing
+- Version: Latest stable
+- Rationale: Type safety, better developer experience, NestJS native support
+
+### Testing
+- **Jest**: JavaScript testing framework (included with NestJS)
+- Version: Latest stable
+- Rationale: Built-in NestJS support, comprehensive testing capabilities
+
+### Code Quality
+- **ESLint**: JavaScript/TypeScript linter
+- **Prettier**: Code formatter
+- Rationale: Consistent code style, catch errors early
+
+## Dependencies
+
+### Core Dependencies
+- `@nestjs/common`: Core NestJS decorators and utilities
+- `@nestjs/core`: NestJS core framework
+- `@nestjs/platform-express`: Express platform adapter
+- `@nestjs/typeorm`: TypeORM integration for NestJS
+- `@nestjs/schedule`: Task scheduling (cron jobs)
+- `@nestjs/config`: Configuration management
+- `typeorm`: ORM library
+- `sqlite3`: SQLite database driver
+- `class-validator`: Request validation
+- `class-transformer`: Object transformation
+- `uuid`: UUID generation
+
+### Parser Dependencies (Playwright option)
+- `playwright`: Browser automation
+- Rationale: Handles JavaScript-rendered content, reliable scraping
+
+### Parser Dependencies (Cheerio option)
+- `cheerio`: Fast HTML parsing
+- `axios`: HTTP client for fetching pages
+- Rationale: Lightweight, fast for static HTML
+
+### CLI Dependencies
+- `commander`: CLI command framework
+- Rationale: Easy CLI command creation for API key management
+
+### Development Dependencies
+- `@types/node`: TypeScript definitions for Node.js
+- `@types/uuid`: TypeScript definitions for UUID
+- `typescript`: TypeScript compiler
+- `jest`: Testing framework
+- `@nestjs/testing`: NestJS testing utilities
+- `eslint`: Linter
+- `prettier`: Code formatter
+
+## Development Setup
+
+### Prerequisites
+- Node.js (LTS version)
+- npm (comes with Node.js)
+- Docker and Docker Compose
+- Git
+
+### Local Development
+1. Clone repository
+2. Install dependencies: `npm install`
+3. Set up environment variables (if any)
+4. Run development server: `npm run start:dev`
+5. Run tests: `npm test`
+
+### Docker Development
+1. Build Docker image: `docker-compose build`
+2. Start services: `docker-compose up -d`
+3. View logs: `docker-compose logs -f`
+4. Stop services: `docker-compose down`
+
+## Environment Configuration
+
+### Environment Variables
+- `NODE_ENV`: Development/Production
+- `PORT`: API port (default: 3000)
+- `DATABASE_PATH`: SQLite database file path
+- `API_KEY_SECRET`: Secret for API key generation (if needed)
+
+### Configuration Management
+- Use `@nestjs/config` for environment-based configuration
+- Separate configs for development and production
+- Sensitive data stored in environment variables, not committed to git
+
+## Operational Constraints
+
+### Deployment Environment
+- Target: Local server via Docker Compose
+- No cloud deployment required
+- Single server deployment
+
+### Performance Constraints
+- Expected load: Low to medium (~10 clients)
+- No specific performance requirements defined
+- SQLite sufficient for current scale
+
+### Security Constraints
+- API key authentication only
+- No OAuth or JWT complexity
+- No rate limiting (only request logging)
+- Maximum 10 API keys enforced
+
+### Scalability Constraints
+- Single database instance (SQLite)
+- No horizontal scaling required
+- No caching layer initially
+- Can be enhanced later if needed
+
+## Code Style Guidelines
+
+### TypeScript Style
+- Use strict type checking
+- Prefer interfaces over types for object shapes
+- Use decorators for NestJS components
+- Follow NestJS best practices
+
+### Naming Conventions
+- Classes: PascalCase (e.g., `BrandsService`)
+- Methods: camelCase (e.g., `findAllBrands`)
+- Variables: camelCase
+- Constants: UPPER_SNAKE_CASE
+- Files: kebab-case (e.g., `brands.service.ts`)
+
+### File Organization
+- Feature-based module structure
+- Each module has its own directory
+- Shared code in `common/` directory
+- Clear separation of concerns (controllers, services, repositories)
+
+## Git Workflow
+
+### Branching Strategy
+- `main`: Production code
+- `develop`: Development branch
+- Feature branches: `feature/feature-name`
+- Bugfix branches: `bugfix/bug-description`
+
+### Commit Message Format
+- Conventional Commits format
+- Examples:
+  - `feat: add brand filtering endpoint`
+  - `fix: resolve pagination issue`
+  - `docs: update API documentation`
+
+## Testing Strategy
+
+### Unit Tests
+- Test individual functions and classes
+- Mock external dependencies
+- Focus on business logic
+
+### Integration Tests
+- Test API endpoints
+- Test database operations
+- Use test database (separate from production)
+
+### E2E Tests
+- Test complete user flows
+- Test parser functionality
+- Test scheduled tasks
+
+## Logging Strategy
+
+### Log Levels
+- ERROR: Critical errors
+- WARN: Warning messages
+- INFO: General information
+- DEBUG: Detailed debugging information
+
+### Log Format
+- Structured JSON logging
+- Include: timestamp, level, message, context, requestId
+- Separate logs per module/service
+
+### Log Rotation
+- Configure log rotation in production
+- Keep logs for 30 days
+- Archive old logs
+
+## Monitoring and Observability
+
+### Health Checks
+- `/health` endpoint for service health
+- Database connection check
+- Parser status check
+
+### Metrics
+- Request count per endpoint
+- Request duration
+- Error rate
+- API key usage statistics
+
+### Alerts
+- Parser failures
+- Database connection issues
+- High error rates
+
+## Backup and Recovery
+
+### Database Backup
+- SQLite database file backup
+- Scheduled daily backups
+- Manual backup before major changes
+
+### Recovery Procedure
+- Stop service
+- Restore database file from backup
+- Restart service
+- Verify data integrity
+
+## Documentation
+
+### API Documentation
+- OpenAPI/Swagger specification
+- Auto-generated from NestJS decorators
+- Available at `/api` endpoint
+
+### Code Documentation
+- JSDoc comments for complex functions
+- README files for each module
+- Inline comments for non-obvious logic
+
+### Deployment Documentation
+- Docker Compose setup guide
+- Environment configuration guide
+- Troubleshooting guide
