@@ -5,10 +5,12 @@ import {
   NotFoundException,
   UseGuards,
   UseInterceptors,
+  Query,
 } from '@nestjs/common';
 import { LinesService } from './lines.service';
 import { ApiKeyGuard } from '../common/guards/api-key.guard';
 import { LoggingInterceptor } from '../common/interceptors/logging.interceptor';
+import { FindLinesDto } from './dto/find-lines.dto';
 
 @Controller('lines')
 @UseGuards(ApiKeyGuard)
@@ -17,9 +19,8 @@ export class LinesController {
   constructor(private readonly linesService: LinesService) {}
 
   @Get()
-  async findAll() {
-    // TODO: Implement pagination and filtering
-    return this.linesService.findAll();
+  async findAll(@Query() query: FindLinesDto) {
+    return this.linesService.findAll(query);
   }
 
   @Get(':id')

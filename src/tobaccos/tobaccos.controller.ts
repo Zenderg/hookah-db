@@ -5,10 +5,12 @@ import {
   NotFoundException,
   UseGuards,
   UseInterceptors,
+  Query,
 } from '@nestjs/common';
 import { TobaccosService } from './tobaccos.service';
 import { ApiKeyGuard } from '../common/guards/api-key.guard';
 import { LoggingInterceptor } from '../common/interceptors/logging.interceptor';
+import { FindTobaccosDto } from './dto/find-tobaccos.dto';
 
 @Controller('tobaccos')
 @UseGuards(ApiKeyGuard)
@@ -17,9 +19,8 @@ export class TobaccosController {
   constructor(private readonly tobaccosService: TobaccosService) {}
 
   @Get()
-  async findAll() {
-    // TODO: Implement pagination, filtering, and sorting
-    return this.tobaccosService.findAll();
+  async findAll(@Query() query: FindTobaccosDto) {
+    return this.tobaccosService.findAll(query);
   }
 
   @Get(':id')

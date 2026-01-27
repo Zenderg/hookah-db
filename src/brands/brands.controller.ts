@@ -5,11 +5,13 @@ import {
   NotFoundException,
   UseGuards,
   UseInterceptors,
+  Query,
 } from '@nestjs/common';
 import { BrandsService } from './brands.service';
 import { ApiKeyGuard } from '../common/guards/api-key.guard';
 import { LoggingInterceptor } from '../common/interceptors/logging.interceptor';
 import { Public } from '../common/decorators/public.decorator';
+import { FindBrandsDto } from './dto/find-brands.dto';
 
 @Controller('brands')
 @UseGuards(ApiKeyGuard)
@@ -19,9 +21,8 @@ export class BrandsController {
 
   @Get()
   @Public()
-  async findAll() {
-    // TODO: Implement pagination, filtering, and sorting
-    return this.brandsService.findAll();
+  async findAll(@Query() query: FindBrandsDto) {
+    return this.brandsService.findAll(query);
   }
 
   @Get(':id')

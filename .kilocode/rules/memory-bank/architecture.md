@@ -42,25 +42,33 @@ src/
 │   ├── guards/             # Auth guards (API key)
 │   ├── middleware/         # Auth middleware
 │   ├── decorators/         # Custom decorators
-│   └── interceptors/       # Logging interceptor
+│   ├── interceptors/       # Logging interceptor
+│   └── dto/               # Shared DTOs
+│       └── pagination.dto.ts  # Pagination base classes
 ├── brands/                 # Brand module
 │   ├── brands.controller.ts
 │   ├── brands.service.ts
 │   ├── brands.repository.ts
 │   ├── brands.entity.ts
-│   └── brands.module.ts
+│   ├── brands.module.ts
+│   └── dto/               # Request/response DTOs
+│       └── find-brands.dto.ts
 ├── tobaccos/               # Tobacco module
 │   ├── tobaccos.controller.ts
 │   ├── tobaccos.service.ts
 │   ├── tobaccos.repository.ts
 │   ├── tobaccos.entity.ts
-│   └── tobaccos.module.ts
+│   ├── tobaccos.module.ts
+│   └── dto/               # Request/response DTOs
+│       └── find-tobaccos.dto.ts
 ├── lines/                  # Line module
 │   ├── lines.controller.ts
 │   ├── lines.service.ts
 │   ├── lines.repository.ts
 │   ├── lines.entity.ts
-│   └── lines.module.ts
+│   ├── lines.module.ts
+│   └── dto/               # Request/response DTOs
+│       └── find-lines.dto.ts
 ├── auth/                   # Authentication module
 │   ├── auth.guard.ts
 │   ├── auth.middleware.ts
@@ -199,6 +207,53 @@ All endpoints require API key authentication via:
 **GET /lines/:id/tobaccos**
 - Query params: `?page=1&limit=20&sortBy=rating&order=desc`
 - Returns: Paginated list of tobaccos for line
+
+## DTOs and Validation
+
+### Common DTOs
+Located in [`src/common/dto/pagination.dto.ts`](src/common/dto/pagination.dto.ts):
+- [`PaginationDto`](src/common/dto/pagination.dto.ts:6) - Base pagination class with `page` (default: 1) and `limit` (default: 20, max: 100)
+- [`PaginationMetaDto`](src/common/dto/pagination.dto.ts:19) - Response metadata with total, page, limit, totalPages
+- [`PaginatedResponseDto<T>`](src/common/dto/pagination.dto.ts:24) - Generic wrapper for paginated responses
+
+### Feature DTOs
+
+**Brands** ([`src/brands/dto/find-brands.dto.ts`](src/brands/dto/find-brands.dto.ts)):
+- [`FindBrandsDto`](src/brands/dto/find-brands.dto.ts:5) - Extends PaginationDto with:
+  - `sortBy`: 'rating' | 'views' | 'name' (default: 'rating')
+  - `order`: 'asc' | 'desc' (default: 'desc')
+  - `country`: Optional string filter
+
+**Tobaccos** ([`src/tobaccos/dto/find-tobaccos.dto.ts`](src/tobaccos/dto/find-tobaccos.dto.ts)):
+- [`FindTobaccosDto`](src/tobaccos/dto/find-tobaccos.dto.ts:5) - Extends PaginationDto with:
+  - `sortBy`: 'rating' | 'views' | 'dateAdded' | 'name' (default: 'rating')
+  - `order`: 'asc' | 'desc' (default: 'desc')
+  - `brandId`: Optional UUID filter
+  - `lineId`: Optional UUID filter
+  - `category`: Optional string filter
+  - `minRating`/`maxRating`: Optional number range filter (0-5)
+  - `year`: Optional number filter (≥2000)
+  - `country`: Optional string filter
+  - `productionStatus`: Optional 'active' | 'discontinued' filter
+
+**Lines** ([`src/lines/dto/find-lines.dto.ts`](src/lines/dto/find-lines.dto.ts)):
+- [`FindLinesDto`](src/lines/dto/find-lines.dto.ts:5) - Extends PaginationDto with:
+  - `brandId`: Optional UUID filter
+
+### Validation Decorators
+All DTOs use `class-validator` decorators for automatic validation:
+- `@IsOptional()` - Marks parameters as optional
+- `@IsString()`, `@IsNumber()`, `@IsUUID()` - Type validation
+- `@IsIn()` - Enum value validation
+- `@Min()`, `@Max()` - Range validation
+- `@Type(() => Number)` - Transform string query params to numbers
+
+### Repository Implementation
+All repositories use TypeORM QueryBuilder for:
+- Dynamic WHERE clause building based on provided filters
+- Sorting with uppercase order ('ASC' | 'DESC')
+- Pagination with skip/take
+- Efficient `getManyAndCount()` for data + total count
 
 ### Filtering and Sorting
 
