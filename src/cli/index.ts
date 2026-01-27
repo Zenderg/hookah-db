@@ -14,15 +14,23 @@ program
   .version('0.0.1');
 
 // Helper function to initialize NestJS app and get service
-async function getApiKeysService(): Promise<ApiKeysService> {
+async function getApiKeysService(): Promise<{
+  service: ApiKeysService;
+  app: any;
+}> {
   const app = await NestFactory.createApplicationContext(AppModule);
-  return app.get(ApiKeysService);
+  const service = app.get(ApiKeysService);
+  return { service, app };
 }
 
 // Helper function to initialize NestJS app and get parser service
-async function getParserService(): Promise<ParserService> {
+async function getParserService(): Promise<{
+  service: ParserService;
+  app: any;
+}> {
   const app = await NestFactory.createApplicationContext(AppModule);
-  return app.get(ParserService);
+  const service = app.get(ParserService);
+  return { service, app };
 }
 
 // Create API key command
@@ -30,9 +38,11 @@ program
   .command('create <name>')
   .description('Create a new API key')
   .action(async (name) => {
+    let app: any = null;
     try {
-      const apiKeysService = await getApiKeysService();
-      const apiKey = await apiKeysService.createApiKey(name);
+      const { service, app: appContext } = await getApiKeysService();
+      app = appContext;
+      const apiKey = await service.createApiKey(name);
 
       console.log('✅ API key created successfully!');
       console.log('');
@@ -42,10 +52,19 @@ program
       console.log(`  Key: ${apiKey.key}`);
       console.log(`  Active: ${apiKey.isActive}`);
       console.log('');
-      console.log('⚠️  Save this key securely. You will not be able to see it again.');
+      console.log(
+        '⚠️  Save this key securely. You will not be able to see it again.',
+      );
     } catch (error) {
-      console.error('❌ Error creating API key:', error instanceof Error ? error.message : error);
+      console.error(
+        '❌ Error creating API key:',
+        error instanceof Error ? error.message : error,
+      );
       process.exit(1);
+    } finally {
+      if (app) {
+        await app.close();
+      }
     }
   });
 
@@ -54,14 +73,23 @@ program
   .command('delete <id>')
   .description('Delete an API key by ID')
   .action(async (id) => {
+    let app: any = null;
     try {
-      const apiKeysService = await getApiKeysService();
-      await apiKeysService.deleteApiKey(id);
+      const { service, app: appContext } = await getApiKeysService();
+      app = appContext;
+      await service.deleteApiKey(id);
 
       console.log('✅ API key deleted successfully!');
     } catch (error) {
-      console.error('❌ Error deleting API key:', error instanceof Error ? error.message : error);
+      console.error(
+        '❌ Error deleting API key:',
+        error instanceof Error ? error.message : error,
+      );
       process.exit(1);
+    } finally {
+      if (app) {
+        await app.close();
+      }
     }
   });
 
@@ -70,9 +98,11 @@ program
   .command('list')
   .description('List all API keys')
   .action(async () => {
+    let app: any = null;
     try {
-      const apiKeysService = await getApiKeysService();
-      const apiKeys = await apiKeysService.findAll();
+      const { service, app: appContext } = await getApiKeysService();
+      app = appContext;
+      const apiKeys = await service.findAll();
 
       if (apiKeys.length === 0) {
         console.log('No API keys found.');
@@ -84,16 +114,29 @@ program
       apiKeys.forEach((key, index) => {
         console.log(`${index + 1}. ${key.name}`);
         console.log(`   ID: ${key.id}`);
-        console.log(`   Key: ${key.key.substring(0, 8)}...${key.key.substring(key.key.length - 4)}`);
+        console.log(
+          `   Key: ${key.key.substring(0, 8)}...${key.key.substring(
+            key.key.length - 4,
+          )}`,
+        );
         console.log(`   Active: ${key.isActive}`);
         console.log(`   Requests: ${key.requestCount}`);
         console.log(`   Created: ${key.createdAt.toISOString()}`);
-        console.log(`   Last Used: ${key.lastUsedAt ? key.lastUsedAt.toISOString() : 'Never'}`);
+        console.log(
+          `   Last Used: ${key.lastUsedAt ? key.lastUsedAt.toISOString() : 'Never'}`,
+        );
         console.log('');
       });
     } catch (error) {
-      console.error('❌ Error listing API keys:', error instanceof Error ? error.message : error);
+      console.error(
+        '❌ Error listing API keys:',
+        error instanceof Error ? error.message : error,
+      );
       process.exit(1);
+    } finally {
+      if (app) {
+        await app.close();
+      }
     }
   });
 
@@ -102,9 +145,11 @@ program
   .command('stats')
   .description('Show API key statistics')
   .action(async () => {
+    let app: any = null;
     try {
-      const apiKeysService = await getApiKeysService();
-      const stats = await apiKeysService.getStats();
+      const { service, app: appContext } = await getApiKeysService();
+      app = appContext;
+      const stats = await service.getStats();
 
       console.log('API Key Statistics:');
       console.log('');
@@ -113,20 +158,29 @@ program
       console.log(`Inactive Keys: ${stats.inactiveKeys}`);
       console.log(`Total Requests: ${stats.totalRequests}`);
     } catch (error) {
-      console.error('❌ Error fetching statistics:', error instanceof Error ? error.message : error);
+      console.error(
+        '❌ Error fetching statistics:',
+        error instanceof Error ? error.message : error,
+      );
       process.exit(1);
+    } finally {
+      if (app) {
+        await app.close();
+      }
     }
   });
 
 // Parse command with subcommands
-const parseCommand = program
+program
   .command('parse')
   .description('Parse data from htreviews.org')
   .argument('<type>', 'Type of data to parse: brands, lines, or tobaccos')
   .option('--limit <number>', 'Limit the number of items to parse', undefined)
   .action(async (type, options) => {
+    let app: any = null;
     try {
-      const parserService = await getParserService();
+      const { service, app: appContext } = await getParserService();
+      app = appContext;
       const limit = options.limit ? parseInt(options.limit, 10) : undefined;
 
       if (limit !== undefined && (isNaN(limit) || limit < 1)) {
@@ -134,34 +188,46 @@ const parseCommand = program
         process.exit(1);
       }
 
-      console.log(`🚀 Starting ${type} parsing${limit ? ` (limit: ${limit})` : ''}...`);
+      console.log(
+        `🚀 Starting ${type} parsing${limit ? ` (limit: ${limit})` : ''}...`,
+      );
       console.log('');
 
       const startTime = Date.now();
 
       switch (type.toLowerCase()) {
         case 'brands':
-          await parserService.parseBrandsManually(limit);
+          await service.parseBrandsManually(limit);
           break;
         case 'lines':
           console.error('❌ Lines parser not implemented yet.');
           process.exit(1);
+          break;
         case 'tobaccos':
           console.error('❌ Tobaccos parser not implemented yet.');
           process.exit(1);
+          break;
         default:
           console.error(
             `❌ Invalid type: ${type}. Must be 'brands', 'lines', or 'tobaccos'.`,
           );
           process.exit(1);
+          break;
       }
 
       const duration = ((Date.now() - startTime) / 1000).toFixed(2);
       console.log('');
       console.log(`✅ ${type} parsing completed in ${duration}s`);
     } catch (error) {
-      console.error('❌ Parsing failed:', error instanceof Error ? error.message : error);
+      console.error(
+        '❌ Parsing failed:',
+        error instanceof Error ? error.message : error,
+      );
       process.exit(1);
+    } finally {
+      if (app) {
+        await app.close();
+      }
     }
   });
 
