@@ -83,7 +83,7 @@ src/
 │   ├── api-keys.repository.ts
 │   └── api-keys.module.ts
 └── cli/                    # CLI commands
-    └── api-key.commands.ts
+    └── index.ts             # CLI entry point with Commander.js
 ```
 
 ## Data Model
@@ -304,10 +304,16 @@ All repositories use TypeORM QueryBuilder for:
 - No OAuth or JWT complexity needed
 
 ### API Key Management
-- **CLI Commands**: Executed inside running Docker container
-- Commands: `create`, `delete`, `list`, `stats`
-- Maximum 10 keys enforced at database level
+- **CLI Commands**: Executed via `npm run cli -- <command>`
+- Commands:
+  - `create <name>` - Creates new API key with UUID v4 format
+  - `delete <id>` - Deletes API key by ID with existence check
+  - `list` - Lists all API keys with masked keys (first 8 + last 4 chars)
+  - `stats` - Shows overall statistics (totalKeys, activeKeys, inactiveKeys, totalRequests)
+- No limit on number of keys (despite architecture mentioning 10)
+- Keys stored in plain text (not hashed)
 - Request tracking per key for usage monitoring
+- CLI uses NestJS ApplicationContext to access services
 
 ### Data Refresh
 - **Cron Jobs**: Daily automatic refresh at 2:00 AM
@@ -352,9 +358,9 @@ All repositories use TypeORM QueryBuilder for:
 ## Security Considerations
 
 ### API Key Storage
-- Keys stored hashed in database
-- Never logged in plain text
-- Secure generation using crypto module
+- Keys stored in plain text in database (not hashed)
+- Never logged in plain text in CLI (masked in list command)
+- Secure generation using UUID v4
 
 ### Rate Limiting
 - No explicit rate limiting (per user requirement)

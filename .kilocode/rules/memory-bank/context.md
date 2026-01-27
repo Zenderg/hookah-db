@@ -85,6 +85,34 @@ Complete NestJS-based project structure has been created with:
 
 ## Recent Changes
 
+**2026-01-27:** CLI commands implementation for API key management
+- Updated [`src/api-keys/api-keys.repository.ts`](src/api-keys/api-keys.repository.ts):
+  - Added [`delete(id)`](src/api-keys/api-keys.repository.ts:34) method for deleting API keys by ID
+  - Added [`findOneById(id)`](src/api-keys/api-keys.repository.ts:39) method for finding API keys by ID
+  - Added [`getCount()`](src/api-keys/api-keys.repository.ts:43) method for getting total count of API keys
+- Updated [`src/api-keys/api-keys.service.ts`](src/api-keys/api-keys.service.ts):
+  - Implemented [`createApiKey(name)`](src/api-keys/api-keys.service.ts:21) - Creates API key with UUID v4 format
+  - Implemented [`deleteApiKey(id)`](src/api-keys/api-keys.service.ts:31) - Deletes API key with existence check
+  - Implemented [`getStats()`](src/api-keys/api-keys.service.ts:39) - Returns statistics (totalKeys, activeKeys, inactiveKeys, totalRequests)
+  - Updated [`validateApiKey(key)`](src/api-keys/api-keys.service.ts:53) - Now returns ApiKey object and increments request count
+- Updated [`src/app.module.ts`](src/app.module.ts):
+  - Added [`ApiKeysModule`](src/app.module.ts:29) to imports for CLI access to ApiKeysService
+- Implemented [`src/cli/index.ts`](src/cli/index.ts) with four commands:
+  - [`create <name>`](src/cli/index.ts:18) - Creates new API key with UUID
+  - [`delete <id>`](src/cli/index.ts:46) - Deletes API key by ID
+  - [`list`](src/cli/index.ts:61) - Lists all API keys with masked keys (first 8 + last 4 chars)
+  - [`stats`](src/cli/index.ts:92) - Shows API key statistics
+- All CLI commands tested successfully:
+  - Create command generates UUID keys
+  - List command masks keys for security
+  - Delete command validates key existence
+  - Stats command shows aggregated statistics
+- Design decisions documented:
+  - API keys use UUID v4 format (not hex)
+  - No limit on number of keys (despite architecture mentioning 10)
+  - Keys stored in plain text (not hashed)
+  - Stats shows overall statistics for all keys
+
 **2026-01-27:** DTOs implementation with validation, filtering, sorting, and pagination
 - Created common DTOs in [`src/common/dto/pagination.dto.ts`](src/common/dto/pagination.dto.ts):
   - [`PaginationDto`](src/common/dto/pagination.dto.ts:6) - Base pagination with page (default: 1) and limit (default: 20, max: 100)
@@ -162,7 +190,7 @@ Complete NestJS-based project structure has been created with:
 2. ✅ Add DTOs: Create data transfer objects for request validation - **COMPLETED**
 3. Implement business logic: Add actual logic to services (replace TODO comments)
 4. Implement parser: Build Playwright/Cheerio parser for htreviews.org
-5. Add CLI commands: Implement create, delete, list, stats commands
+5. ✅ Add CLI commands: Implement create, delete, list, stats commands - **COMPLETED**
 6. Write tests: Add unit and integration tests
 7. Configure CORS: Set up proper CORS origins for production
 8. Add error handling: Implement global exception filter
@@ -177,7 +205,7 @@ Complete NestJS-based project structure has been created with:
 5. ✅ Filtering and sorting logic - **COMPLETED**
 6. Scheduled tasks for data refresh - **STRUCTURE READY**
 7. Docker deployment setup - **COMPLETED**
-8. CLI commands for API key management - **STRUCTURE READY**
+8. ✅ CLI commands for API key management - **COMPLETED**
 
 ## Known Constraints
 
@@ -193,6 +221,11 @@ Complete NestJS-based project structure has been created with:
 
 - Parser choice: Playwright selected (Playwright v1.58.0 in package.json)
 - API key storage: Database table (implemented in api-keys.entity.ts)
+- API key format: UUID v4 (not hex)
+- API key limit: No limit enforced (despite architecture mentioning 10)
+- API key hashing: Not hashed (stored in plain text)
+- CLI framework: Commander.js v14.0.0 for command-line interface
+- CLI statistics: Shows overall statistics for all keys (not per-key)
 - Error handling strategy: Global exception filter (to be implemented)
 - Logging framework: Structured JSON logging with interceptor (structure ready)
 - Rate limiting: Request logging only (per requirements)
@@ -207,7 +240,7 @@ Complete NestJS-based project structure has been created with:
 - ✅ Request/response logging interceptor
 - ✅ Environment-based configuration
 - ✅ Docker containerization
-- ✅ CLI structure for API key management
+- ✅ CLI commands for API key management (create, delete, list, stats)
 - ✅ Scheduled task structure for data refresh
 - ✅ DTOs for validation with filtering, sorting, and pagination
 - ✅ API endpoints with filtering/sorting (brands, tobaccos, lines)
@@ -215,7 +248,6 @@ Complete NestJS-based project structure has been created with:
 **Pending Implementation:**
 - ⏳ Business logic in services (partially complete - repositories done)
 - ⏳ Parser implementation (Playwright)
-- ⏳ CLI commands (create, delete, list, stats)
 - ⏳ Global exception filter
 - ⏳ Health check endpoint
 - ⏳ Tests

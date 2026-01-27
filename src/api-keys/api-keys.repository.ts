@@ -30,4 +30,17 @@ export class ApiKeysRepository {
   async incrementRequestCount(id: string): Promise<void> {
     await this.apiKeyRepository.increment({ id }, 'requestCount', 1);
   }
+
+  async delete(id: string): Promise<boolean> {
+    const result = await this.apiKeyRepository.delete(id);
+    return (result.affected ?? 0) > 0;
+  }
+
+  async findOneById(id: string): Promise<ApiKey | null> {
+    return this.apiKeyRepository.findOne({ where: { id } });
+  }
+
+  async getCount(): Promise<number> {
+    return this.apiKeyRepository.count();
+  }
 }
