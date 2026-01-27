@@ -85,6 +85,23 @@ Complete NestJS-based project structure has been created with:
 
 ## Recent Changes
 
+**2026-01-27:** TypeORM migrations setup
+- Updated [`src/app.module.ts`](src/app.module.ts) to disable `synchronize` and configure migrations
+- Created [`src/data-source.ts`](src/data-source.ts) for TypeORM CLI configuration
+- Created initial migration [`src/migrations/1706328000000-InitialSchema.ts`](src/migrations/1706328000000-InitialSchema.ts):
+  - Creates all tables: brands, lines, tobaccos, api_keys
+  - Sets up foreign key relationships with CASCADE and SET NULL
+  - Creates performance indexes on frequently queried columns
+- Updated [`package.json`](package.json) with migration scripts:
+  - `npm run typeorm` - Base TypeORM CLI command
+  - `npm run migration:generate` - Generate new migration from entity changes
+  - `npm run migration:run` - Run pending migrations
+  - `npm run migration:revert` - Revert last migration
+  - `npm run migration:show` - Show migration status
+- Successfully executed initial migration
+- Database file created at [`data/hookah.db`](data/hookah.db)
+- All tables and indexes created successfully
+
 **2026-01-26:** Dependency installation and verification
 - Fixed dependency versions in package.json:
   - Updated @nestjs/common from ^11.0.1 to ^11.1.12 (latest stable)
