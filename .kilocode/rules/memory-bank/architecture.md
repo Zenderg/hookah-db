@@ -86,6 +86,9 @@ src/
 │   └── api-keys.module.ts
 └── cli/                    # CLI commands
     └── index.ts             # CLI entry point with Commander.js
+└── health/                  # Health check module
+    ├── health.module.ts      # Health module configuration
+    └── health.controller.ts  # Health check endpoint
 ```
 
 ## Data Model
@@ -169,6 +172,29 @@ src/
 All endpoints require API key authentication via:
 - Header: `X-API-Key: <key>`
 - OR Header: `Authorization: Bearer <key>`
+
+### Health
+
+**GET /health**
+- Returns: Health check status
+- Authentication: Public (no API key required)
+- Response format:
+  ```json
+  {
+    "status": "ok",
+    "info": {
+      "database": {
+        "status": "up"
+      }
+    },
+    "error": {},
+    "details": {
+      "database": {
+        "status": "up"
+      }
+    }
+  }
+  ```
 
 ### Brands
 
@@ -334,6 +360,15 @@ All repositories use TypeORM QueryBuilder for:
 - Parser failures logged but don't crash the service
 - API errors return standardized JSON format
 - Detailed logging for debugging with stack traces
+
+### Health Check
+- Public endpoint for monitoring and deployment verification
+- Implemented using `@nestjs/terminus` package (v11.0.0)
+- Database connectivity check using `TypeOrmHealthIndicator`
+- Endpoint path: `/health` (GET method)
+- No API key authentication required
+- Response format follows Terminus standard: `{ status, info, error, details }`
+- Implemented in [`src/health/health.module.ts`](src/health/health.module.ts) and [`src/health/health.controller.ts`](src/health/health.controller.ts)
 
 ### Logging
 - Request logging per API key

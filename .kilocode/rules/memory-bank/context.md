@@ -2,7 +2,7 @@
 
 ## Current State
 
-**Status:** Global exception filter implemented and tested - application ready for further development
+**Status:** Health check endpoint implemented and tested - application ready for further development
 
 The project structure has been successfully initialized with all necessary files and directories. Dependencies have been installed and the application startup has been verified. The memory bank contains comprehensive documentation covering:
 
@@ -204,6 +204,19 @@ Complete NestJS-based project structure has been created with:
 - Created environment configuration template
 - Updated gitignore with comprehensive rules
 
+**2026-01-27:** Health check endpoint implementation
+- Installed [`@nestjs/terminus@11.0.0`](package.json) package for health check functionality
+- Created [`src/health/health.module.ts`](src/health/health.module.ts) - Health module with Terminus integration
+- Created [`src/health/health.controller.ts`](src/health/health.controller.ts) - Health controller with database connectivity check
+- Updated [`src/app.module.ts`](src/app.module.ts) - Registered HealthModule in application imports
+- Health endpoint tested successfully at `http://localhost:3000/health`
+- Response format: `{ status: "ok", info: { database: { status: "up" } }, error: {}, details: { database: { status: "up" } }`
+- Design decisions documented:
+  - Endpoint is public (no API key required)
+  - Only database connectivity check implemented (no memory, disk space, or external API checks)
+  - Simple status response following Terminus standard format
+  - Path: `/health` for monitoring and deployment verification
+
 ## Next Steps
 
 ### Immediate Actions
@@ -215,7 +228,7 @@ Complete NestJS-based project structure has been created with:
 6. Write tests: Add unit and integration tests
 7. Configure CORS: Set up proper CORS origins for production
 8. ✅ Add error handling: Implement global exception filter - **COMPLETED**
-9. Add health check: Create health endpoint for monitoring
+9. ✅ Add health check: Create health endpoint for monitoring - **COMPLETED**
 10. ✅ Run migrations: Set up TypeORM migrations - **COMPLETED**
 
 ### Implementation Priority
@@ -270,5 +283,4 @@ Complete NestJS-based project structure has been created with:
 **Pending Implementation:**
 - ⏳ Business logic in services (partially complete - repositories done)
 - ⏳ Parser implementation (Playwright)
-- ⏳ Health check endpoint
 - ⏳ Tests

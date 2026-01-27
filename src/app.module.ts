@@ -7,6 +7,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ApiKeysModule } from './api-keys/api-keys.module';
 import { HttpExceptionFilter } from './common/filters/http-exception-filter';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception-filter';
     }),
     ScheduleModule.forRoot(),
     ApiKeysModule,
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [

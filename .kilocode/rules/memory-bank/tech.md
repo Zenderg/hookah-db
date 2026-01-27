@@ -59,6 +59,7 @@
 - `@nestjs/typeorm`: TypeORM integration for NestJS (v11.0.0)
 - `@nestjs/schedule`: Task scheduling (cron jobs) (v6.1.0)
 - `@nestjs/config`: Configuration management (v4.0.0)
+- `@nestjs/terminus`: Health check integration (v11.0.0)
 - `typeorm`: ORM library (v0.3.28)
 - `sqlite3`: SQLite database driver (v5.1.7)
 - `class-validator`: Request validation (v0.14.3)
