@@ -115,28 +115,28 @@ src/
 ```typescript
 {
   id: string (UUID)
-  nameRu: string
-  nameEn: string
+  name: string (can be Russian or English)
   brandId: string (FK)
   lineId: string (FK, nullable)
   rating: number
   ratingsCount: number
-  reviewsCount: number
-  views: number
-  category: string
-  year: number
   country: string
-  strengthOfficial: string
-  strengthUser: number
-  tier: string
-  flavorDescriptors: string[]
-  productionStatus: string
-  htreviewsId: string
-  dateAdded: Date
+  strengthOfficial: string (nullable)
+  strengthByRatings: string (nullable) - STRING, not decimal
+  status: string (nullable) - "Выпускается", "Лимитированная", "Снята с производства"
+  htreviewsId: string (unique)
+  imageUrl: string - URL of tobacco product image
+  description: text - Detailed tobacco description
   createdAt: Date
   updatedAt: Date
 }
 ```
+
+**Note**: Entity requires significant changes from initial schema:
+- Removed fields: nameRu, nameEn (replaced with single `name`), reviewsCount, views, category, flavorDescriptors, dateAdded, year, tier, productionStatus
+- Added fields: imageUrl, description
+- Renamed: productionStatus → status
+- Fixed: strengthByRatings type from `decimal` to `string` (critical bug)
 
 ### Line Entity
 
@@ -146,6 +146,7 @@ src/
   name: string
   brandId: string (FK)
   description: string
+  imageUrl: string (nullable) - URL of line product image
   createdAt: Date
   updatedAt: Date
 }

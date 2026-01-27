@@ -15,7 +15,7 @@ A RESTful API service that provides structured access to hookah tobacco data by 
 
 ### Data Sources
 - Primary source: htreviews.org
-- Expected scale: ~100 brands, ~100 flavors per brand (~10,000 total flavors)
+- Expected scale: ~272 brands, ~471 lines, ~11,861 tobaccos total
 
 ### API Features
 - Key-based authentication for all endpoints

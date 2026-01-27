@@ -85,6 +85,76 @@ Complete NestJS-based project structure has been created with:
 
 ## Recent Changes
 
+**2026-01-27:** Line image requirement added to documentation
+- Used Playwright to verify that line detail pages on htreviews.org have images
+- Confirmed that lines display product images on their detail pages (e.g., "100% сигарный панк" line has an image)
+- Updated [`plans/line-parsing-spec.md`](plans/line-parsing-spec.md) to add `imageUrl` field to parsing specification:
+  - Added `imageUrl` to "Fields to PARSE" table (nullable string field)
+  - Updated all 5 data examples to include imageUrl field
+  - Updated parsing strategy to mention extracting imageUrl from line detail pages
+  - Updated "Database Schema Changes Required" section to include imageUrl
+- Updated [`.kilocode/rules/memory-bank/architecture.md`](.kilocode/rules/memory-bank/architecture.md) Line entity to include imageUrl field
+- **CRITICAL**: Line entity currently does NOT have imageUrl field - needs to be added via migration
+- **Next steps**: Create migration to add imageUrl field to Line entity, implement parser to extract line images
+
+**2026-01-27:** Tobacco parsing specification created
+- Created [`plans/tobacco-parsing-spec.md`](plans/tobacco-parsing-spec.md) - Comprehensive specification for parsing Tobacco (Табаки) data from htreviews.org
+- **IMPORTANT**: Files in `plans/` directory are temporary and should be deleted after implementation
+- Tobacco structure analyzed using Playwright:
+  - Expected scale: ~11,861 tobaccos total
+  - Data parsed from tobacco detail pages
+  - URL structure: `https://htreviews.org/tobaccos/{brand-slug}/{line-slug}/{tobacco-slug}`
+- **Fields to PARSE** (12 total):
+  - `name` - Tobacco name as displayed on website (can be Russian or English)
+  - `brandId` - Foreign key to brands table (mapped from brand slug)
+  - `lineId` - Foreign key to lines table (mapped from line slug, nullable)
+  - `rating` - Average rating (0-5 scale)
+  - `ratingsCount` - Number of ratings
+  - `country` - Country of origin
+  - `strengthOfficial` - Official strength rating (nullable): "Лёгкая", "Средне-лёгкая", "Средняя", "Средне-крепкая", "Крепкая", "Не указано"
+  - `strengthByRatings` - Strength by user ratings (nullable): "Лёгкая", "Средне-лёгкая", "Средняя", "Средне-крепкая", "Крепкая", "Не указано"
+  - `status` - Production status (nullable): "Выпускается", "Лимитированная", "Снята с производства"
+  - `htreviewsId` - Unique identifier from htreviews.org (format: "htr" + numeric ID)
+  - `imageUrl` - URL of tobacco product image
+  - `description` - Detailed description of the tobacco
+- **Fields to NOT PARSE**:
+  - `reviewsCount` - Not required per user requirements
+  - `views` - Not required per user requirements
+  - `category` - Not required per user requirements
+  - `flavorDescriptors` - Not required per user requirements
+  - `dateAdded` - Not required per user requirements
+  - `year` - Not available on website
+  - `tier` - Not available on website
+- **CRITICAL ISSUES**:
+  - `strengthByRatings` field type mismatch: Entity defines as `decimal` but website stores as STRING. Must be fixed before implementation.
+  - Entity cleanup needed: Remove 10 fields (nameRu, nameEn, reviewsCount, views, category, productionStatus, flavorDescriptors, dateAdded, year, tier) and add 2 new fields (imageUrl, description)
+- **Parsing strategy**: Two-phase approach
+  - Phase 1: Use already parsed brands and lines data
+  - Phase 2: For each line, navigate to line detail page and extract tobacco list
+  - Phase 3: For each tobacco, navigate to tobacco detail page and extract all 12 fields
+- **Data examples**:
+  - Dark Chocolate (Bonche - Основная): name="Темный шоколад", rating=4.7, ratingsCount=174, country="Россия", strengthOfficial="Крепкая", strengthByRatings="Средне-крепкая", status="Выпускается", htreviewsId="htr96739", imageUrl="https://htreviews.org/uploads/objects/1/b92b3dc00c4d985b47225ce428bd84912b5a0f7f.webp", description="Вкус темного шоколада."
+  - Банан желтый (Dogma - 100% сигарный панк): name="Банан желтый", rating=4.4, ratingsCount=64, country="Россия", strengthOfficial="Средне-крепкая", strengthByRatings="Средняя", status="Выпускается", htreviewsId="htr198516", imageUrl="https://htreviews.org/uploads/objects/1/4ac4bcdca8022589f5acc8791c83ab93a8ab5af1.webp", description="Какой мы хотели сделать банан? — Без травянистой ноты..."
+- **Next steps**: Create database migration to fix strengthByRatings field type, remove unused fields, add imageUrl and description fields, implement parser using Playwright
+
+**2026-01-27:** Line parsing specification created
+- Created [`plans/brand-parsing-spec.md`](plans/brand-parsing-spec.md) - Comprehensive specification for parsing brand data from htreviews.org
+- **IMPORTANT**: Files in `plans/` directory are temporary and should be deleted after implementation
+- Brand structure analyzed using Playwright:
+  - Two categories: "Лучшие" (~54 brands) and "Все остальные" (~218+ brands)
+  - Total: ~272+ brands
+  - Infinite scroll loading (no traditional pagination)
+- **Fields to PARSE**: name, country, rating, ratingsCount, description, logoUrl
+- **Fields to NOT PARSE**: website, yearFounded, status, dateAdded, reviewsCount, views
+- **URL structure**:
+  - Best brands: `https://htreviews.org/tobaccos/brands?r=position&s=rating&d=desc`
+  - All other brands: `https://htreviews.org/tobaccos/brands?r=others&s=rating&d=desc`
+- **Parsing strategy**: Two-phase approach - list page for basic data, detail pages for logoUrl and full description
+- **Data examples**:
+  - Догма: name="Догма", country="Россия", rating=4.5, ratingsCount=3266, logoUrl="https://htreviews.org/uploads/objects/1/b92b3dc00c4d985b47225ce428bd84912b5a0f7f.webp"
+  - Lezzet: name="Lezzet", country="Россия", rating=5.0, ratingsCount=1, logoUrl="https://htreviews.org/uploads/objects/1/4ac4bcdca8022589f5acc8791c83ab93a8ab5af1.webp"
+- **Next steps**: Update Brand entity to add logoUrl field, implement parser using Playwright
+
 **2026-01-27:** Global exception filter implementation
 - Created [`src/common/filters/http-exception-filter.ts`](src/common/filters/http-exception-filter.ts):
   - Implements global exception filter using `@Catch()` decorator
@@ -230,6 +300,7 @@ Complete NestJS-based project structure has been created with:
 8. ✅ Add error handling: Implement global exception filter - **COMPLETED**
 9. ✅ Add health check: Create health endpoint for monitoring - **COMPLETED**
 10. ✅ Run migrations: Set up TypeORM migrations - **COMPLETED**
+11. ✅ Create tobacco parsing specification: Comprehensive specification for parsing tobacco data - **COMPLETED**
 
 ### Implementation Priority
 1. Core infrastructure (NestJS setup, database, entities) - **COMPLETED**
