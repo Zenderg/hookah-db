@@ -16,10 +16,7 @@ export class Tobacco {
   id: string;
 
   @Column()
-  nameRu: string;
-
-  @Column()
-  nameEn: string;
+  name: string;
 
   @Column()
   brandId: string;
@@ -41,41 +38,26 @@ export class Tobacco {
   @Column({ default: 0 })
   ratingsCount: number;
 
-  @Column({ default: 0 })
-  reviewsCount: number;
-
-  @Column({ default: 0 })
-  views: number;
-
-  @Column()
-  category: string;
-
-  @Column({ nullable: true })
-  year: number;
-
   @Column()
   country: string;
 
   @Column({ nullable: true })
   strengthOfficial: string;
 
-  @Column('decimal', { precision: 3, scale: 2, nullable: true })
-  strengthUser: number;
+  @Column({ nullable: true })
+  strengthByRatings: string;
 
   @Column({ nullable: true })
-  tier: string;
-
-  @Column('simple-array', { nullable: true })
-  flavorDescriptors: string[];
-
-  @Column({ nullable: true })
-  productionStatus: string;
+  status: string;
 
   @Column({ unique: true })
   htreviewsId: string;
 
-  @Column()
-  dateAdded: Date;
+  @Column({ nullable: true })
+  imageUrl: string;
+
+  @Column({ type: 'text', nullable: true })
+  description: string;
 
   @CreateDateColumn()
   createdAt: Date;

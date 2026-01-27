@@ -132,11 +132,12 @@ src/
 }
 ```
 
-**Note**: Entity requires significant changes from initial schema:
+**Note**: Entity schema has been corrected via migration (2026-01-27):
 - Removed fields: nameRu, nameEn (replaced with single `name`), reviewsCount, views, category, flavorDescriptors, dateAdded, year, tier, productionStatus
 - Added fields: imageUrl, description
 - Renamed: productionStatus → status
 - Fixed: strengthByRatings type from `decimal` to `string` (critical bug)
+- Migration: [`src/migrations/1706328000002-FixTobaccoSchema.ts`](src/migrations/1706328000002-FixTobaccoSchema.ts)
 
 ### Line Entity
 

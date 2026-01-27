@@ -85,6 +85,22 @@ Complete NestJS-based project structure has been created with:
 
 ## Recent Changes
 
+**2026-01-27:** Entity schema fixes implemented
+- Created migration [`src/migrations/1706328000001-AddImageUrlToLine.ts`](src/migrations/1706328000001-AddImageUrlToLine.ts) to add `imageUrl` field to Line entity
+- Created migration [`src/migrations/1706328000002-FixTobaccoSchema.ts`](src/migrations/1706328000002-FixTobaccoSchema.ts) to fix Tobacco entity schema
+- Updated [`src/lines/lines.entity.ts`](src/lines/lines.entity.ts:30) to include `imageUrl` field (nullable varchar)
+- Updated [`src/tobaccos/tobaccos.entity.ts`](src/tobaccos/tobaccos.entity.ts) with corrected schema:
+  - Replaced `nameRu` and `nameEn` with single `name` field
+  - Fixed `strengthByRatings` type from decimal to string (critical bug fix)
+  - Removed unused fields: `reviewsCount`, `views`, `category`, `flavorDescriptors`, `dateAdded`, `year`, `tier`, `productionStatus`
+  - Renamed `productionStatus` to `status`
+  - Added `imageUrl` and `description` fields
+- Successfully executed both migrations to update database schema
+- Verified database schema:
+  - Lines table now includes `imageUrl` column
+  - Tobaccos table has corrected schema with all required fields and proper types
+- Entities now match architecture documentation and are ready for parser implementation
+
 **2026-01-27:** Line image requirement added to documentation
 - Used Playwright to verify that line detail pages on htreviews.org have images
 - Confirmed that lines display product images on their detail pages (e.g., "100% сигарный панк" line has an image)
@@ -292,25 +308,27 @@ Complete NestJS-based project structure has been created with:
 ### Immediate Actions
 1. ✅ Install dependencies: Run `npm install` to install all packages - **COMPLETED**
 2. ✅ Add DTOs: Create data transfer objects for request validation - **COMPLETED**
-3. Implement business logic: Add actual logic to services (replace TODO comments)
-4. Implement parser: Build Playwright/Cheerio parser for htreviews.org
-5. ✅ Add CLI commands: Implement create, delete, list, stats commands - **COMPLETED**
-6. Write tests: Add unit and integration tests
-7. Configure CORS: Set up proper CORS origins for production
-8. ✅ Add error handling: Implement global exception filter - **COMPLETED**
-9. ✅ Add health check: Create health endpoint for monitoring - **COMPLETED**
-10. ✅ Run migrations: Set up TypeORM migrations - **COMPLETED**
-11. ✅ Create tobacco parsing specification: Comprehensive specification for parsing tobacco data - **COMPLETED**
+3. ✅ Fix entity schemas: Add imageUrl to Line, fix Tobacco entity schema - **COMPLETED**
+4. Implement business logic: Add actual logic to services (replace TODO comments)
+5. Implement parser: Build Playwright/Cheerio parser for htreviews.org
+6. ✅ Add CLI commands: Implement create, delete, list, stats commands - **COMPLETED**
+7. Write tests: Add unit and integration tests
+8. Configure CORS: Set up proper CORS origins for production
+9. ✅ Add error handling: Implement global exception filter - **COMPLETED**
+10. ✅ Add health check: Create health endpoint for monitoring - **COMPLETED**
+11. ✅ Run migrations: Set up TypeORM migrations - **COMPLETED**
+12. ✅ Create tobacco parsing specification: Comprehensive specification for parsing tobacco data - **COMPLETED**
 
 ### Implementation Priority
-1. Core infrastructure (NestJS setup, database, entities) - **COMPLETED**
+1. ✅ Core infrastructure (NestJS setup, database, entities) - **COMPLETED**
 2. Authentication system (API keys, middleware) - **STRUCTURE READY**
 3. Data parser (scraping htreviews.org) - **STRUCTURE READY**
 4. API endpoints (brands, tobaccos, lines) - **STRUCTURE READY**
 5. ✅ Filtering and sorting logic - **COMPLETED**
 6. Scheduled tasks for data refresh - **STRUCTURE READY**
-7. Docker deployment setup - **COMPLETED**
+7. ✅ Docker deployment setup - **COMPLETED**
 8. ✅ CLI commands for API key management - **COMPLETED**
+9. ✅ Entity schema fixes (Line imageUrl, Tobacco schema) - **COMPLETED**
 
 ## Known Constraints
 
@@ -341,6 +359,7 @@ Complete NestJS-based project structure has been created with:
 - ✅ Modular architecture with feature-based modules
 - ✅ Layered design (Controller → Service → Repository)
 - ✅ TypeORM entities with proper relationships
+- ✅ Entity schema fixes (Line imageUrl, Tobacco schema corrections)
 - ✅ API key authentication guard
 - ✅ Request/response logging interceptor
 - ✅ Environment-based configuration
