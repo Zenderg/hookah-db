@@ -32,6 +32,9 @@ export class Brand {
   @Column({ type: 'text', nullable: true })
   description: string;
 
+  @Column({ type: 'varchar', nullable: true })
+  logoUrl: string;
+
   @CreateDateColumn()
   createdAt: Date;
 

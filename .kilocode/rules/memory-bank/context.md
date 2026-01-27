@@ -2,7 +2,7 @@
 
 ## Current State
 
-**Status:** Health check endpoint implemented and tested - application ready for further development
+**Status:** Brand parser implemented and tested - application ready for further development
 
 The project structure has been successfully initialized with all necessary files and directories. Dependencies have been installed and the application startup has been verified. The memory bank contains comprehensive documentation covering:
 
@@ -84,6 +84,31 @@ Complete NestJS-based project structure has been created with:
 - `data/` - Directory for SQLite database persistence (mounted volume)
 
 ## Recent Changes
+
+**2026-01-27:** Brand parser implementation
+- Created migration [`src/migrations/1706328000003-AddLogoUrlToBrand.ts`](src/migrations/1706328000003-AddLogoUrlToBrand.ts) to add `logoUrl` field to Brand entity
+- Updated [`src/brands/brands.entity.ts`](src/brands/brands.entity.ts:33) to include `logoUrl` column
+- Successfully ran migration to update database schema
+- Created [`src/parser/strategies/brand-parser.strategy.ts`](src/parser/strategies/brand-parser.strategy.ts) with:
+  - Playwright browser initialization and cleanup
+  - Two-phase parsing approach:
+    - Phase 1: Parse brand list pages from both "Best Brands" and "All Other Brands" categories
+    - Phase 2: Parse brand detail pages for logoUrl and full description
+  - Infinite scroll handling with duplicate detection
+  - Error handling that continues parsing on individual brand failures
+  - Data normalization to Brand entity format
+- Updated [`src/parser/parser.service.ts`](src/parser/parser.service.ts) with:
+  - Cron job scheduled for daily execution at 2:00 AM
+  - Database operations to update existing brands (not just insert new ones)
+  - Comprehensive logging with progress tracking (created, updated, error counts)
+  - Error handling that logs failures but continues processing
+  - Manual parsing method available via `parseBrandsManually()`
+- Updated [`src/parser/parser.module.ts`](src/parser/parser.module.ts) to:
+  - Import TypeOrmModule for Brand entity
+  - Register BrandParserStrategy as provider
+  - Export ParserService for use by other modules
+- Application builds successfully and all modules initialize correctly
+- **Note**: Selectors used in parser (e.g., `[data-testid="brand-item"]`) are based on specification and may need adjustment if actual HTML structure of htreviews.org differs
 
 **2026-01-27:** Entity schema fixes implemented
 - Created migration [`src/migrations/1706328000001-AddImageUrlToLine.ts`](src/migrations/1706328000001-AddImageUrlToLine.ts) to add `imageUrl` field to Line entity
@@ -322,10 +347,10 @@ Complete NestJS-based project structure has been created with:
 ### Implementation Priority
 1. ✅ Core infrastructure (NestJS setup, database, entities) - **COMPLETED**
 2. Authentication system (API keys, middleware) - **STRUCTURE READY**
-3. Data parser (scraping htreviews.org) - **STRUCTURE READY**
+3. ✅ Data parser (scraping htreviews.org) - **COMPLETED**
 4. API endpoints (brands, tobaccos, lines) - **STRUCTURE READY**
 5. ✅ Filtering and sorting logic - **COMPLETED**
-6. Scheduled tasks for data refresh - **STRUCTURE READY**
+6. ✅ Scheduled tasks for data refresh - **COMPLETED**
 7. ✅ Docker deployment setup - **COMPLETED**
 8. ✅ CLI commands for API key management - **COMPLETED**
 9. ✅ Entity schema fixes (Line imageUrl, Tobacco schema) - **COMPLETED**

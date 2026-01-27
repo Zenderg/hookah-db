@@ -105,6 +105,7 @@ src/
   reviewsCount: number
   views: number
   description: string
+  logoUrl: string
   createdAt: Date
   updatedAt: Date
 }
@@ -322,10 +323,15 @@ All repositories use TypeORM QueryBuilder for:
 - Active community and good documentation
 
 ### Parser Strategy
-- **Decision pending**: Playwright vs Cheerio
-- Playwright: Full browser automation, handles JavaScript-rendered content
-- Cheerio: Fast, lightweight, HTML parsing only
-- Final choice depends on htreviews.org page structure
+- **Playwright selected**: Full browser automation, handles JavaScript-rendered content
+- **Implementation**: Brand parser implemented with:
+  - Two-phase parsing (list pages + detail pages)
+  - Infinite scroll handling with duplicate detection
+  - Error handling that continues parsing on individual brand failures
+  - Data normalization to Brand entity format
+- **Cron Job**: Daily execution at 2:00 AM
+- **Data Persistence**: Updates existing brands by name, creates new ones
+- **Note**: Selectors used in parser (e.g., `[data-testid="brand-item"]`) are based on specification and may need adjustment if actual HTML structure of htreviews.org differs
 
 ### Authentication
 - **API Key-based**: Simple, stateless authentication
