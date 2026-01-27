@@ -2,7 +2,7 @@
 
 ## Current State
 
-**Status:** DTOs implemented with validation, filtering, sorting, and pagination - ready for testing
+**Status:** Global exception filter implemented and tested - application ready for further development
 
 The project structure has been successfully initialized with all necessary files and directories. Dependencies have been installed and the application startup has been verified. The memory bank contains comprehensive documentation covering:
 
@@ -84,6 +84,27 @@ Complete NestJS-based project structure has been created with:
 - `data/` - Directory for SQLite database persistence (mounted volume)
 
 ## Recent Changes
+
+**2026-01-27:** Global exception filter implementation
+- Created [`src/common/filters/http-exception-filter.ts`](src/common/filters/http-exception-filter.ts):
+  - Implements global exception filter using `@Catch()` decorator
+  - Handles `HttpException` with proper status codes and messages
+  - Handles unknown exceptions with `INTERNAL_SERVER_ERROR` status
+  - Handles validation errors with custom status codes
+  - Returns consistent JSON response format: `{ statusCode, timestamp, path, message }`
+  - Logs all errors with stack traces for debugging
+- Created [`src/common/filters/http-exception-filter.spec.ts`](src/common/filters/http-exception-filter.spec.ts):
+  - Comprehensive unit tests for exception filter
+  - Tests cover: HttpException handling, unknown exceptions, validation errors, timestamp formatting, and path extraction
+  - All 6 tests pass successfully
+- Updated [`src/app.module.ts`](src/app.module.ts):
+  - Registered `HttpExceptionFilter` globally using `APP_FILTER` provider
+  - Filter applies to all endpoints application-wide
+- Design decisions documented:
+  - Error response format: `{ statusCode, timestamp, path, message }`
+  - Unknown exceptions return 500 status with "Internal server error" message
+  - Validation errors preserve their original status codes
+  - All errors logged with stack traces for debugging
 
 **2026-01-27:** CLI commands implementation for API key management
 - Updated [`src/api-keys/api-keys.repository.ts`](src/api-keys/api-keys.repository.ts):
@@ -193,7 +214,7 @@ Complete NestJS-based project structure has been created with:
 5. ✅ Add CLI commands: Implement create, delete, list, stats commands - **COMPLETED**
 6. Write tests: Add unit and integration tests
 7. Configure CORS: Set up proper CORS origins for production
-8. Add error handling: Implement global exception filter
+8. ✅ Add error handling: Implement global exception filter - **COMPLETED**
 9. Add health check: Create health endpoint for monitoring
 10. ✅ Run migrations: Set up TypeORM migrations - **COMPLETED**
 
@@ -244,10 +265,10 @@ Complete NestJS-based project structure has been created with:
 - ✅ Scheduled task structure for data refresh
 - ✅ DTOs for validation with filtering, sorting, and pagination
 - ✅ API endpoints with filtering/sorting (brands, tobaccos, lines)
+- ✅ Global exception filter with consistent error responses
 
 **Pending Implementation:**
 - ⏳ Business logic in services (partially complete - repositories done)
 - ⏳ Parser implementation (Playwright)
-- ⏳ Global exception filter
 - ⏳ Health check endpoint
 - ⏳ Tests

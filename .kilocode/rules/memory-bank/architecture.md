@@ -43,6 +43,8 @@ src/
 │   ├── middleware/         # Auth middleware
 │   ├── decorators/         # Custom decorators
 │   ├── interceptors/       # Logging interceptor
+│   ├── filters/            # Global exception filters
+│   │   └── http-exception-filter.ts  # Global exception filter
 │   └── dto/               # Shared DTOs
 │       └── pagination.dto.ts  # Pagination base classes
 ├── brands/                 # Brand module
@@ -323,9 +325,15 @@ All repositories use TypeORM QueryBuilder for:
 
 ### Error Handling
 - Global exception filter for consistent error responses
+- Implemented in [`src/common/filters/http-exception-filter.ts`](src/common/filters/http-exception-filter.ts)
+- Registered globally in [`src/app.module.ts`](src/app.module.ts) using `APP_FILTER` provider
+- Error response format: `{ statusCode, timestamp, path, message }`
+- Handles `HttpException` with proper status codes and messages
+- Handles unknown exceptions with `INTERNAL_SERVER_ERROR` status
+- Handles validation errors with custom status codes
 - Parser failures logged but don't crash the service
 - API errors return standardized JSON format
-- Detailed logging for debugging
+- Detailed logging for debugging with stack traces
 
 ### Logging
 - Request logging per API key
