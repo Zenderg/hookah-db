@@ -42,7 +42,7 @@ export class BrandParserStrategy {
     this.logger.log('Playwright browser closed');
   }
 
-  async parseBrands(): Promise<ParsedBrandData[]> {
+  async parseBrands(limit?: number): Promise<ParsedBrandData[]> {
     if (!this.page) {
       throw new Error('Browser not initialized. Call initialize() first.');
     }
@@ -53,6 +53,7 @@ export class BrandParserStrategy {
     this.logger.log('Parsing best brands...');
     const bestBrands = await this.parseBrandList(
       'https://htreviews.org/tobaccos/brands?r=position&s=rating&d=desc',
+      limit,
     );
     allBrands.push(...bestBrands);
     this.logger.log(`Parsed ${bestBrands.length} best brands`);
@@ -61,20 +62,24 @@ export class BrandParserStrategy {
     this.logger.log('Parsing other brands...');
     const otherBrands = await this.parseBrandList(
       'https://htreviews.org/tobaccos/brands?r=others&s=rating&d=desc',
+      limit ? limit - bestBrands.length : undefined,
     );
     allBrands.push(...otherBrands);
     this.logger.log(`Parsed ${otherBrands.length} other brands`);
 
+    // Apply limit if specified
+    const brandsToProcess = limit ? allBrands.slice(0, limit) : allBrands;
+
     // Parse detail pages for logoUrl and full description
     this.logger.log('Parsing brand detail pages...');
-    for (let i = 0; i < allBrands.length; i++) {
-      const brand = allBrands[i];
+    for (let i = 0; i < brandsToProcess.length; i++) {
+      const brand = brandsToProcess[i];
       try {
         this.logger.log(
-          `Parsing detail page for brand ${i + 1}/${allBrands.length}: ${brand.name}`,
+          `Parsing detail page for brand ${i + 1}/${brandsToProcess.length}: ${brand.name}`,
         );
         const detailData = await this.parseBrandDetail(brand.detailUrl);
-        allBrands[i] = {
+        brandsToProcess[i] = {
           ...brand,
           logoUrl: detailData.logoUrl,
           description: detailData.description,
@@ -87,10 +92,10 @@ export class BrandParserStrategy {
       }
     }
 
-    return allBrands;
+    return brandsToProcess;
   }
 
-  private async parseBrandList(url: string): Promise<ParsedBrandData[]> {
+  private async parseBrandList(url: string, limit?: number): Promise<ParsedBrandData[]> {
     if (!this.page) {
       throw new Error('Browser not initialized');
     }
@@ -104,6 +109,12 @@ export class BrandParserStrategy {
     const maxNoNewContent = 3;
 
     while (noNewContentCount < maxNoNewContent) {
+      // Check if we've reached the limit
+      if (limit && brands.length >= limit) {
+        this.logger.log(`Reached limit of ${limit} brands`);
+        break;
+      }
+
       // Scroll to bottom to trigger infinite scroll
       await this.page.evaluate(() => {
         window.scrollTo(0, document.body.scrollHeight);
@@ -152,8 +163,14 @@ export class BrandParserStrategy {
         return true;
       });
 
+      // Apply limit to new brands
+      const remainingLimit = limit ? limit - brands.length : undefined;
+      const brandsToAdd = remainingLimit
+        ? newBrands.slice(0, remainingLimit)
+        : newBrands;
+
       brands.push(
-        ...newBrands.map((brand) => ({
+        ...brandsToAdd.map((brand) => ({
           ...brand,
           description: '',
           logoUrl: '',

@@ -4,6 +4,7 @@ import { Command } from 'commander';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../app.module';
 import { ApiKeysService } from '../api-keys/api-keys.service';
+import { ParserService } from '../parser/parser.service';
 
 const program = new Command();
 
@@ -16,6 +17,12 @@ program
 async function getApiKeysService(): Promise<ApiKeysService> {
   const app = await NestFactory.createApplicationContext(AppModule);
   return app.get(ApiKeysService);
+}
+
+// Helper function to initialize NestJS app and get parser service
+async function getParserService(): Promise<ParserService> {
+  const app = await NestFactory.createApplicationContext(AppModule);
+  return app.get(ParserService);
 }
 
 // Create API key command
@@ -107,6 +114,53 @@ program
       console.log(`Total Requests: ${stats.totalRequests}`);
     } catch (error) {
       console.error('❌ Error fetching statistics:', error instanceof Error ? error.message : error);
+      process.exit(1);
+    }
+  });
+
+// Parse command with subcommands
+const parseCommand = program
+  .command('parse')
+  .description('Parse data from htreviews.org')
+  .argument('<type>', 'Type of data to parse: brands, lines, or tobaccos')
+  .option('--limit <number>', 'Limit the number of items to parse', undefined)
+  .action(async (type, options) => {
+    try {
+      const parserService = await getParserService();
+      const limit = options.limit ? parseInt(options.limit, 10) : undefined;
+
+      if (limit !== undefined && (isNaN(limit) || limit < 1)) {
+        console.error('❌ Invalid limit value. Must be a positive number.');
+        process.exit(1);
+      }
+
+      console.log(`🚀 Starting ${type} parsing${limit ? ` (limit: ${limit})` : ''}...`);
+      console.log('');
+
+      const startTime = Date.now();
+
+      switch (type.toLowerCase()) {
+        case 'brands':
+          await parserService.parseBrandsManually(limit);
+          break;
+        case 'lines':
+          console.error('❌ Lines parser not implemented yet.');
+          process.exit(1);
+        case 'tobaccos':
+          console.error('❌ Tobaccos parser not implemented yet.');
+          process.exit(1);
+        default:
+          console.error(
+            `❌ Invalid type: ${type}. Must be 'brands', 'lines', or 'tobaccos'.`,
+          );
+          process.exit(1);
+      }
+
+      const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+      console.log('');
+      console.log(`✅ ${type} parsing completed in ${duration}s`);
+    } catch (error) {
+      console.error('❌ Parsing failed:', error instanceof Error ? error.message : error);
       process.exit(1);
     }
   });

@@ -85,6 +85,22 @@ Complete NestJS-based project structure has been created with:
 
 ## Recent Changes
 
+**2026-01-27:** CLI parse command with limit support for manual testing
+- Updated [`src/parser/parser.service.ts`](src/parser/parser.service.ts:19) to support optional `limit` parameter in [`handleDailyRefresh`](src/parser/parser.service.ts:19) method
+- Updated [`src/parser/parser.service.ts`](src/parser/parser.service.ts:93) to add [`parseBrandsManually(limit?: number)`](src/parser/parser.service.ts:93) method for manual parsing
+- Updated [`src/parser/strategies/brand-parser.strategy.ts`](src/parser/strategies/brand-parser.strategy.ts:45) to support `limit` parameter in [`parseBrands`](src/parser/strategies/brand-parser.strategy.ts:45) method
+- Updated [`src/parser/strategies/brand-parser.strategy.ts`](src/parser/strategies/brand-parser.strategy.ts:98) to support `limit` parameter in [`parseBrandList`](src/parser/strategies/brand-parser.strategy.ts:98) method
+- Added CLI command [`parse`](src/cli/index.ts:121) to [`src/cli/index.ts`](src/cli/index.ts) with:
+  - Subcommands for data types: `brands`, `lines`, `tobaccos`
+  - `--limit <number>` option to restrict number of items to parse
+  - Validation for limit parameter (must be positive number)
+  - Progress tracking and execution time display
+  - Statistics output (created, updated, errors)
+- Updated [`src/app.module.ts`](src/app.module.ts:33) to import [`ParserModule`](src/parser/module.ts) for CLI access to ParserService
+- CLI command tested successfully with `npm run cli -- parse brands --limit 5`
+- Command completes in ~18 seconds and shows detailed statistics
+- **Note**: Parser selectors based on specification may need adjustment for actual htreviews.org HTML structure
+
 **2026-01-27:** Brand parser implementation
 - Created migration [`src/migrations/1706328000003-AddLogoUrlToBrand.ts`](src/migrations/1706328000003-AddLogoUrlToBrand.ts) to add `logoUrl` field to Brand entity
 - Updated [`src/brands/brands.entity.ts`](src/brands/brands.entity.ts:33) to include `logoUrl` column

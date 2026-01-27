@@ -8,6 +8,7 @@ import { AppService } from './app.service';
 import { ApiKeysModule } from './api-keys/api-keys.module';
 import { HttpExceptionFilter } from './common/filters/http-exception-filter';
 import { HealthModule } from './health/health.module';
+import { ParserModule } from './parser/parser.module';
 
 @Module({
   imports: [
@@ -19,18 +20,19 @@ import { HealthModule } from './health/health.module';
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
         type: 'sqlite',
-        database: configService.get('DATABASE_PATH') || './data/hookah.db',
-        entities: [__dirname + '/**/*.entity{.ts,.js}'],
-        synchronize: false,
-        migrations: [__dirname + '/migrations/*{.ts,.js}'],
-        migrationsRun: false,
-        migrationsTableName: 'migrations',
-      }),
+          database: configService.get('DATABASE_PATH') || './data/hookah.db',
+          entities: [__dirname + '/**/*.entity{.ts,.js}'],
+          synchronize: false,
+          migrations: [__dirname + '/migrations/*{.ts,.js}'],
+          migrationsRun: false,
+          migrationsTableName: 'migrations',
+        }),
       inject: [ConfigService],
     }),
     ScheduleModule.forRoot(),
     ApiKeysModule,
     HealthModule,
+    ParserModule,
   ],
   controllers: [AppController],
   providers: [

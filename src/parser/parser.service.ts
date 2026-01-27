@@ -16,14 +16,18 @@ export class ParserService {
   ) {}
 
   @Cron(CronExpression.EVERY_DAY_AT_2AM)
-  async handleDailyRefresh() {
-    this.logger.log('Starting daily data refresh...');
+  async handleDailyRefresh(limit?: number): Promise<{
+    created: number;
+    updated: number;
+    errors: number;
+  }> {
+    this.logger.log('Starting data refresh...');
 
     try {
       await this.brandParserStrategy.initialize();
 
       // Parse all brands from htreviews.org
-      const parsedBrands = await this.brandParserStrategy.parseBrands();
+      const parsedBrands = await this.brandParserStrategy.parseBrands(limit);
       this.logger.log(
         `Parsed ${parsedBrands.length} brands from htreviews.org`,
       );
@@ -67,19 +71,26 @@ export class ParserService {
       }
 
       this.logger.log(
-        `Daily refresh completed: ${createdCount} created, ${updatedCount} updated, ${errorCount} errors`,
+        `Refresh completed: ${createdCount} created, ${updatedCount} updated, ${errorCount} errors`,
       );
+
+      return {
+        created: createdCount,
+        updated: updatedCount,
+        errors: errorCount,
+      };
     } catch (error) {
       this.logger.error(
-        `Daily refresh failed: ${error instanceof Error ? error.message : String(error)}`,
+        `Refresh failed: ${error instanceof Error ? error.message : String(error)}`,
       );
+      throw error;
     } finally {
       await this.brandParserStrategy.close();
     }
   }
 
-  async parseBrandsManually(): Promise<void> {
+  async parseBrandsManually(limit?: number): Promise<void> {
     this.logger.log('Starting manual brand parsing...');
-    await this.handleDailyRefresh();
+    await this.handleDailyRefresh(limit);
   }
 }
