@@ -2,7 +2,7 @@
 
 ## Current State
 
-**Status:** Brand parser implemented and tested - application ready for further development
+**Status:** Brand parser fixed and working correctly - successfully parsing brands from htreviews.org
 
 The project structure has been successfully initialized with all necessary files and directories. Dependencies have been installed and the application startup has been verified. The memory bank contains comprehensive documentation covering:
 
@@ -84,6 +84,21 @@ Complete NestJS-based project structure has been created with:
 - `data/` - Directory for SQLite database persistence (mounted volume)
 
 ## Recent Changes
+
+**2026-01-27:** Brand parser fixed - CSS selectors updated for actual website structure
+- **Problem**: Brand parser was returning 0 brands when running CLI command `npm run cli -- parse brands --limit 5`
+- **Root cause**: Parser was using `data-testid` CSS selectors (e.g., `[data-testid="brand-item"]`, `[data-testid="brand-name"]`) which don't exist on htreviews.org
+- **Solution**: Updated [`src/parser/strategies/brand-parser.strategy.ts`](src/parser/strategies/brand-parser.strategy.ts) to use correct class-based selectors:
+  - Changed list item selector from `[data-testid="brand-item"]` to `.tobacco_list_item`
+  - Updated [`parseBrandList`](src/parser/strategies/brand-parser.strategy.ts:98) method to find div children and extract data based on text patterns:
+    - Rating: Decimal pattern `/^\d+\.\d+$/` (e.g., 4.5)
+    - Ratings count: 3-5 digit pattern `/^\d{3,5}$/` (e.g., 3271)
+    - Description: Long text (>50 chars) containing brand/tobacco keywords
+  - Updated [`parseBrandDetail`](src/parser/strategies/brand-parser.strategy.ts:217) method to use class-based selectors:
+    - Logo: `.brand-header img, .brand img`
+    - Description: `p.description, .brand-description, .tobacco_list_item_description`
+- **Verification**: Successfully parsed 5 brands (Догма, Bonche, Satyr, Kraken, World Tobacco Original) with all required fields in 48.69 seconds
+- **Key learning**: Always verify actual HTML structure using Playwright before implementing selectors - specification-based selectors may not match reality
 
 **2026-01-27:** CLI parse command with limit support for manual testing
 - Updated [`src/parser/parser.service.ts`](src/parser/parser.service.ts:19) to support optional `limit` parameter in [`handleDailyRefresh`](src/parser/parser.service.ts:19) method
@@ -351,7 +366,7 @@ Complete NestJS-based project structure has been created with:
 2. ✅ Add DTOs: Create data transfer objects for request validation - **COMPLETED**
 3. ✅ Fix entity schemas: Add imageUrl to Line, fix Tobacco entity schema - **COMPLETED**
 4. Implement business logic: Add actual logic to services (replace TODO comments)
-5. Implement parser: Build Playwright/Cheerio parser for htreviews.org
+5. ✅ Implement brand parser: Build Playwright parser for htreviews.org - **COMPLETED**
 6. ✅ Add CLI commands: Implement create, delete, list, stats commands - **COMPLETED**
 7. Write tests: Add unit and integration tests
 8. Configure CORS: Set up proper CORS origins for production
@@ -359,17 +374,21 @@ Complete NestJS-based project structure has been created with:
 10. ✅ Add health check: Create health endpoint for monitoring - **COMPLETED**
 11. ✅ Run migrations: Set up TypeORM migrations - **COMPLETED**
 12. ✅ Create tobacco parsing specification: Comprehensive specification for parsing tobacco data - **COMPLETED**
+13. ⏳ Implement line parser: Build Playwright parser for lines from htreviews.org
+14. ⏳ Implement tobacco parser: Build Playwright parser for tobaccos from htreviews.org
 
 ### Implementation Priority
 1. ✅ Core infrastructure (NestJS setup, database, entities) - **COMPLETED**
 2. Authentication system (API keys, middleware) - **STRUCTURE READY**
-3. ✅ Data parser (scraping htreviews.org) - **COMPLETED**
+3. ✅ Brand parser (scraping htreviews.org) - **COMPLETED**
 4. API endpoints (brands, tobaccos, lines) - **STRUCTURE READY**
 5. ✅ Filtering and sorting logic - **COMPLETED**
 6. ✅ Scheduled tasks for data refresh - **COMPLETED**
 7. ✅ Docker deployment setup - **COMPLETED**
 8. ✅ CLI commands for API key management - **COMPLETED**
 9. ✅ Entity schema fixes (Line imageUrl, Tobacco schema) - **COMPLETED**
+10. ⏳ Line parser implementation
+11. ⏳ Tobacco parser implementation
 
 ## Known Constraints
 
@@ -413,5 +432,6 @@ Complete NestJS-based project structure has been created with:
 
 **Pending Implementation:**
 - ⏳ Business logic in services (partially complete - repositories done)
-- ⏳ Parser implementation (Playwright)
+- ⏳ Line parser implementation
+- ⏳ Tobacco parser implementation
 - ⏳ Tests

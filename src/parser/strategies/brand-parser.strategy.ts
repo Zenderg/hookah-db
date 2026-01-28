@@ -95,7 +95,10 @@ export class BrandParserStrategy {
     return brandsToProcess;
   }
 
-  private async parseBrandList(url: string, limit?: number): Promise<ParsedBrandData[]> {
+  private async parseBrandList(
+    url: string,
+    limit?: number,
+  ): Promise<ParsedBrandData[]> {
     if (!this.page) {
       throw new Error('Browser not initialized');
     }
@@ -121,34 +124,61 @@ export class BrandParserStrategy {
       });
       await this.page.waitForTimeout(2000);
 
-      // Extract brand items
+      // Extract brand items using actual CSS selectors
       const brandItems = await this.page.$$eval(
-        '[data-testid="brand-item"]',
+        '.tobacco_list_item',
         (elements) => {
           return elements.map((element) => {
             const nameElement = element.querySelector(
-              '[data-testid="brand-name"]',
+              '.tobacco_list_item_slug span:first-child',
             );
             const countryElement = element.querySelector(
-              '[data-testid="brand-country"]',
+              '.tobacco_list_item_slug .country',
             );
-            const ratingElement = element.querySelector(
-              '[data-testid="brand-rating"]',
+            const imageElement = element.querySelector(
+              '.tobacco_list_item_image img',
             );
-            const ratingsCountElement = element.querySelector(
-              '[data-testid="brand-ratings-count"]',
+            const linkElement = element.querySelector(
+              '.tobacco_list_item_slug',
             );
-            const linkElement = element.querySelector('a[href*="/tobaccos/"]');
+
+            // Get all div children to find rating, ratings count, and description
+            const divs = Array.from(
+              element.querySelectorAll(':scope > div > div'),
+            );
+
+            // Find rating div (contains decimal like 4.5)
+            const ratingDiv = divs.find((div) => {
+              const text = div.textContent.trim();
+              return text.match(/^\d+\.\d+$/);
+            });
+
+            // Find ratings count div (contains 3-5 digit number)
+            const ratingsCountDiv = divs.find((div) => {
+              const text = div.textContent.trim();
+              return text.match(/^\d{3,5}$/);
+            });
+
+            // Find description div (long text with brand/tobacco keywords)
+            const descriptionDiv = divs.find((div) => {
+              const text = div.textContent.trim();
+              return (
+                text.length > 50 &&
+                (text.includes('табак') || text.includes('бренд'))
+              );
+            });
 
             return {
               name: nameElement?.textContent?.trim() || '',
               country: countryElement?.textContent?.trim() || '',
-              rating: parseFloat(ratingElement?.textContent?.trim() || '0'),
+              rating: parseFloat(ratingDiv?.textContent?.trim() || '0'),
               ratingsCount: parseInt(
-                ratingsCountElement?.textContent?.trim() || '0',
+                ratingsCountDiv?.textContent?.trim() || '0',
                 10,
               ),
               detailUrl: linkElement?.getAttribute('href') || '',
+              description: descriptionDiv?.textContent?.trim() || '',
+              logoUrl: imageElement?.getAttribute('src') || '',
             };
           });
         },
@@ -169,13 +199,7 @@ export class BrandParserStrategy {
         ? newBrands.slice(0, remainingLimit)
         : newBrands;
 
-      brands.push(
-        ...brandsToAdd.map((brand) => ({
-          ...brand,
-          description: '',
-          logoUrl: '',
-        })),
-      );
+      brands.push(...brandsToAdd);
 
       // Check if new content was loaded
       const currentCount = brands.length;
@@ -187,11 +211,7 @@ export class BrandParserStrategy {
       }
     }
 
-    return brands.map((brand) => ({
-      ...brand,
-      description: '',
-      logoUrl: '',
-    }));
+    return brands;
   }
 
   private async parseBrandDetail(detailUrl: string): Promise<{
@@ -209,11 +229,12 @@ export class BrandParserStrategy {
     await this.page.goto(fullUrl, { waitUntil: 'networkidle' });
 
     const data = await this.page.evaluate(() => {
-      const logoImg = document.querySelector(
-        'img[alt*="brand"], img[alt*="Бренд"]',
-      );
+      // Find logo image - look for img in object_image class
+      const logoImg = document.querySelector('.object_image img');
+      
+      // Find description - look for span in object_card_discr class
       const descriptionElement = document.querySelector(
-        '[data-testid="brand-description"], .brand-description, p.description',
+        '.object_card_discr span',
       );
 
       return {

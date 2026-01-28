@@ -329,9 +329,11 @@ All repositories use TypeORM QueryBuilder for:
   - Infinite scroll handling with duplicate detection
   - Error handling that continues parsing on individual brand failures
   - Data normalization to Brand entity format
+  - **Correct CSS selectors**: Uses class-based selectors (`.tobacco_list_item`) instead of data-testid attributes
+  - **Data extraction**: Uses text pattern matching for rating (decimal), ratings count (3-5 digits), and description (long text with keywords)
 - **Cron Job**: Daily execution at 2:00 AM
 - **Data Persistence**: Updates existing brands by name, creates new ones
-- **Note**: Selectors used in parser (e.g., `[data-testid="brand-item"]`) are based on specification and may need adjustment if actual HTML structure of htreviews.org differs
+- **Selectors verified**: Tested against actual htreviews.org HTML structure using Playwright
 
 ### Authentication
 - **API Key-based**: Simple, stateless authentication
