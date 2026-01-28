@@ -4,6 +4,7 @@ import { Brand } from '../../brands/brands.entity';
 
 export type ParsedBrandData = {
   name: string;
+  slug: string;
   country: string;
   rating: number;
   ratingsCount: number;
@@ -168,15 +169,27 @@ export class BrandParserStrategy {
               );
             });
 
+            const detailUrl = linkElement?.getAttribute('href') || '';
+            
+            // Extract slug from detailUrl (format: /tobaccos/{slug})
+            let slug = '';
+            if (detailUrl) {
+              const urlMatch = detailUrl.match(/\/tobaccos\/([^\/?]+)/);
+              if (urlMatch) {
+                slug = urlMatch[1];
+              }
+            }
+
             return {
               name: nameElement?.textContent?.trim() || '',
+              slug,
               country: countryElement?.textContent?.trim() || '',
               rating: parseFloat(ratingDiv?.textContent?.trim() || '0'),
               ratingsCount: parseInt(
                 ratingsCountDiv?.textContent?.trim() || '0',
                 10,
               ),
-              detailUrl: linkElement?.getAttribute('href') || '',
+              detailUrl,
               description: descriptionDiv?.textContent?.trim() || '',
               logoUrl: imageElement?.getAttribute('src') || '',
             };
@@ -249,6 +262,7 @@ export class BrandParserStrategy {
   normalizeToEntity(data: ParsedBrandData): Partial<Brand> {
     return {
       name: data.name,
+      slug: data.slug,
       country: data.country,
       rating: data.rating,
       ratingsCount: data.ratingsCount,

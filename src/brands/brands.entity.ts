@@ -4,6 +4,7 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  Index,
 } from 'typeorm';
 
 @Entity('brands')
@@ -14,6 +15,10 @@ export class Brand {
   @Column()
   name: string;
 
+  @Column({ type: 'varchar' })
+  @Index('idx_brands_slug')
+  slug: string;
+
   @Column()
   country: string;
 
@@ -23,16 +28,10 @@ export class Brand {
   @Column({ default: 0 })
   ratingsCount: number;
 
-  @Column({ default: 0 })
-  reviewsCount: number;
-
-  @Column({ default: 0 })
-  views: number;
-
   @Column({ type: 'text', nullable: true })
   description: string;
 
-  @Column({ type: 'varchar', nullable: true })
+  @Column({ type: 'varchar' })
   logoUrl: string;
 
   @CreateDateColumn()

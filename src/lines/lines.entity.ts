@@ -6,6 +6,7 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
+  Index,
 } from 'typeorm';
 import { Brand } from '../brands/brands.entity';
 
@@ -17,6 +18,10 @@ export class Line {
   @Column()
   name: string;
 
+  @Column({ type: 'varchar' })
+  @Index('idx_lines_slug')
+  slug: string;
+
   @Column()
   brandId: string;
 
@@ -27,8 +32,23 @@ export class Line {
   @Column({ type: 'text', nullable: true })
   description: string;
 
-  @Column({ nullable: true })
+  @Column()
   imageUrl: string;
+
+  @Column({ type: 'decimal', precision: 3, scale: 2, default: 0 })
+  rating: number;
+
+  @Column({ default: 0 })
+  ratingsCount: number;
+
+  @Column()
+  strengthOfficial: string;
+
+  @Column()
+  strengthByRatings: string;
+
+  @Column()
+  status: string;
 
   @CreateDateColumn()
   createdAt: Date;

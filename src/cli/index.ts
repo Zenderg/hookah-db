@@ -200,8 +200,7 @@ program
           await service.parseBrandsManually(limit);
           break;
         case 'lines':
-          console.error('❌ Lines parser not implemented yet.');
-          process.exit(1);
+          await service.parseLinesManually(limit);
           break;
         case 'tobaccos':
           console.error('❌ Tobaccos parser not implemented yet.');

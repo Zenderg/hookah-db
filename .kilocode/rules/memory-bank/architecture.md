@@ -98,18 +98,19 @@ src/
 ```typescript
 {
   id: string (UUID)
-  name: string
+  name: string (required)
+  slug: string (required) - URL slug extracted from htreviews.org (e.g., "dogma")
   country: string
   rating: number
   ratingsCount: number
-  reviewsCount: number
-  views: number
   description: string
   logoUrl: string
   createdAt: Date
   updatedAt: Date
 }
 ```
+
+**Note**: Slug and name are now required fields. Slug is extracted from the brand detail URL (format: `/tobaccos/{slug}`) and stored for use in line and tobacco parsing. The reviewsCount and views columns have been removed as they were not being parsed or used.
 
 ### Tobacco Entity
 
@@ -205,7 +206,7 @@ All endpoints require API key authentication via:
 - Query params: `?page=1&limit=20&sortBy=rating&order=desc&country=Russia`
 - Returns: Paginated list of brands
 - Filtering: by country
-- Sorting: by rating, views, name
+- Sorting: by rating, name
 
 **GET /brands/:id**
 - Returns: Single brand details
@@ -251,7 +252,7 @@ Located in [`src/common/dto/pagination.dto.ts`](src/common/dto/pagination.dto.ts
 
 **Brands** ([`src/brands/dto/find-brands.dto.ts`](src/brands/dto/find-brands.dto.ts)):
 - [`FindBrandsDto`](src/brands/dto/find-brands.dto.ts:5) - Extends PaginationDto with:
-  - `sortBy`: 'rating' | 'views' | 'name' (default: 'rating')
+  - `sortBy`: 'rating' | 'name' (default: 'rating')
   - `order`: 'asc' | 'desc' (default: 'desc')
   - `country`: Optional string filter
 
@@ -299,7 +300,6 @@ All repositories use TypeORM QueryBuilder for:
 
 **Available sort fields:**
 - `rating`: Sort by rating
-- `views`: Sort by view count
 - `dateAdded`: Sort by date added to database
 - `name`: Sort by name
 
@@ -433,7 +433,7 @@ All repositories use TypeORM QueryBuilder for:
 
 ### Database Indexing
 - Foreign keys indexed
-- Frequently filtered fields indexed (rating, views, dateAdded)
+- Frequently filtered fields indexed (rating, dateAdded)
 - Composite indexes for common query patterns
 
 ### Caching
