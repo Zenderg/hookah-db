@@ -48,25 +48,32 @@ export class BrandParserStrategy {
       throw new Error('Browser not initialized. Call initialize() first.');
     }
 
-    const allBrands: ParsedBrandData[] = [];
+    // Parse both "Best Brands" and "Other Brands" pages
+    const bestBrandsUrl = 'https://htreviews.org/tobaccos/brands?r=position&s=rating&d=desc';
+    const otherBrandsUrl = 'https://htreviews.org/tobaccos/brands?r=others&s=rating&d=desc';
 
-    // Parse best brands
-    this.logger.log('Parsing best brands...');
-    const bestBrands = await this.parseBrandList(
-      'https://htreviews.org/tobaccos/brands?r=position&s=rating&d=desc',
-      limit,
-    );
-    allBrands.push(...bestBrands);
-    this.logger.log(`Parsed ${bestBrands.length} best brands`);
+    this.logger.log('Parsing brands from Best Brands page...');
+    const bestBrands = await this.parseBrandList(bestBrandsUrl, limit);
+    this.logger.log(`Parsed ${bestBrands.length} brands from Best Brands page`);
 
-    // Parse other brands
-    this.logger.log('Parsing other brands...');
-    const otherBrands = await this.parseBrandList(
-      'https://htreviews.org/tobaccos/brands?r=others&s=rating&d=desc',
-      limit ? limit - bestBrands.length : undefined,
+    this.logger.log('Parsing brands from Other Brands page...');
+    const otherBrands = await this.parseBrandList(otherBrandsUrl, limit);
+    this.logger.log(`Parsed ${otherBrands.length} brands from Other Brands page`);
+
+    // Combine and deduplicate by slug
+    const allBrandsMap = new Map<string, ParsedBrandData>();
+
+    for (const brand of [...bestBrands, ...otherBrands]) {
+      if (!allBrandsMap.has(brand.slug)) {
+        allBrandsMap.set(brand.slug, brand);
+      }
+    }
+
+    const allBrands = Array.from(allBrandsMap.values());
+    const duplicateCount = bestBrands.length + otherBrands.length - allBrands.length;
+    this.logger.log(
+      `Combined ${bestBrands.length} + ${otherBrands.length} brands, found ${duplicateCount} duplicates, total unique: ${allBrands.length}`,
     );
-    allBrands.push(...otherBrands);
-    this.logger.log(`Parsed ${otherBrands.length} other brands`);
 
     // Apply limit if specified
     const brandsToProcess = limit ? allBrands.slice(0, limit) : allBrands;
@@ -110,9 +117,13 @@ export class BrandParserStrategy {
     const seenUrls = new Set<string>();
     let previousCount = 0;
     let noNewContentCount = 0;
-    const maxNoNewContent = 3;
+    const maxNoNewContent = 10;
+    let scrollCount = 0;
 
     while (noNewContentCount < maxNoNewContent) {
+      scrollCount++;
+      this.logger.log(`Scroll ${scrollCount}: Found ${brands.length} brands so far`);
+
       // Check if we've reached the limit
       if (limit && brands.length >= limit) {
         this.logger.log(`Reached limit of ${limit} brands`);
@@ -123,7 +134,7 @@ export class BrandParserStrategy {
       await this.page.evaluate(() => {
         window.scrollTo(0, document.body.scrollHeight);
       });
-      await this.page.waitForTimeout(2000);
+      await this.page.waitForTimeout(3000);
 
       // Extract brand items using actual CSS selectors
       const brandItems = await this.page.$$eval(
@@ -148,16 +159,25 @@ export class BrandParserStrategy {
               element.querySelectorAll(':scope > div > div'),
             );
 
-            // Find rating div (contains decimal like 4.5)
-            const ratingDiv = divs.find((div) => {
+            // Skip first div (rank/position number) and find rating div
+            // Rating must be in range 0-5 to avoid matching ratings count
+            const ratingDiv = divs.slice(1).find((div) => {
               const text = div.textContent.trim();
-              return text.match(/^\d+\.\d+$/);
+              const match = text.match(/^(\d+(\.\d+)?)$/);
+              if (!match) return false;
+              const rating = parseFloat(match[1]);
+              return rating >= 0 && rating <= 5;
             });
 
-            // Find ratings count div (contains 3-5 digit number)
-            const ratingsCountDiv = divs.find((div) => {
+            // Find ratings count div (contains 1-5 digit number)
+            // Skip first div (rank) and skip rating div
+            const ratingsCountDiv = divs.slice(1).find((div) => {
               const text = div.textContent.trim();
-              return text.match(/^\d{3,5}$/);
+              const match = text.match(/^(\d{1,5})$/);
+              if (!match) return false;
+              const count = parseInt(match[1], 10);
+              // Ratings count should be >= 1 to avoid matching ratings (which are decimals)
+              return count >= 1;
             });
 
             // Find description div (long text with brand/tobacco keywords)
@@ -170,11 +190,11 @@ export class BrandParserStrategy {
             });
 
             const detailUrl = linkElement?.getAttribute('href') || '';
-            
+
             // Extract slug from detailUrl (format: /tobaccos/{slug})
             let slug = '';
             if (detailUrl) {
-              const urlMatch = detailUrl.match(/\/tobaccos\/([^\/?]+)/);
+              const urlMatch = detailUrl.match(/\/tobaccos\/([^/?]+)/);
               if (urlMatch) {
                 slug = urlMatch[1];
               }
@@ -244,7 +264,6 @@ export class BrandParserStrategy {
     const data = await this.page.evaluate(() => {
       // Find logo image - look for img in object_image class
       const logoImg = document.querySelector('.object_image img');
-      
       // Find description - look for span in object_card_discr class
       const descriptionElement = document.querySelector(
         '.object_card_discr span',
