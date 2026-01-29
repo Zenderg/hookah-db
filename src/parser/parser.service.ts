@@ -119,7 +119,7 @@ export class ParserService {
 
       this.logger.log(`Parsing lines for ${brandUrls.length} brands with slugs`);
 
-      // Parse lines from brand detail pages
+      // Parse lines - strategy extracts all data from brand pages
       const parsedLines = await this.lineParserStrategy.parseLines(brandUrls, limit);
       this.logger.log(`Parsed ${parsedLines.length} lines from htreviews.org`);
 
@@ -132,14 +132,26 @@ export class ParserService {
         try {
           const lineData = this.lineParserStrategy.normalizeToEntity(parsedLine);
 
-          // Check if line already exists by name and brandId
+          // Check if line already exists by slug and brandId
           const existingLine = await this.lineRepository.findOne({
-            where: { name: lineData.name, brandId: lineData.brandId },
+            where: { slug: lineData.slug, brandId: lineData.brandId },
           });
 
           if (existingLine) {
-            // Update existing line
-            await this.lineRepository.update(existingLine.id, lineData);
+            // Update existing line - use Partial<Line> to handle nullable types
+            const updateData: Partial<Line> = {
+              name: lineData.name,
+              slug: lineData.slug,
+              brandId: lineData.brandId,
+              description: lineData.description,
+              imageUrl: lineData.imageUrl,
+              strengthOfficial: lineData.strengthOfficial,
+              strengthByRatings: lineData.strengthByRatings,
+              status: lineData.status,
+              rating: lineData.rating,
+              ratingsCount: lineData.ratingsCount,
+            };
+            await this.lineRepository.update(existingLine.id, updateData);
             updatedCount++;
             this.logger.debug(
               `Updated line: ${lineData.name} (ID: ${existingLine.id})`,

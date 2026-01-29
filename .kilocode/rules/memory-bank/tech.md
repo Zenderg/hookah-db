@@ -69,6 +69,7 @@
 ### Parser Dependencies (Playwright option)
 - `playwright`: Browser automation (v1.58.0)
 - Rationale: Handles JavaScript-rendered content, reliable scraping
+- **Status**: Implemented for Brand and Line parsers
 
 ### Parser Dependencies (Cheerio option)
 - `cheerio`: Fast HTML parsing

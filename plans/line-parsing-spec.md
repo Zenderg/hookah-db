@@ -120,45 +120,19 @@ Lines are parsed from **brand detail pages** on htreviews.org.
 
 ## Parsing Strategy
 
-### Phase 1: Parse Brands List
-1. Navigate to brands list page: `https://htreviews.org/tobaccos/brands?r=position&s=rating&d=desc`
-2. Extract all brand URLs and slugs
-3. Store brand slugs for phase 2
-
-### Phase 2: Parse Brand Detail Pages
 For each brand:
 1. Navigate to brand detail page: `https://htreviews.org/tobaccos/{brand-slug}`
 2. Locate "Линейки (X)" section
-3. For each line in section:
-   - Extract line name and URL slug
+3. For each line in section extract URL slug
+4. Navigate to each line detail page: `https://htreviews.org/tobaccos/{brand-slug}/{line-slug}`:
+   - Extract line name
    - Extract rating (number)
    - Extract strength official (Крепость официальная)
    - Extract strength by ratings (Крепость по оценкам)
    - Extract status (Статус)
    - Extract description
    - Extract ratings count
-   - Extract imageUrl from line detail page
-
-## Data Normalization
-
-**Strength Values (enum):**
-- "Лёгкая"
-- "Средне-лёгкая"
-- "Средняя"
-- "Средне-крепкая"
-- "Крепкая"
-- "Не указано" (null in database)
-
-**Status Values (enum):**
-- "Выпускается"
-- "Лимитированная"
-- "Снята с производства"
-
-**Rating:**
-- Parse as float (e.g., "4.8" → 4.8)
-
-**Counts:**
-- Parse as integer (e.g., "154" → 154)
+   - Extract imageUrl
 
 ## URL Patterns
 

@@ -2,18 +2,29 @@ import { Injectable, Logger } from '@nestjs/common';
 import { chromium, Browser, Page, BrowserContext } from 'playwright';
 import { Line } from '../../lines/lines.entity';
 
+export type LineUrlInfo = {
+  name: string;
+  slug: string;
+  url: string;
+  rating: number;
+  strengthOfficial: string;
+  strengthByRatings: string;
+  status: string;
+  description: string;
+  flavorsCount: number;
+};
+
 export type ParsedLineData = {
   name: string;
   slug: string;
   brandId: string;
-  description: string;
-  imageUrl: string;
-  strengthOfficial: string;
-  strengthByRatings: string;
-  status: string;
+  description: string | null;
+  imageUrl: string | null;
+  strengthOfficial: string | null;
+  strengthByRatings: string | null;
+  status: string | null;
   rating: number;
   ratingsCount: number;
-  detailUrl: string;
 };
 
 @Injectable()
@@ -59,7 +70,7 @@ export class LineParserStrategy {
     for (let i = 0; i < brandUrls.length; i++) {
       const { url, brandId } = brandUrls[i];
 
-      // Check if we've reached the limit
+      // Check if we've reached limit
       if (limit && allLines.length >= limit) {
         this.logger.log(`Reached limit of ${limit} lines`);
         break;
@@ -69,9 +80,55 @@ export class LineParserStrategy {
         this.logger.log(
           `Parsing lines for brand ${i + 1}/${brandUrls.length}: ${brandId}`,
         );
-        const lines = await this.parseBrandDetailPage(url, brandId, limit ? limit - allLines.length : undefined);
-        allLines.push(...lines);
-        this.logger.log(`Parsed ${lines.length} lines from ${url}`);
+
+        // Extract line data from brand page (basic data)
+        const lineData = await this.extractLinesFromBrandPage(url, brandId);
+        this.logger.log(`Found ${lineData.length} lines on ${url}`);
+
+        // Extract brand slug from URL for detail page navigation
+        const brandSlugMatch = url.match(/\/tobaccos\/([^\/]+)/);
+        const brandSlug = brandSlugMatch ? brandSlugMatch[1] : '';
+
+        for (const line of lineData) {
+          // Check limit again
+          if (limit && allLines.length >= limit) {
+            this.logger.log(`Reached limit of ${limit} lines`);
+            break;
+          }
+
+          // Extract additional data from line detail page (ratingsCount, imageUrl, strengthByRatings)
+          if (brandSlug && line.slug) {
+            try {
+              const additionalData = await this.extractAdditionalDataFromDetailPage(
+                line.slug,
+                brandSlug,
+              );
+              line.ratingsCount = additionalData.ratingsCount;
+              line.imageUrl = additionalData.imageUrl;
+              line.strengthOfficial = additionalData.strengthOfficial;
+              line.strengthByRatings = additionalData.strengthByRatings;
+              this.logger.debug(
+                `Extracted additional data for ${line.name}: ` +
+                  `ratingsCount=${line.ratingsCount}, ` +
+                  `imageUrl=${line.imageUrl ? 'yes' : 'no'}, ` +
+                  `strengthByRatings=${line.strengthByRatings || 'N/A'}`,
+              );
+            } catch (error) {
+              this.logger.warn(
+                `Failed to extract additional data for ${line.name}: ${error instanceof Error ? error.message : String(error)}`,
+              );
+              // Continue with line even if detail page extraction fails
+            }
+          }
+
+          allLines.push(line);
+          this.logger.log(`Parsed line: ${line.name}`);
+        }
+
+        // Break outer loop if limit reached
+        if (limit && allLines.length >= limit) {
+          break;
+        }
       } catch (error) {
         this.logger.error(
           `Failed to parse lines from ${url}: ${error instanceof Error ? error.message : String(error)}`,
@@ -83,153 +140,329 @@ export class LineParserStrategy {
     return limit ? allLines.slice(0, limit) : allLines;
   }
 
-  private async parseBrandDetailPage(
+  /**
+   * Extract line data from brand detail page
+   * All line data is available on brand page, no need to navigate to line detail pages
+   */
+  private async extractLinesFromBrandPage(
     url: string,
     brandId: string,
-    limit?: number,
   ): Promise<ParsedLineData[]> {
     if (!this.page) {
       throw new Error('Browser not initialized');
     }
 
-    const fullUrl = url.startsWith('http') ? url : `https://htreviews.org${url}`;
+    const fullUrl = url.startsWith('http')
+      ? url
+      : `https://htreviews.org${url}`;
     await this.page.goto(fullUrl, { waitUntil: 'networkidle' });
 
     const lines = await this.page.evaluate(() => {
       const lineItems: ParsedLineData[] = [];
 
-      // Find all line items - look for elements that contain line data
-      // Based on specification, lines are in a section with "Линейки" heading
-      const lineElements = document.querySelectorAll('.tobacco_list_item');
+      // Find "Линейки" section - look for h2 containing "Линейки"
+      const allHeadings = Array.from(document.querySelectorAll('h2'));
+      const linesHeading = allHeadings.find((h2) => {
+        const text = h2.textContent?.trim() || '';
+        return text.includes('Линейки');
+      });
+
+      if (!linesHeading) {
+        console.log('No "Линейки" heading found');
+        return lineItems;
+      }
+
+      // Get container after heading - it's a sibling of heading's parent
+      const headingParent = linesHeading.parentElement;
+      const linesContainer = headingParent?.nextElementSibling;
+      if (!linesContainer) {
+        console.log('No container found after "Линейки" heading');
+        return lineItems;
+      }
+
+      // Find all line items - each line item is a child element (div/generic)
+      // The first child contains link and heading
+      const lineElements = Array.from(linesContainer.children).filter((child) => {
+        // Check if first child contains a link with h3
+        const firstChild = child.firstElementChild;
+        if (firstChild) {
+          const link = firstChild.querySelector('a');
+          const heading = firstChild.querySelector('h3');
+          return link && heading;
+        }
+        return false;
+      });
+
+      console.log(`Found ${lineElements.length} line elements`);
 
       lineElements.forEach((element) => {
-        const linkElement = element.querySelector('.tobacco_list_item_slug');
-        const nameElement = element.querySelector('.tobacco_list_item_slug span:first-child');
-        const imageElement = element.querySelector('.tobacco_list_item_image img');
-
-        if (!nameElement || !linkElement) {
-          return;
-        }
-
-        // Get all div children to find rating, ratings count, strength, status
-        const divs = Array.from(element.querySelectorAll(':scope > div > div'));
-
-        // Find rating div (contains decimal like 4.8)
-        const ratingDiv = divs.find((div) => {
-          const text = div.textContent.trim();
-          return text.match(/^\d+\.\d+$/);
-        });
-
-        // Find ratings count div (contains 3-5 digit number)
-        const ratingsCountDiv = divs.find((div) => {
-          const text = div.textContent.trim();
-          return text.match(/^\d{3,5}$/);
-        });
-
-        // Find description div (long text)
-        const descriptionDiv = divs.find((div) => {
-          const text = div.textContent.trim();
-          return text.length > 50;
-        });
-
-        // Find strength official (Крепость официальная)
-        const strengthOfficialDiv = divs.find((div) => {
-          const text = div.textContent.trim();
-          return (
-            text.includes('Крепость') &&
-            (text.includes('Лёгкая') ||
-              text.includes('Средне-лёгкая') ||
-              text.includes('Средняя') ||
-              text.includes('Средне-крепкая') ||
-              text.includes('Крепкая') ||
-              text.includes('Смешанная') ||
-              text.includes('Не указано'))
-          );
-        });
-
-        // Find strength by ratings (Крепость по оценкам)
-        const strengthByRatingsDiv = divs.find((div) => {
-          const text = div.textContent.trim();
-          return (
-            text.includes('по оценкам') &&
-            (text.includes('Лёгкая') ||
-              text.includes('Средне-лёгкая') ||
-              text.includes('Средняя') ||
-              text.includes('Средне-крепкая') ||
-              text.includes('Крепкая'))
-          );
-        });
-
-        // Find status (Статус)
-        const statusDiv = divs.find((div) => {
-          const text = div.textContent.trim();
-          return (
-            text.includes('Статус') &&
-            (text.includes('Выпускается') ||
-              text.includes('Лимитированная') ||
-              text.includes('Лимитированный') ||
-              text.includes('Снята с производства'))
-          );
-        });
-
-        const name = nameElement.textContent?.trim() || '';
-        const detailUrl = linkElement.getAttribute('href') || '';
-
-        // Skip if no name or URL
-        if (!name || !detailUrl) {
-          return;
-        }
-
-        // Extract slug from detailUrl (format: /tobaccos/{brand-slug}/{line-slug})
-        let slug = '';
-        if (detailUrl) {
-          const urlMatch = detailUrl.match(/\/tobaccos\/[^\/]+\/([^\/?]+)/);
-          if (urlMatch) {
-            slug = urlMatch[1];
+        try {
+          // The link and heading are inside first child element
+          const firstChild = element.firstElementChild;
+          if (!firstChild) {
+            return;
           }
-        }
 
-        lineItems.push({
-          name,
-          slug,
-          brandId,
-          description: descriptionDiv?.textContent?.trim() || '',
-          imageUrl: imageElement?.getAttribute('src') || '',
-          strengthOfficial: this.extractStrengthValue(strengthOfficialDiv?.textContent || ''),
-          strengthByRatings: this.extractStrengthValue(strengthByRatingsDiv?.textContent || ''),
-          status: this.extractStatusValue(statusDiv?.textContent || ''),
-          rating: parseFloat(ratingDiv?.textContent?.trim() || '0'),
-          ratingsCount: parseInt(ratingsCountDiv?.textContent?.trim() || '0', 10),
-          detailUrl,
-        });
+          // Extract line name from heading
+          const headingElement = firstChild.querySelector('h3');
+          const name = headingElement?.textContent?.trim() || '';
+
+          // Extract URL slug from link
+          const linkElement = firstChild.querySelector('a');
+          const detailUrl = linkElement?.getAttribute('href') || '';
+
+          // Extract slug from URL (format: dogma/100-sigarnyy-pank or /tobaccos/dogma/100-sigarnyy-pank)
+          let slug = '';
+          if (detailUrl) {
+            const urlMatch = detailUrl.match(/([^/]+)\/([^/]+)$/);
+            if (urlMatch) {
+              slug = urlMatch[2]; // Get last segment (line slug)
+            }
+          }
+
+          // Skip if no name or slug
+          if (!name || !slug) {
+            return;
+          }
+
+          // Extract rating - find decimal number in line container
+          let rating = 0;
+          const textContent = element.textContent || '';
+          const ratingMatches = textContent.match(/\b(\d\.\d)\b/g);
+          if (ratingMatches) {
+            for (const match of ratingMatches) {
+              const parsedRating = parseFloat(match);
+              if (parsedRating > 0 && parsedRating <= 5) {
+                rating = parsedRating;
+                break;
+              }
+            }
+          }
+
+          // Extract status - look for status values
+          let status = '';
+          const statusValues = [
+            'Выпускается',
+            'Лимитированная',
+            'Снята с производства',
+          ];
+          for (const statusValue of statusValues) {
+            if (textContent.includes(statusValue)) {
+              status = statusValue;
+              break;
+            }
+          }
+
+          // Extract description - find longest text (>50 chars) from child elements
+          let description = '';
+          const allTextElements = Array.from(element.children).slice(1); // Skip first child (has link/heading)
+          for (const textElement of allTextElements) {
+            const text = textElement.textContent?.trim() || '';
+            if (text.length > 50 && text.length > description.length && !text.includes('вкусов')) {
+              description = text;
+            }
+          }
+
+          lineItems.push({
+            name,
+            slug,
+            brandId: '', // Will be set by caller
+            description: description || null,
+            imageUrl: null, // Will be extracted from detail page if needed
+            strengthOfficial: null, // Will be extracted from detail page
+            strengthByRatings: null, // Not available on brand page
+            status: status || null,
+            rating,
+            ratingsCount: 0, // Will be extracted from detail page
+          });
+        } catch (error) {
+          console.error('Error parsing line item:', error);
+        }
       });
 
       return lineItems;
     });
 
-    return limit ? lines.slice(0, limit) : lines;
+    // Set brandId for all lines
+    return lines.map((line) => ({
+      ...line,
+      brandId,
+    }));
   }
 
-  private extractStrengthValue(text: string): string {
-    if (!text) return '';
-    
-    const strengths = ['Лёгкая', 'Средне-лёгкая', 'Средняя', 'Средне-крепкая', 'Крепкая', 'Смешанная'];
-    for (const strength of strengths) {
-      if (text.includes(strength)) {
-        return strength;
-      }
+  /**
+   * Extract additional data from line detail page (imageUrl, ratingsCount, strengthByRatings)
+   */
+  async extractAdditionalDataFromDetailPage(
+    lineSlug: string,
+    brandSlug: string,
+  ): Promise<{
+    imageUrl: string | null;
+    ratingsCount: number;
+    strengthOfficial: string | null;
+    strengthByRatings: string | null;
+  }> {
+    if (!this.page) {
+      throw new Error('Browser not initialized. Call initialize() first.');
     }
-    return 'Не указано';
-  }
 
-  private extractStatusValue(text: string): string {
-    if (!text) return '';
-    
-    if (text.includes('Выпускается')) return 'Выпускается';
-    if (text.includes('Лимитированная') || text.includes('Лимитированный')) return 'Лимитированная';
-    if (text.includes('Снята с производства')) return 'Снята с производства';
-    
-    return '';
+    const fullUrl = `https://htreviews.org/tobaccos/${brandSlug}/${lineSlug}`;
+
+    this.logger.debug(`Parsing line detail page: ${fullUrl}`);
+
+    try {
+      await this.page.goto(fullUrl, { waitUntil: 'networkidle' });
+
+      const data = await this.page.evaluate(() => {
+        // Get all elements for searching
+        const allElements = Array.from(document.querySelectorAll('*'));
+
+        // Extract imageUrl: Try multiple selectors
+        let imageUrl = '';
+        const imageSelectors = [
+          'main img', // First image in main
+          'img[alt]', // Any image with alt text
+          'img[src*="uploads/objects"]', // Most specific - images from uploads folder
+          'img', // Fallback to any image
+        ];
+
+        for (const selector of imageSelectors) {
+          const imageElement = document.querySelector(selector);
+          if (imageElement) {
+            imageUrl = imageElement.getAttribute('src') || '';
+            if (imageUrl) {
+              break;
+            }
+          }
+        }
+
+        let ratingsCount = 0;
+        let strengthOfficial = '';
+        let strengthByRatings = '';
+
+        // Find ratings count by directly searching for a div with 3 children that are all numbers
+        // This is more reliable than traversing the DOM from the rating element
+        const allDivs = Array.from(document.querySelectorAll('div'));
+        const statsCandidates = allDivs.filter((div) => {
+          const children = Array.from(div.children);
+          if (children.length !== 3) return false;
+
+          // Check if all children have numeric text (possibly with 'k' suffix for thousands)
+          const allNumbers = children.every((c) => {
+            const text = c.textContent?.trim() || '';
+            return /^\d+(\.\d*k)?$/.test(text);
+          });
+
+          return allNumbers;
+        });
+
+        if (statsCandidates.length > 0) {
+          // Use the first matching container
+          const statsContainer = statsCandidates[0];
+          const firstChild = statsContainer.firstElementChild;
+          if (firstChild) {
+            const text = firstChild.textContent?.trim() || '';
+            ratingsCount = parseInt(text, 10);
+          }
+        }
+
+        // Extract strengthOfficial: Look for "Крепость официальная" label
+        const labelElementForOfficial = allElements.find((el) => {
+          const text = el.textContent?.trim() || '';
+          // Only match elements where text is EXACTLY the label, not elements that contain the label
+          return text === 'Крепость официальная';
+        });
+
+        if (labelElementForOfficial) {
+          // The label is in a container, and the value is a sibling of that container
+          const labelContainer = labelElementForOfficial.parentElement;
+          if (labelContainer) {
+            const parentContainer = labelContainer.parentElement;
+            if (parentContainer) {
+              // Find sibling of labelContainer that contains the strength value
+              const valueDivForOfficial = Array.from(
+                parentContainer.children,
+              ).find((child) => {
+                const text = child.textContent?.trim() || '';
+                const strengthValues = [
+                  'Лёгкая',
+                  'Средне-лёгкая',
+                  'Средняя',
+                  'Средне-крепкая',
+                  'Крепкая',
+                  'Не указано',
+                  'Смешанная',
+                ];
+                return strengthValues.includes(text);
+              });
+
+              if (valueDivForOfficial) {
+                strengthOfficial = valueDivForOfficial.textContent?.trim() || '';
+              }
+            }
+          }
+        }
+
+        // Extract strengthByRatings: Look for "Крепость по оценкам" label
+        const labelElementForRatings = allElements.find((el) => {
+          const text = el.textContent?.trim() || '';
+          // Only match elements where text is EXACTLY the label, not elements that contain the label
+          return text === 'Крепость по оценкам';
+        });
+
+        if (labelElementForRatings) {
+          // The label is in a container, and the value is a sibling of that container
+          const labelContainer = labelElementForRatings.parentElement;
+          if (labelContainer) {
+            const parentContainer = labelContainer.parentElement;
+            if (parentContainer) {
+              // Find sibling of labelContainer that contains the strength value
+              const valueDivForRatings = Array.from(
+                parentContainer.children,
+              ).find((child) => {
+                const text = child.textContent?.trim() || '';
+                const strengthValues = [
+                  'Лёгкая',
+                  'Средне-лёгкая',
+                  'Средняя',
+                  'Средне-крепкая',
+                  'Крепкая',
+                  'Не указано',
+                  'Мало оценок',
+                ];
+                return strengthValues.includes(text);
+              });
+
+              if (valueDivForRatings) {
+                strengthByRatings = valueDivForRatings.textContent?.trim() || '';
+              }
+            }
+          }
+        }
+
+        return {
+          imageUrl,
+          ratingsCount,
+          strengthOfficial,
+          strengthByRatings,
+        };
+      });
+
+      this.logger.debug(
+        `Extracted additional data: ` +
+          `imageUrl=${data.imageUrl ? 'yes' : 'no'}, ` +
+          `ratingsCount=${data.ratingsCount}, ` +
+          `strengthOfficial=${data.strengthOfficial || 'N/A'}, ` +
+          `strengthByRatings=${data.strengthByRatings || 'N/A'}`,
+      );
+
+      return data;
+    } catch (error) {
+      this.logger.error(
+        `Failed to parse line detail page ${fullUrl}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw error;
+    }
   }
 
   normalizeToEntity(data: ParsedLineData): Partial<Line> {
@@ -238,12 +471,12 @@ export class LineParserStrategy {
       slug: data.slug,
       brandId: data.brandId,
       description: data.description || undefined,
-      imageUrl: data.imageUrl,
-      strengthOfficial: data.strengthOfficial,
-      strengthByRatings: data.strengthByRatings,
-      status: data.status,
-      rating: data.rating,
-      ratingsCount: data.ratingsCount,
+      imageUrl: data.imageUrl || undefined,
+      strengthOfficial: data.strengthOfficial || undefined,
+      strengthByRatings: data.strengthByRatings || undefined,
+      status: data.status || undefined,
+      rating: data.rating || 0,
+      ratingsCount: data.ratingsCount || 0,
     };
   }
 }

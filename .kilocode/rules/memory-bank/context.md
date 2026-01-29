@@ -2,7 +2,7 @@
 
 ## Current State
 
-**Status:** Brand and Line entity schemas updated - logoUrl and multiple Line fields are now required, slug field added to Line entity
+**Status:** Brand and Line entity schemas updated - logoUrl and multiple Line fields are now required, slug field added to Line entity. Migration 1706328000007 executed to enforce required fields.
 
 The project structure has been successfully initialized with all necessary files and directories. Dependencies have been installed and the application startup has been verified. The memory bank contains comprehensive documentation covering:
 
@@ -84,6 +84,25 @@ Complete NestJS-based project structure has been created with:
 - `data/` - Directory for SQLite database persistence (mounted volume)
 
 ## Recent Changes
+
+**2026-01-29:** Brand and Line entity schemas updated - multiple fields made required
+- **Problem**: Brand and Line entities had several nullable fields that should be required for data integrity
+- **Root cause**: Fields like logoUrl, brandId, imageUrl, rating, ratingsCount, strengthOfficial, strengthByRatings, and status were nullable but should always have values
+- **Solution**: Created migration to make these fields required (non-nullable)
+- Created migration [`src/migrations/1706328000007-MakeBrandAndLineFieldsRequired.ts`](src/migrations/1706328000007-MakeBrandAndLineFieldsRequired.ts) to:
+  - **Brand table**: Make `logoUrl` column non-nullable
+  - **Line table**: Make `slug`, `brandId`, `imageUrl`, `rating`, `ratingsCount`, `strengthOfficial`, `strengthByRatings`, and `status` columns non-nullable
+  - Add index `idx_lines_slug` for faster lookups
+  - Add foreign key constraint `fk_lines_brand` with CASCADE delete
+  - Includes reversible `down()` method for rollback
+- Successfully executed migration to update database schema
+- **CRITICAL ISSUE**: Entity files still show some fields as nullable despite migration making them required:
+  - [`src/lines/lines.entity.ts`](src/lines/lines.entity.ts:35-36): `imageUrl` is still nullable (line 35-36) - should be non-nullable
+  - [`src/lines/lines.entity.ts`](src/lines/lines.entity.ts:44-51): `strengthOfficial`, `strengthByRatings`, and `status` are still nullable (lines 44-51) - should be non-nullable
+  - [`src/brands/brands.entity.ts`](src/brands/brands.entity.ts:34-35): `logoUrl` is correctly non-nullable (line 34-35) - matches migration
+  - [`src/lines/lines.entity.ts`](src/lines/lines.entity.ts:21-26): `slug` and `brandId` are correctly non-nullable (lines 21-26) - match migration
+  - [`src/lines/lines.entity.ts`](src/lines/lines.entity.ts:38-42): `rating` and `ratingsCount` are correctly non-nullable (lines 38-42) - match migration
+- **Next steps**: Update [`src/lines/lines.entity.ts`](src/lines/lines.entity.ts) to remove `nullable: true` from imageUrl, strengthOfficial, strengthByRatings, and status columns to match migration
 
 **2026-01-28:** Brand schema updated - slug and name are now required fields
 - **Problem**: Brand entity had nullable slug field and unnecessary reviewsCount/views columns that were not being parsed
@@ -444,7 +463,7 @@ Complete NestJS-based project structure has been created with:
 1. ✅ Install dependencies: Run `npm install` to install all packages - **COMPLETED**
 2. ✅ Add DTOs: Create data transfer objects for request validation - **COMPLETED**
 3. ✅ Fix entity schemas: Add imageUrl to Line, fix Tobacco entity schema - **COMPLETED**
-4. Implement business logic: Add actual logic to services (replace TODO comments)
+4. ⏳ Update Line entity to match migration: Remove `nullable: true` from imageUrl, strengthOfficial, strengthByRatings, and status columns
 5. ✅ Implement brand parser: Build Playwright parser for htreviews.org - **COMPLETED**
 6. ✅ Add CLI commands: Implement create, delete, list, stats commands - **COMPLETED**
 7. Write tests: Add unit and integration tests
@@ -466,12 +485,12 @@ Complete NestJS-based project structure has been created with:
 7. ✅ Docker deployment setup - **COMPLETED**
 8. ✅ CLI commands for API key management - **COMPLETED**
 9. ✅ Entity schema fixes (Line imageUrl, Tobacco schema) - **COMPLETED**
-10. ⏳ Line parser implementation
+10. ⏳ Update Line entity to match migration 1706328000007
 11. ⏳ Tobacco parser implementation
 
 ## Known Constraints
 
-- Maximum 10 API keys/clients
+- No limit on API keys/clients (despite architecture mentioning 10)
 - Daily data refresh schedule
 - No user accounts or social features
 - No admin panel or web UI
@@ -488,7 +507,7 @@ Complete NestJS-based project structure has been created with:
 - API key hashing: Not hashed (stored in plain text)
 - CLI framework: Commander.js v14.0.0 for command-line interface
 - CLI statistics: Shows overall statistics for all keys (not per-key)
-- Error handling strategy: Global exception filter (to be implemented)
+- Error handling strategy: Global exception filter implemented
 - Logging framework: Structured JSON logging with interceptor (structure ready)
 - Rate limiting: Request logging only (per requirements)
 
@@ -508,8 +527,11 @@ Complete NestJS-based project structure has been created with:
 - ✅ DTOs for validation with filtering, sorting, and pagination
 - ✅ API endpoints with filtering/sorting (brands, tobaccos, lines)
 - ✅ Global exception filter with consistent error responses
+- ✅ Brand parser implementation (scraping htreviews.org)
+- ✅ Line parser implementation (scraping htreviews.org)
 
 **Pending Implementation:**
+- ⏳ Update Line entity to match migration 1706328000007 (remove nullable from imageUrl, strengthOfficial, strengthByRatings, status)
 - ⏳ Business logic in services (partially complete - repositories done)
 - ⏳ Tobacco parser implementation
 - ⏳ Tests

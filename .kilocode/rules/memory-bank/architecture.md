@@ -147,13 +147,21 @@ src/
 {
   id: string (UUID)
   name: string
-  brandId: string (FK)
+  slug: string (required) - URL slug extracted from htreviews.org (e.g., "100-sigarnyy-pank")
+  brandId: string (FK, required)
   description: string
-  imageUrl: string (nullable) - URL of line product image
+  imageUrl: string (required) - URL of line product image
+  rating: number (required)
+  ratingsCount: number (required)
+  strengthOfficial: string (required) - "Лёгкая", "Средне-лёгкая", "Средняя", "Средне-крепкая", "Крепкая", "Не указано"
+  strengthByRatings: string (required) - "Лёгкая", "Средне-лёгкая", "Средняя", "Средне-крепкая", "Крепкая", "Не указано", "Мало оценок"
+  status: string (required) - "Выпускается", "Лимитированная", "Снята с производства"
   createdAt: Date
   updatedAt: Date
 }
 ```
+
+**Note**: Slug, brandId, imageUrl, rating, ratingsCount, strengthOfficial, strengthByRatings, and status are now required fields per migration 1706328000007. Entity files may still show some fields as nullable and need to be updated to match migration.
 
 ### API Key Entity
 
@@ -324,15 +332,24 @@ All repositories use TypeORM QueryBuilder for:
 
 ### Parser Strategy
 - **Playwright selected**: Full browser automation, handles JavaScript-rendered content
-- **Implementation**: Brand parser implemented with:
+- **Brand parser implemented** with:
   - Two-phase parsing (list pages + detail pages)
   - Infinite scroll handling with duplicate detection
   - Error handling that continues parsing on individual brand failures
   - Data normalization to Brand entity format
   - **Correct CSS selectors**: Uses class-based selectors (`.tobacco_list_item`) instead of data-testid attributes
   - **Data extraction**: Uses text pattern matching for rating (decimal), ratings count (3-5 digits), and description (long text with keywords)
+- **Line parser implemented** with:
+  - Two-phase parsing (brand pages + line detail pages)
+  - Extracts all line data from brand detail pages (name, slug, rating, status, description)
+  - Extracts additional data from line detail pages (imageUrl, ratingsCount, strengthOfficial, strengthByRatings)
+  - Error handling that continues parsing on individual line failures
+  - Data normalization to Line entity format
+  - **Correct CSS selectors**: Uses heading-based selectors to find "Линейки" section and line items
+  - **Data extraction**: Uses text pattern matching for rating (decimal), status values, and description (long text)
+- **Tobacco parser**: Specification created in [`plans/tobacco-parsing-spec.md`](plans/tobacco-parsing-spec.md) but not yet implemented
 - **Cron Job**: Daily execution at 2:00 AM
-- **Data Persistence**: Updates existing brands by name, creates new ones
+- **Data Persistence**: Updates existing brands/lines by slug, creates new ones
 - **Selectors verified**: Tested against actual htreviews.org HTML structure using Playwright
 
 ### Authentication

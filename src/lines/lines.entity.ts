@@ -32,7 +32,7 @@ export class Line {
   @Column({ type: 'text', nullable: true })
   description: string;
 
-  @Column()
+  @Column({ nullable: true })
   imageUrl: string;
 
   @Column({ type: 'decimal', precision: 3, scale: 2, default: 0 })
@@ -41,13 +41,13 @@ export class Line {
   @Column({ default: 0 })
   ratingsCount: number;
 
-  @Column()
+  @Column({ nullable: true })
   strengthOfficial: string;
 
-  @Column()
+  @Column({ nullable: true })
   strengthByRatings: string;
 
-  @Column()
+  @Column({ nullable: true })
   status: string;
 
   @CreateDateColumn()
