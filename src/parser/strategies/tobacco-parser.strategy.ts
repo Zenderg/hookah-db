@@ -357,6 +357,7 @@ export class TobaccoParserStrategy {
                 'Средне-крепкая',
                 'Крепкая',
                 'Не указано',
+                'Мало оценок',
               ];
               return strengthValues.includes(text);
             });
