@@ -203,8 +203,7 @@ program
           await service.parseLinesManually(limit);
           break;
         case 'tobaccos':
-          console.error('❌ Tobaccos parser not implemented yet.');
-          process.exit(1);
+          await service.parseTobaccosManually(limit);
           break;
         default:
           console.error(

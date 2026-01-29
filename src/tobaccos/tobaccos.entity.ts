@@ -19,6 +19,9 @@ export class Tobacco {
   name: string;
 
   @Column()
+  slug: string;
+
+  @Column()
   brandId: string;
 
   @ManyToOne(() => Brand)
