@@ -96,7 +96,7 @@ export class LineParserStrategy {
             break;
           }
 
-          // Extract additional data from line detail page (ratingsCount, imageUrl, strengthByRatings)
+          // Extract additional data from line detail page (ratingsCount, imageUrl, strengthByRatings, description)
           if (brandSlug && line.slug) {
             try {
               const additionalData = await this.extractAdditionalDataFromDetailPage(
@@ -107,11 +107,16 @@ export class LineParserStrategy {
               line.imageUrl = additionalData.imageUrl;
               line.strengthOfficial = additionalData.strengthOfficial;
               line.strengthByRatings = additionalData.strengthByRatings;
+              // Only update description if it was extracted from detail page
+              if (additionalData.description) {
+                line.description = additionalData.description;
+              }
               this.logger.debug(
                 `Extracted additional data for ${line.name}: ` +
                   `ratingsCount=${line.ratingsCount}, ` +
                   `imageUrl=${line.imageUrl ? 'yes' : 'no'}, ` +
-                  `strengthByRatings=${line.strengthByRatings || 'N/A'}`,
+                  `strengthByRatings=${line.strengthByRatings || 'N/A'}, ` +
+                  `description=${line.description ? 'yes' : 'no'}`,
               );
             } catch (error) {
               this.logger.warn(
@@ -225,22 +230,21 @@ export class LineParserStrategy {
             return;
           }
 
-          // Extract rating - find decimal number in line container
+          // Extract rating - use specific selector for .lines_item_score div
           let rating = 0;
-          const textContent = element.textContent || '';
-          const ratingMatches = textContent.match(/\b(\d\.\d)\b/g);
-          if (ratingMatches) {
-            for (const match of ratingMatches) {
-              const parsedRating = parseFloat(match);
-              if (parsedRating > 0 && parsedRating <= 5) {
-                rating = parsedRating;
-                break;
-              }
+          const scoreElement = element.querySelector('.lines_item_score');
+          if (scoreElement) {
+            const ratingSpan = scoreElement.querySelector('span');
+            const ratingText = ratingSpan?.textContent?.trim() || '';
+            const parsedRating = parseFloat(ratingText);
+            if (!isNaN(parsedRating) && parsedRating > 0 && parsedRating <= 5) {
+              rating = parsedRating;
             }
           }
 
           // Extract status - look for status values
           let status = '';
+          const textContent = element.textContent || '';
           const statusValues = [
             'Выпускается',
             'Лимитированная',
@@ -301,6 +305,7 @@ export class LineParserStrategy {
     ratingsCount: number;
     strengthOfficial: string | null;
     strengthByRatings: string | null;
+    description: string | null;
   }> {
     if (!this.page) {
       throw new Error('Browser not initialized. Call initialize() first.');
@@ -340,29 +345,19 @@ export class LineParserStrategy {
         let strengthOfficial = '';
         let strengthByRatings = '';
 
-        // Find ratings count by directly searching for a div with 3 children that are all numbers
-        // This is more reliable than traversing the DOM from the rating element
-        const allDivs = Array.from(document.querySelectorAll('div'));
-        const statsCandidates = allDivs.filter((div) => {
-          const children = Array.from(div.children);
-          if (children.length !== 3) return false;
-
-          // Check if all children have numeric text (possibly with 'k' suffix for thousands)
-          const allNumbers = children.every((c) => {
-            const text = c.textContent?.trim() || '';
-            return /^\d+(\.\d*k)?$/.test(text);
-          });
-
-          return allNumbers;
-        });
-
-        if (statsCandidates.length > 0) {
-          // Use the first matching container
-          const statsContainer = statsCandidates[0];
-          const firstChild = statsContainer.firstElementChild;
-          if (firstChild) {
-            const text = firstChild.textContent?.trim() || '';
-            ratingsCount = parseInt(text, 10);
+        // Find ratings count by looking for div with data-hover-title="Оценки" and extracting the span value
+        const ratingsElement = document.querySelector('div[data-hover-title="Оценки"]');
+        if (ratingsElement) {
+          const ratingsSpan = ratingsElement.querySelector('span');
+          const ratingsText = ratingsSpan?.textContent?.trim() || '';
+          // Parse the number (handle 'k' suffix for thousands)
+          if (ratingsText) {
+            if (ratingsText.endsWith('k')) {
+              const numPart = parseFloat(ratingsText.slice(0, -1));
+              ratingsCount = Math.round(numPart * 1000);
+            } else {
+              ratingsCount = parseInt(ratingsText, 10);
+            }
           }
         }
 
@@ -440,11 +435,81 @@ export class LineParserStrategy {
           }
         }
 
+        // Extract description from JSON-LD schema
+        let description = '';
+        const jsonLdScripts = Array.from(
+          document.querySelectorAll('script[type="application/ld+json"]'),
+        );
+
+        for (const script of jsonLdScripts) {
+          try {
+            const data = JSON.parse(script.textContent || '');
+            // Check if it's a Product with description
+            if (data['@type'] === 'Product' && data.description) {
+              description = data.description;
+              break;
+            }
+          } catch (e) {
+            // Skip invalid JSON
+          }
+        }
+
+          // Fallback: If no description from JSON-LD, try to extract from HTML
+          if (!description) {
+            // First fallback: Look for description in .object_card_discr container
+            const descriptionContainer = document.querySelector('.object_card_discr');
+            if (descriptionContainer) {
+              // The description is typically in a span element within this container
+              const descriptionSpan = descriptionContainer.querySelector('span');
+              if (descriptionSpan) {
+                const text = descriptionSpan.textContent?.trim() || '';
+                if (text.length > 50) {
+                  description = text;
+                }
+              }
+            }
+
+            // Second fallback: Find h1 heading (line name) and look for description in its container
+            if (!description) {
+              const h1 = document.querySelector('h1');
+              if (h1) {
+                // Get container that holds h1
+                const h1Container = h1.parentElement;
+                if (h1Container) {
+                  // Get all children of the container
+                  const children = Array.from(h1Container.children);
+                  // The description is typically the second child (after h1)
+                  // Look for a generic element with long text content
+                  for (let i = 1; i < children.length; i++) {
+                    const child = children[i];
+                    const text = child.textContent?.trim() || '';
+                    // Check if it's a long text (>50 chars)
+                    // Either contains description keywords OR is very long (>100 chars) and not just whitespace
+                    if (text.length > 50) {
+                      // Prefer text with description keywords
+                      if (text.includes('Описание') || text.includes('Описание линейки')) {
+                        description = text;
+                        break;
+                      }
+                      // Fallback: use very long text that doesn't contain brand/line info
+                      // Skip if it contains brand info (like "Бренд", "Сайт", etc.)
+                      if (text.length > 100 && !text.includes('Бренд') && !text.includes('Сайт') && !text.includes('Крепость')) {
+                        description = text;
+                        break;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+
         return {
           imageUrl,
           ratingsCount,
           strengthOfficial,
           strengthByRatings,
+          description,
         };
       });
 
@@ -453,7 +518,8 @@ export class LineParserStrategy {
           `imageUrl=${data.imageUrl ? 'yes' : 'no'}, ` +
           `ratingsCount=${data.ratingsCount}, ` +
           `strengthOfficial=${data.strengthOfficial || 'N/A'}, ` +
-          `strengthByRatings=${data.strengthByRatings || 'N/A'}`,
+          `strengthByRatings=${data.strengthByRatings || 'N/A'}, ` +
+          `description=${data.description ? 'yes' : 'no'}`,
       );
 
       return data;
