@@ -237,25 +237,12 @@ Tobacco data is parsed from individual tobacco detail pages. Each page contains 
 9. **year** (number) - No data source
 10. **tier** (string) - No data source
 
-### Fields to Add to Entity
-
-1. **imageUrl** (string) - URL of tobacco image
-2. **description** (text) - Detailed tobacco description
-
-### Fields to Rename
-
-1. **productionStatus** → **status** - Simplified field name
-
-### Field Type Fixes
-
-1. **strengthByRatings** - Change from `decimal` to `string` (critical bug)
-
 ## Parsing Strategy
 
 ### Phase 1: Get Line Data
 1. Use already parsed brands and lines data
 2. For each line, navigate to line detail page: `https://htreviews.org/tobaccos/{brand-slug}/{line-slug}`
-3. Extract list of tobaccos from line page (basic info: name, rating, htreviewsId)
+3. Extract list URLs of tobaccos from line page
 
 ### Phase 2: Parse Tobacco Detail Pages
 For each tobacco:
@@ -327,54 +314,6 @@ For each tobacco:
 }
 ```
 
-## Critical Issues to Fix
-
-### Issue 1: strengthByRatings Field Type Mismatch
-**Problem**: The entity defines `strengthByRatings` as `decimal` but the website stores it as STRING.
-
-**Current entity**:
-```typescript
-@Column('decimal', { precision: 3, scale: 2, nullable: true })
-strengthUser: number;
-```
-
-**Actual data from website**:
-- "Лёгкая" (Light)
-- "Средне-лёгкая" (Medium-light)
-- "Средняя" (Medium)
-- "Средне-крепкая" (Medium-strong)
-- "Крепкая" (Strong)
-- "Не указано" (Not specified)
-
-**Solution**: Change field type from `decimal` to `string`:
-```typescript
-@Column({ nullable: true })
-strengthByRatings: string;
-```
-
-**Migration required**: Create migration to change column type from DECIMAL to VARCHAR.
-
-### Issue 2: Entity Field Cleanup
-**Problem**: Entity has many fields that are not required or have no data source.
-
-**Fields to remove**:
-- `nameRu` (string) - Replace with single `name` field
-- `nameEn` (string) - Replace with single `name` field
-- `reviewsCount` (number) - Not required
-- `views` (number) - Not required
-- `category` (string) - Not required
-- `productionStatus` (string) - Replace with `status`
-- `flavorDescriptors` (string array) - Not required
-- `dateAdded` (Date) - Not required
-- `year` (number) - No data source
-- `tier` (string) - No data source
-
-**Fields to add**:
-- `imageUrl` (string) - URL of tobacco image
-- `description` (text) - Detailed tobacco description
-
-**Migration required**: Create migration to remove 10 fields and add 2 new fields.
-
 ## Implementation Notes
 
 1. **Parsing Order**: Parse brands first, then lines, then tobaccos (dependencies)
@@ -384,15 +323,3 @@ strengthByRatings: string;
 5. **Image URL Parsing**: Extract src attribute from image element
 6. **String vs Number**: strengthByRatings is STRING, not decimal (fix entity first)
 7. **Name Language**: Parse name exactly as it appears on website (Russian or English)
-
-## Next Steps
-
-1. ✅ Create database migration to fix strengthByRatings field type
-2. ✅ Create database migration to remove unused fields (nameRu, nameEn, reviewsCount, views, category, productionStatus, flavorDescriptors, dateAdded, year, tier)
-3. ✅ Create database migration to add new fields (imageUrl, description)
-4. ✅ Update Tobacco entity to reflect schema changes
-5. ✅ Implement parser using Playwright
-6. ✅ Test with sample data from multiple brands/lines
-7. ✅ Run full parsing for all tobaccos
-8. ✅ Validate data integrity (foreign keys, unique constraints)
-9. ✅ Delete this specification file after implementation
