@@ -12,6 +12,7 @@ import { ApiKeyGuard } from '../common/guards/api-key.guard';
 import { LoggingInterceptor } from '../common/interceptors/logging.interceptor';
 import { Public } from '../common/decorators/public.decorator';
 import { FindBrandsDto } from './dto/find-brands.dto';
+import { FindTobaccosDto } from '../tobaccos/dto/find-tobaccos.dto';
 
 @Controller('brands')
 @UseGuards(ApiKeyGuard)
@@ -29,8 +30,16 @@ export class BrandsController {
   async findOne(@Param('id') id: string) {
     try {
       return this.brandsService.findOne(id);
-    } catch (error) {
+    } catch {
       throw new NotFoundException('Brand not found');
     }
+  }
+
+  @Get(':id/tobaccos')
+  async findTobaccosByBrand(
+    @Param('id') id: string,
+    @Query() query: FindTobaccosDto,
+  ) {
+    return this.brandsService.findTobaccosByBrand(id, query);
   }
 }

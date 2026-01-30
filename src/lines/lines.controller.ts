@@ -11,6 +11,7 @@ import { LinesService } from './lines.service';
 import { ApiKeyGuard } from '../common/guards/api-key.guard';
 import { LoggingInterceptor } from '../common/interceptors/logging.interceptor';
 import { FindLinesDto } from './dto/find-lines.dto';
+import { FindTobaccosDto } from '../tobaccos/dto/find-tobaccos.dto';
 
 @Controller('lines')
 @UseGuards(ApiKeyGuard)
@@ -27,8 +28,16 @@ export class LinesController {
   async findOne(@Param('id') id: string) {
     try {
       return this.linesService.findOne(id);
-    } catch (error) {
+    } catch {
       throw new NotFoundException('Line not found');
     }
+  }
+
+  @Get(':id/tobaccos')
+  async findTobaccosByLine(
+    @Param('id') id: string,
+    @Query() query: FindTobaccosDto,
+  ) {
+    return this.linesService.findTobaccosByLine(id, query);
   }
 }

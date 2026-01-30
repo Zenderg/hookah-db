@@ -163,7 +163,7 @@ src/
 }
 ```
 
-**Note**: Slug, brandId, imageUrl, rating, ratingsCount, strengthOfficial, strengthByRatings, and status are required fields per migration 1706328000000 (InitialSchema). Entity file still shows imageUrl, strengthOfficial, strengthByRatings, and status as nullable (lines 35-51 in [`src/lines/lines.entity.ts`](src/lines/lines.entity.ts:35-51)) - should be updated to match migration.
+**Note**: Slug, brandId, imageUrl, rating, ratingsCount, strengthOfficial, strengthByRatings, and status are required fields per migration 1706328000000 (InitialSchema). Entity has been updated to match migration schema - all required fields are now non-nullable. Status: ✅ VERIFIED
 
 ### API Key Entity
 
@@ -523,4 +523,5 @@ services:
 3. **Manual API Key Management**: No web UI for key management
 4. **No Backup Automation**: Manual backup required
 5. **Limited Monitoring**: Basic logging only, no metrics dashboard
-6. **Entity/Migration Mismatch**: Line entity has nullable fields (imageUrl, strengthOfficial, strengthByRatings, status) that are non-nullable in migration 1706328000000 - entity should be updated to match migration
+6. **API Key Request Count Not Incrementing**: API key requestCount stays at 0 despite multiple API requests (bug logged for future fix)
+7. **Brands Country Filter Issue**: Filtering by country returns empty results, possibly due to encoding issue with Cyrillic characters (bug logged for future fix)

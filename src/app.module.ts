@@ -9,6 +9,9 @@ import { ApiKeysModule } from './api-keys/api-keys.module';
 import { HttpExceptionFilter } from './common/filters/http-exception-filter';
 import { HealthModule } from './health/health.module';
 import { ParserModule } from './parser/parser.module';
+import { BrandsModule } from './brands/brands.module';
+import { LinesModule } from './lines/lines.module';
+import { TobaccosModule } from './tobaccos/tobaccos.module';
 
 @Module({
   imports: [
@@ -20,19 +23,22 @@ import { ParserModule } from './parser/parser.module';
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
         type: 'sqlite',
-          database: configService.get('DATABASE_PATH') || './data/hookah.db',
-          entities: [__dirname + '/**/*.entity{.ts,.js}'],
-          synchronize: false,
-          migrations: [__dirname + '/migrations/*{.ts,.js}'],
-          migrationsRun: false,
-          migrationsTableName: 'migrations',
-        }),
+        database: configService.get('DATABASE_PATH') || './data/hookah.db',
+        entities: [__dirname + '/**/*.entity{.ts,.js}'],
+        synchronize: false,
+        migrations: [__dirname + '/migrations/*{.ts,.js}'],
+        migrationsRun: false,
+        migrationsTableName: 'migrations',
+      }),
       inject: [ConfigService],
     }),
     ScheduleModule.forRoot(),
     ApiKeysModule,
     HealthModule,
     ParserModule,
+    BrandsModule,
+    LinesModule,
+    TobaccosModule,
   ],
   controllers: [AppController],
   providers: [

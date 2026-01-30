@@ -9,6 +9,6 @@ import { Tobacco } from './tobaccos.entity';
   imports: [TypeOrmModule.forFeature([Tobacco])],
   controllers: [TobaccosController],
   providers: [TobaccosService, TobaccosRepository],
-  exports: [TobaccosService],
+  exports: [TobaccosService, TobaccosRepository],
 })
 export class TobaccosModule {}
