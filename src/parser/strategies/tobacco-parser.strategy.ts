@@ -473,12 +473,12 @@ export class TobaccoParserStrategy {
       rating: tobaccoData.rating || 0,
       ratingsCount: tobaccoData.ratingsCount || 0,
       country: tobaccoData.country || '',
-      strengthOfficial: tobaccoData.strengthOfficial || null,
-      strengthByRatings: tobaccoData.strengthByRatings || null,
-      status: tobaccoData.status || null,
+      strengthOfficial: tobaccoData.strengthOfficial || 'Не указано',
+      strengthByRatings: tobaccoData.strengthByRatings || 'Не указано',
+      status: tobaccoData.status || 'Выпускается',
       htreviewsId: tobaccoData.htreviewsId,
-      imageUrl: tobaccoData.imageUrl || null,
-      description: tobaccoData.description || null,
+      imageUrl: tobaccoData.imageUrl || '',
+      description: tobaccoData.description || '',
     };
   }
 
@@ -491,12 +491,12 @@ export class TobaccoParserStrategy {
       rating: data.rating,
       ratingsCount: data.ratingsCount,
       country: data.country,
-      strengthOfficial: data.strengthOfficial || undefined,
-      strengthByRatings: data.strengthByRatings || undefined,
-      status: data.status || undefined,
+      strengthOfficial: data.strengthOfficial || 'Не указано',
+      strengthByRatings: data.strengthByRatings || 'Не указано',
+      status: data.status || 'Выпускается',
       htreviewsId: data.htreviewsId,
-      imageUrl: data.imageUrl || undefined,
-      description: data.description || undefined,
+      imageUrl: data.imageUrl || '',
+      description: data.description || '',
     };
   }
 }

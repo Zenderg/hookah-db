@@ -2,7 +2,7 @@
 
 ## Current State
 
-**Status:** Brand and Line entity schemas updated - logoUrl and multiple Line fields are now required, slug field added to Line entity. Migration 1706328000007 executed to enforce required fields.
+**Status:** All three parsers (Brand, Line, Tobacco) fully implemented and integrated. Entity schemas now match database migrations. All parsers have CLI commands available for manual testing.
 
 The project structure has been successfully initialized with all necessary files and directories. Dependencies have been installed and the application startup has been verified. The memory bank contains comprehensive documentation covering:
 
@@ -10,6 +10,8 @@ The project structure has been successfully initialized with all necessary files
 - Product description explaining why the project exists and what problems it solves
 - Architecture documentation with complete system design
 - Technology stack details with all dependencies
+
+**IMPORTANT CORRECTION**: Memory bank previously contained inaccurate information about migrations. Only one migration exists: `1706328000000-InitialSchema.ts`. The migrations mentioned in context (1706328000001-1706328000007) were never created. All schema changes are reflected in the InitialSchema migration.
 
 ## Project Structure Created
 
@@ -84,6 +86,49 @@ Complete NestJS-based project structure has been created with:
 - `data/` - Directory for SQLite database persistence (mounted volume)
 
 ## Recent Changes
+
+**2026-01-30:** Line entity updated to match migration schema
+- **Problem**: Line entity had `nullable: true` for imageUrl, strengthOfficial, strengthByRatings, and status fields, but migration 1706328000000 (InitialSchema) defines these as non-nullable
+- **Root cause**: Entity file was not updated after migration was created, causing entity-database schema mismatch
+- **Solution**: Removed `nullable: true` from four fields in [`src/lines/lines.entity.ts`](src/lines/lines.entity.ts):
+  - [`imageUrl`](src/lines/lines.entity.ts:35) - line 35-36
+  - [`strengthOfficial`](src/lines/lines.entity.ts:44) - line 44-45
+  - [`strengthByRatings`](src/lines/lines.entity.ts:47) - line 47-48
+  - [`status`](src/lines/lines.entity.ts:50) - line 50-51
+- **Verification**: Application builds successfully with no TypeScript errors
+- **Result**: Entity definition now matches database schema from migration 1706328000000
+- **Note**: Only [`description`](src/lines/lines.entity.ts:32) field remains nullable as intended
+
+**2026-01-30:** Tobacco parser fully implemented and integrated
+- **Problem**: Tobacco parser specification was created but not implemented, preventing complete data parsing from htreviews.org
+- **Root cause**: Parser implementation was pending after brand and line parsers were completed
+- **Solution**: Implemented comprehensive tobacco parser with full Playwright integration
+- Created [`src/parser/strategies/tobacco-parser.strategy.ts`](src/parser/strategies/tobacco-parser.strategy.ts) with:
+  - Playwright browser initialization and cleanup
+  - Two-phase parsing approach:
+    - Phase 1: Extract tobacco URLs from line detail pages with infinite scroll handling
+    - Phase 2: Parse tobacco detail pages for all 12 required fields
+  - Data extraction for all fields: name, slug, brandId, lineId, rating, ratingsCount, country, strengthOfficial, strengthByRatings, status, htreviewsId, imageUrl, description
+  - Error handling that continues parsing on individual tobacco failures
+  - Data normalization to Tobacco entity format
+  - Helper methods for extracting data from detail pages using CSS selectors and text patterns
+- Updated [`src/parser/parser.service.ts`](src/parser/parser.service.ts) with:
+  - Import of Tobacco entity and TobaccoParserStrategy
+  - Injection of tobaccoRepository and tobaccoParserStrategy
+  - New [`parseTobaccosManually(limit?: number)`](src/parser/parser.service.ts:193) method for manual tobacco parsing
+  - Database operations to update existing tobaccos by htreviewsId (not just insert new ones)
+  - Comprehensive logging with progress tracking (created, updated, error counts)
+  - Error handling that logs failures but continues processing
+- Updated [`src/parser/parser.module.ts`](src/parser/parser.module.ts) to:
+  - Import Tobacco entity
+  - Register TobaccoParserStrategy as provider
+  - Add Tobacco to TypeOrmModule.forFeature imports
+- Updated [`src/cli/index.ts`](src/cli/index.ts) to support tobacco parsing:
+  - Added `tobaccos` case in parse command to call [`service.parseTobaccosManually(limit)`](src/parser/parser.service.ts:193)
+  - Command: `npm run cli -- parse tobaccos --limit <number>`
+- Application compiles successfully with no TypeScript errors
+- **Note**: Parser selectors based on specification and should be tested against actual htreviews.org HTML structure
+- **Next steps**: Test tobacco parser with actual data, verify database schema matches entity definitions
 
 **2026-01-29:** Brand and Line entity schemas updated - multiple fields made required
 - **Problem**: Brand and Line entities had several nullable fields that should be required for data integrity
@@ -463,7 +508,7 @@ Complete NestJS-based project structure has been created with:
 1. ✅ Install dependencies: Run `npm install` to install all packages - **COMPLETED**
 2. ✅ Add DTOs: Create data transfer objects for request validation - **COMPLETED**
 3. ✅ Fix entity schemas: Add imageUrl to Line, fix Tobacco entity schema - **COMPLETED**
-4. ⏳ Update Line entity to match migration: Remove `nullable: true` from imageUrl, strengthOfficial, strengthByRatings, and status columns
+4. ✅ Update Line entity to match migration: Remove `nullable: true` from imageUrl, strengthOfficial, strengthByRatings, and status columns - **COMPLETED**
 5. ✅ Implement brand parser: Build Playwright parser for htreviews.org - **COMPLETED**
 6. ✅ Add CLI commands: Implement create, delete, list, stats commands - **COMPLETED**
 7. Write tests: Add unit and integration tests
@@ -473,7 +518,7 @@ Complete NestJS-based project structure has been created with:
 11. ✅ Run migrations: Set up TypeORM migrations - **COMPLETED**
 12. ✅ Create tobacco parsing specification: Comprehensive specification for parsing tobacco data - **COMPLETED**
 13. ✅ Implement line parser: Build Playwright parser for lines from htreviews.org - **COMPLETED**
-14. ⏳ Implement tobacco parser: Build Playwright parser for tobaccos from htreviews.org
+14. ✅ Implement tobacco parser: Build Playwright parser for tobaccos from htreviews.org - **COMPLETED**
 
 ### Implementation Priority
 1. ✅ Core infrastructure (NestJS setup, database, entities) - **COMPLETED**
@@ -485,8 +530,8 @@ Complete NestJS-based project structure has been created with:
 7. ✅ Docker deployment setup - **COMPLETED**
 8. ✅ CLI commands for API key management - **COMPLETED**
 9. ✅ Entity schema fixes (Line imageUrl, Tobacco schema) - **COMPLETED**
-10. ⏳ Update Line entity to match migration 1706328000007
-11. ⏳ Tobacco parser implementation
+10. ✅ Update Line entity to match migration 1706328000007 - **COMPLETED**
+11. ✅ Tobacco parser implementation - **COMPLETED**
 
 ## Known Constraints
 
@@ -517,7 +562,7 @@ Complete NestJS-based project structure has been created with:
 - ✅ Modular architecture with feature-based modules
 - ✅ Layered design (Controller → Service → Repository)
 - ✅ TypeORM entities with proper relationships
-- ✅ Entity schema fixes (Line imageUrl, Tobacco schema corrections)
+- ✅ Entity schema fixes (Line imageUrl, Tobacco schema corrections, Line entity nullable fields)
 - ✅ API key authentication guard
 - ✅ Request/response logging interceptor
 - ✅ Environment-based configuration
@@ -529,9 +574,8 @@ Complete NestJS-based project structure has been created with:
 - ✅ Global exception filter with consistent error responses
 - ✅ Brand parser implementation (scraping htreviews.org)
 - ✅ Line parser implementation (scraping htreviews.org)
+- ✅ Tobacco parser implementation (scraping htreviews.org)
 
 **Pending Implementation:**
-- ⏳ Update Line entity to match migration 1706328000007 (remove nullable from imageUrl, strengthOfficial, strengthByRatings, status)
 - ⏳ Business logic in services (partially complete - repositories done)
-- ⏳ Tobacco parser implementation
 - ⏳ Tests

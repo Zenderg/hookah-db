@@ -17,6 +17,10 @@ export class InitialSchema1706328000000 implements MigrationInterface {
             type: 'varchar',
           },
           {
+            name: 'slug',
+            type: 'varchar',
+          },
+          {
             name: 'country',
             type: 'varchar',
           },
@@ -33,19 +37,13 @@ export class InitialSchema1706328000000 implements MigrationInterface {
             default: 0,
           },
           {
-            name: 'reviewsCount',
-            type: 'integer',
-            default: 0,
-          },
-          {
-            name: 'views',
-            type: 'integer',
-            default: 0,
-          },
-          {
             name: 'description',
             type: 'text',
             isNullable: true,
+          },
+          {
+            name: 'logoUrl',
+            type: 'varchar',
           },
           {
             name: 'createdAt',
@@ -58,6 +56,23 @@ export class InitialSchema1706328000000 implements MigrationInterface {
         ],
       }),
       true,
+    );
+
+    // Create indexes for brands
+    await queryRunner.createIndex(
+      'brands',
+      new TableIndex({
+        name: 'idx_brands_slug',
+        columnNames: ['slug'],
+      }),
+    );
+
+    await queryRunner.createIndex(
+      'brands',
+      new TableIndex({
+        name: 'idx_brands_rating',
+        columnNames: ['rating'],
+      }),
     );
 
     // Create lines table
@@ -75,6 +90,10 @@ export class InitialSchema1706328000000 implements MigrationInterface {
             type: 'varchar',
           },
           {
+            name: 'slug',
+            type: 'varchar',
+          },
+          {
             name: 'brandId',
             type: 'text',
           },
@@ -82,6 +101,34 @@ export class InitialSchema1706328000000 implements MigrationInterface {
             name: 'description',
             type: 'text',
             isNullable: true,
+          },
+          {
+            name: 'imageUrl',
+            type: 'varchar',
+          },
+          {
+            name: 'rating',
+            type: 'decimal',
+            precision: 3,
+            scale: 2,
+            default: 0,
+          },
+          {
+            name: 'ratingsCount',
+            type: 'integer',
+            default: 0,
+          },
+          {
+            name: 'strengthOfficial',
+            type: 'varchar',
+          },
+          {
+            name: 'strengthByRatings',
+            type: 'varchar',
+          },
+          {
+            name: 'status',
+            type: 'varchar',
           },
           {
             name: 'createdAt',
@@ -96,6 +143,47 @@ export class InitialSchema1706328000000 implements MigrationInterface {
       true,
     );
 
+    // Create indexes for lines
+    await queryRunner.createIndex(
+      'lines',
+      new TableIndex({
+        name: 'idx_lines_slug',
+        columnNames: ['slug'],
+      }),
+    );
+
+    await queryRunner.createIndex(
+      'lines',
+      new TableIndex({
+        name: 'idx_lines_rating',
+        columnNames: ['rating'],
+      }),
+    );
+
+    await queryRunner.createIndex(
+      'lines',
+      new TableIndex({
+        name: 'idx_lines_status',
+        columnNames: ['status'],
+      }),
+    );
+
+    await queryRunner.createIndex(
+      'lines',
+      new TableIndex({
+        name: 'idx_lines_strength',
+        columnNames: ['strengthOfficial'],
+      }),
+    );
+
+    await queryRunner.createIndex(
+      'lines',
+      new TableIndex({
+        name: 'idx_lines_brandId',
+        columnNames: ['brandId'],
+      }),
+    );
+
     // Create foreign key for lines.brandId
     await queryRunner.createForeignKey(
       'lines',
@@ -104,6 +192,7 @@ export class InitialSchema1706328000000 implements MigrationInterface {
         referencedColumnNames: ['id'],
         referencedTableName: 'brands',
         onDelete: 'CASCADE',
+        name: 'fk_lines_brand',
       }),
     );
 
@@ -118,11 +207,11 @@ export class InitialSchema1706328000000 implements MigrationInterface {
             isPrimary: true,
           },
           {
-            name: 'nameRu',
+            name: 'name',
             type: 'varchar',
           },
           {
-            name: 'nameEn',
+            name: 'slug',
             type: 'varchar',
           },
           {
@@ -147,54 +236,20 @@ export class InitialSchema1706328000000 implements MigrationInterface {
             default: 0,
           },
           {
-            name: 'reviewsCount',
-            type: 'integer',
-            default: 0,
-          },
-          {
-            name: 'views',
-            type: 'integer',
-            default: 0,
-          },
-          {
-            name: 'category',
-            type: 'varchar',
-          },
-          {
-            name: 'year',
-            type: 'integer',
-            isNullable: true,
-          },
-          {
             name: 'country',
             type: 'varchar',
           },
           {
             name: 'strengthOfficial',
             type: 'varchar',
-            isNullable: true,
           },
           {
-            name: 'strengthUser',
-            type: 'decimal',
-            precision: 3,
-            scale: 2,
-            isNullable: true,
-          },
-          {
-            name: 'tier',
+            name: 'strengthByRatings',
             type: 'varchar',
-            isNullable: true,
           },
           {
-            name: 'flavorDescriptors',
-            type: 'text',
-            isNullable: true,
-          },
-          {
-            name: 'productionStatus',
+            name: 'status',
             type: 'varchar',
-            isNullable: true,
           },
           {
             name: 'htreviewsId',
@@ -202,8 +257,13 @@ export class InitialSchema1706328000000 implements MigrationInterface {
             isUnique: true,
           },
           {
-            name: 'dateAdded',
-            type: 'datetime',
+            name: 'imageUrl',
+            type: 'varchar',
+          },
+          {
+            name: 'description',
+            type: 'text',
+            isNullable: true,
           },
           {
             name: 'createdAt',
@@ -218,7 +278,40 @@ export class InitialSchema1706328000000 implements MigrationInterface {
       true,
     );
 
-    // Create foreign key for tobaccos.brandId
+    // Create indexes for tobaccos
+    await queryRunner.createIndex(
+      'tobaccos',
+      new TableIndex({
+        name: 'idx_tobaccos_brandId',
+        columnNames: ['brandId'],
+      }),
+    );
+
+    await queryRunner.createIndex(
+      'tobaccos',
+      new TableIndex({
+        name: 'idx_tobaccos_lineId',
+        columnNames: ['lineId'],
+      }),
+    );
+
+    await queryRunner.createIndex(
+      'tobaccos',
+      new TableIndex({
+        name: 'idx_tobaccos_rating',
+        columnNames: ['rating'],
+      }),
+    );
+
+    await queryRunner.createIndex(
+      'tobaccos',
+      new TableIndex({
+        name: 'idx_tobaccos_country',
+        columnNames: ['country'],
+      }),
+    );
+
+    // Create foreign keys for tobaccos
     await queryRunner.createForeignKey(
       'tobaccos',
       new TableForeignKey({
@@ -226,10 +319,10 @@ export class InitialSchema1706328000000 implements MigrationInterface {
         referencedColumnNames: ['id'],
         referencedTableName: 'brands',
         onDelete: 'CASCADE',
+        name: 'fk_tobaccos_brand',
       }),
     );
 
-    // Create foreign key for tobaccos.lineId
     await queryRunner.createForeignKey(
       'tobaccos',
       new TableForeignKey({
@@ -237,6 +330,7 @@ export class InitialSchema1706328000000 implements MigrationInterface {
         referencedColumnNames: ['id'],
         referencedTableName: 'lines',
         onDelete: 'SET NULL',
+        name: 'fk_tobaccos_line',
       }),
     );
 
@@ -286,112 +380,30 @@ export class InitialSchema1706328000000 implements MigrationInterface {
       }),
       true,
     );
-
-    // Create indexes for better query performance
-    await queryRunner.createIndex(
-      'brands',
-      new TableIndex({
-        name: 'IDX_BRANDS_RATING',
-        columnNames: ['rating'],
-      }),
-    );
-
-    await queryRunner.createIndex(
-      'brands',
-      new TableIndex({
-        name: 'IDX_BRANDS_VIEWS',
-        columnNames: ['views'],
-      }),
-    );
-
-    await queryRunner.createIndex(
-      'tobaccos',
-      new TableIndex({
-        name: 'IDX_TOBACCOS_BRAND_ID',
-        columnNames: ['brandId'],
-      }),
-    );
-
-    await queryRunner.createIndex(
-      'tobaccos',
-      new TableIndex({
-        name: 'IDX_TOBACCOS_LINE_ID',
-        columnNames: ['lineId'],
-      }),
-    );
-
-    await queryRunner.createIndex(
-      'tobaccos',
-      new TableIndex({
-        name: 'IDX_TOBACCOS_RATING',
-        columnNames: ['rating'],
-      }),
-    );
-
-    await queryRunner.createIndex(
-      'tobaccos',
-      new TableIndex({
-        name: 'IDX_TOBACCOS_VIEWS',
-        columnNames: ['views'],
-      }),
-    );
-
-    await queryRunner.createIndex(
-      'tobaccos',
-      new TableIndex({
-        name: 'IDX_TOBACCOS_DATE_ADDED',
-        columnNames: ['dateAdded'],
-      }),
-    );
-
-    await queryRunner.createIndex(
-      'tobaccos',
-      new TableIndex({
-        name: 'IDX_TOBACCOS_CATEGORY',
-        columnNames: ['category'],
-      }),
-    );
-
-    await queryRunner.createIndex(
-      'tobaccos',
-      new TableIndex({
-        name: 'IDX_TOBACCOS_COUNTRY',
-        columnNames: ['country'],
-      }),
-    );
-
-    await queryRunner.createIndex(
-      'tobaccos',
-      new TableIndex({
-        name: 'IDX_TOBACCOS_PRODUCTION_STATUS',
-        columnNames: ['productionStatus'],
-      }),
-    );
-
-    await queryRunner.createIndex(
-      'lines',
-      new TableIndex({
-        name: 'IDX_LINES_BRAND_ID',
-        columnNames: ['brandId'],
-      }),
-    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    // Drop indexes
-    await queryRunner.dropIndex('lines', 'IDX_LINES_BRAND_ID');
-    await queryRunner.dropIndex('tobaccos', 'IDX_TOBACCOS_PRODUCTION_STATUS');
-    await queryRunner.dropIndex('tobaccos', 'IDX_TOBACCOS_COUNTRY');
-    await queryRunner.dropIndex('tobaccos', 'IDX_TOBACCOS_CATEGORY');
-    await queryRunner.dropIndex('tobaccos', 'IDX_TOBACCOS_DATE_ADDED');
-    await queryRunner.dropIndex('tobaccos', 'IDX_TOBACCOS_VIEWS');
-    await queryRunner.dropIndex('tobaccos', 'IDX_TOBACCOS_RATING');
-    await queryRunner.dropIndex('tobaccos', 'IDX_TOBACCOS_LINE_ID');
-    await queryRunner.dropIndex('tobaccos', 'IDX_TOBACCOS_BRAND_ID');
-    await queryRunner.dropIndex('brands', 'IDX_BRANDS_VIEWS');
-    await queryRunner.dropIndex('brands', 'IDX_BRANDS_RATING');
+    // Drop foreign keys first
+    await queryRunner.dropForeignKey('tobaccos', 'fk_tobaccos_line');
+    await queryRunner.dropForeignKey('tobaccos', 'fk_tobaccos_brand');
+    await queryRunner.dropForeignKey('lines', 'fk_lines_brand');
 
-    // Drop tables in reverse order of creation (to handle foreign keys)
+    // Drop indexes
+    await queryRunner.dropIndex('tobaccos', 'idx_tobaccos_country');
+    await queryRunner.dropIndex('tobaccos', 'idx_tobaccos_rating');
+    await queryRunner.dropIndex('tobaccos', 'idx_tobaccos_lineId');
+    await queryRunner.dropIndex('tobaccos', 'idx_tobaccos_brandId');
+
+    await queryRunner.dropIndex('lines', 'idx_lines_brandId');
+    await queryRunner.dropIndex('lines', 'idx_lines_strength');
+    await queryRunner.dropIndex('lines', 'idx_lines_status');
+    await queryRunner.dropIndex('lines', 'idx_lines_rating');
+    await queryRunner.dropIndex('lines', 'idx_lines_slug');
+
+    await queryRunner.dropIndex('brands', 'idx_brands_rating');
+    await queryRunner.dropIndex('brands', 'idx_brands_slug');
+
+    // Drop tables
     await queryRunner.dropTable('api_keys');
     await queryRunner.dropTable('tobaccos');
     await queryRunner.dropTable('lines');

@@ -118,14 +118,15 @@ src/
 {
   id: string (UUID)
   name: string (can be Russian or English)
+  slug: string (required) - URL slug extracted from htreviews.org
   brandId: string (FK)
   lineId: string (FK, nullable)
   rating: number
   ratingsCount: number
   country: string
-  strengthOfficial: string (nullable)
-  strengthByRatings: string (nullable) - STRING, not decimal
-  status: string (nullable) - "Выпускается", "Лимитированная", "Снята с производства"
+  strengthOfficial: string (required) - "Лёгкая", "Средне-лёгкая", "Средняя", "Средне-крепкая", "Крепкая", "Не указано"
+  strengthByRatings: string (required) - "Лёгкая", "Средне-лёгкая", "Средняя", "Средне-крепкая", "Крепкая", "Не указано", "Мало оценок"
+  status: string (required) - "Выпускается", "Лимитированная", "Снята с производства"
   htreviewsId: string (unique)
   imageUrl: string - URL of tobacco product image
   description: text - Detailed tobacco description
@@ -136,10 +137,11 @@ src/
 
 **Note**: Entity schema has been corrected via migration (2026-01-27):
 - Removed fields: nameRu, nameEn (replaced with single `name`), reviewsCount, views, category, flavorDescriptors, dateAdded, year, tier, productionStatus
-- Added fields: imageUrl, description
+- Added fields: slug, imageUrl, description
 - Renamed: productionStatus → status
 - Fixed: strengthByRatings type from `decimal` to `string` (critical bug)
-- Migration: [`src/migrations/1706328000002-FixTobaccoSchema.ts`](src/migrations/1706328000002-FixTobaccoSchema.ts)
+- All fields are now required except lineId and description (nullable)
+- Migration: [`src/migrations/1706328000000-InitialSchema.ts`](src/migrations/1706328000000-InitialSchema.ts)
 
 ### Line Entity
 
@@ -161,7 +163,7 @@ src/
 }
 ```
 
-**Note**: Slug, brandId, imageUrl, rating, ratingsCount, strengthOfficial, strengthByRatings, and status are now required fields per migration 1706328000007. Entity files may still show some fields as nullable and need to be updated to match migration.
+**Note**: Slug, brandId, imageUrl, rating, ratingsCount, strengthOfficial, strengthByRatings, and status are required fields per migration 1706328000000 (InitialSchema). Entity file still shows imageUrl, strengthOfficial, strengthByRatings, and status as nullable (lines 35-51 in [`src/lines/lines.entity.ts`](src/lines/lines.entity.ts:35-51)) - should be updated to match migration.
 
 ### API Key Entity
 
@@ -347,9 +349,16 @@ All repositories use TypeORM QueryBuilder for:
   - Data normalization to Line entity format
   - **Correct CSS selectors**: Uses heading-based selectors to find "Линейки" section and line items
   - **Data extraction**: Uses text pattern matching for rating (decimal), status values, and description (long text)
-- **Tobacco parser**: Specification created in [`plans/tobacco-parsing-spec.md`](plans/tobacco-parsing-spec.md) but not yet implemented
+- **Tobacco parser implemented** with:
+  - Two-phase parsing (line pages + tobacco detail pages)
+  - Extracts tobacco URLs from line detail pages with infinite scroll handling
+  - Extracts all 12 required fields from tobacco detail pages (name, slug, brandId, lineId, rating, ratingsCount, country, strengthOfficial, strengthByRatings, status, htreviewsId, imageUrl, description)
+  - Error handling that continues parsing on individual tobacco failures
+  - Data normalization to Tobacco entity format
+  - **CSS selectors**: Uses pattern matching for tobacco URLs (`/tobaccos/{brand}/{line}/{tobacco}`), element queries for data extraction
+  - **Data extraction**: Uses text pattern matching for rating (decimal), ratings count, and field labels (Страна, Крепость официальная, Крепость по оценкам, Статус, HtreviewsID)
 - **Cron Job**: Daily execution at 2:00 AM
-- **Data Persistence**: Updates existing brands/lines by slug, creates new ones
+- **Data Persistence**: Updates existing brands/lines/tobaccos by slug/htreviewsId, creates new ones
 - **Selectors verified**: Tested against actual htreviews.org HTML structure using Playwright
 
 ### Authentication
@@ -514,3 +523,4 @@ services:
 3. **Manual API Key Management**: No web UI for key management
 4. **No Backup Automation**: Manual backup required
 5. **Limited Monitoring**: Basic logging only, no metrics dashboard
+6. **Entity/Migration Mismatch**: Line entity has nullable fields (imageUrl, strengthOfficial, strengthByRatings, status) that are non-nullable in migration 1706328000000 - entity should be updated to match migration

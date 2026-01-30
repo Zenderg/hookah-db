@@ -19,5 +19,6 @@ A RESTful API service that provides structured access to hookah tobacco data by 
 
 ### API Features
 - Key-based authentication for all endpoints
-- Endpoints for brands, flavors, and their relationships
+- Endpoints for brands, lines, tobaccos, and their relationships
 - Filtering and sorting capabilities
+- Playwright-based parsers for all three data types (brands, lines, tobaccos)

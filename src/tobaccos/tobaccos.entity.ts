@@ -44,19 +44,19 @@ export class Tobacco {
   @Column()
   country: string;
 
-  @Column({ nullable: true })
+  @Column()
   strengthOfficial: string;
 
-  @Column({ nullable: true })
+  @Column()
   strengthByRatings: string;
 
-  @Column({ nullable: true })
+  @Column()
   status: string;
 
   @Column({ unique: true })
   htreviewsId: string;
 
-  @Column({ nullable: true })
+  @Column()
   imageUrl: string;
 
   @Column({ type: 'text', nullable: true })
