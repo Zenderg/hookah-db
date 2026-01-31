@@ -12,13 +12,19 @@ export class BrandsRepository {
   ) {}
 
   async findAll(query: FindBrandsDto): Promise<{ data: Brand[]; total: number }> {
-    const { page = 1, limit = 20, sortBy = 'rating', order = 'desc', country } = query;
+    const { page = 1, limit = 20, sortBy = 'rating', order = 'desc', country, search } = query;
     const skip = (page - 1) * limit;
 
     const queryBuilder = this.brandRepository.createQueryBuilder('brand');
 
     if (country) {
       queryBuilder.andWhere('brand.country = :country', { country });
+    }
+
+    if (search) {
+      queryBuilder.andWhere('brand.name ILIKE :search', {
+        search: `%${search}%`,
+      });
     }
 
     queryBuilder

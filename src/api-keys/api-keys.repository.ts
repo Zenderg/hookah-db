@@ -20,7 +20,8 @@ export class ApiKeysRepository {
   }
 
   async create(apiKey: Partial<ApiKey>): Promise<ApiKey> {
-    return this.apiKeyRepository.save(apiKey);
+    const entity = this.apiKeyRepository.create(apiKey);
+    return this.apiKeyRepository.save(entity);
   }
 
   async updateLastUsed(id: string): Promise<void> {

@@ -20,10 +20,6 @@ export class FindTobaccosDto extends PaginationDto {
   lineId?: string;
 
   @IsOptional()
-  @IsString()
-  category?: string;
-
-  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(0)
@@ -38,16 +34,14 @@ export class FindTobaccosDto extends PaginationDto {
   maxRating?: number;
 
   @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(2000)
-  year?: number;
-
-  @IsOptional()
   @IsString()
   country?: string;
 
   @IsOptional()
   @IsString()
-  productionStatus?: 'active' | 'discontinued';
+  status?: string;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
 }

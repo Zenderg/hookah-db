@@ -2,7 +2,7 @@
 
 ## Current State
 
-**Status:** PostgreSQL 18.1 migration Phase 1 & 2 completed. Database is running with all tables created. Application successfully connected to PostgreSQL. **Phase 3 (Schema Migration) completed. Phase 4 (ILIKE search) pending.**
+**Status:** PostgreSQL 18.1 migration Phase 1, 2, 3, and 4 completed. Database is running with all tables created. Application successfully connected to PostgreSQL. **Phase 4 (ILIKE search) completed. Phase 5 (Testing) pending.**
 
 The project structure has been successfully initialized with all necessary files and directories. Dependencies have been installed and the application startup has been verified. The memory bank contains comprehensive documentation covering:
 
@@ -101,6 +101,7 @@ Complete NestJS-based project structure has been created with:
 13. ✅ Implement line parser: Build Playwright parser for lines from htreviews.org - **COMPLETED**
 14. ✅ Implement tobacco parser: Build Playwright parser for tobaccos from htreviews.org - **COMPLETED**
 15. ✅ Test business logic in services: API endpoints tested via curl requests - **COMPLETED** (2026-01-30)
+16. ✅ Implement ILIKE search: Add case-insensitive search for brands, lines, and tobaccos - **COMPLETED** (2026-01-31)
 
 ### Implementation Priority
 1. ✅ Core infrastructure (NestJS setup, database, entities) - **COMPLETED**
@@ -108,13 +109,14 @@ Complete NestJS-based project structure has been created with:
 3. ✅ Brand parser (scraping htreviews.org) - **COMPLETED**
 4. ✅ API endpoints (brands, tobaccos, lines) - **COMPLETED**
 5. ✅ Filtering and sorting logic - **COMPLETED**
-6. ✅ Scheduled tasks for data refresh - **COMPLETED**
-7. ✅ Docker deployment setup - **COMPLETED**
-8. ✅ CLI commands for API key management - **COMPLETED**
-9. ✅ Entity schema fixes (Line imageUrl, Tobacco schema) - **COMPLETED**
-10. ✅ Update Line entity to match migration 1706328000007 - **COMPLETED**
-11. ✅ Tobacco parser implementation - **COMPLETED**
-12. ✅ Business logic in services (tested via API requests) - **COMPLETED**
+6. ✅ ILIKE search implementation - **COMPLETED** (2026-01-31)
+7. ✅ Scheduled tasks for data refresh - **COMPLETED**
+8. ✅ Docker deployment setup - **COMPLETED**
+9. ✅ CLI commands for API key management - **COMPLETED**
+10. ✅ Entity schema fixes (Line imageUrl, Tobacco schema) - **COMPLETED**
+11. ✅ Update Line entity to match migration 1706328000007 - **COMPLETED**
+12. ✅ Tobacco parser implementation - **COMPLETED**
+13. ✅ Business logic in services (tested via API requests) - **COMPLETED**
 
 ## Known Constraints
 
@@ -176,13 +178,13 @@ Complete NestJS-based project structure has been created with:
 - Application successfully connected to PostgreSQL
 
 **Next Steps Required:**
-1. Phase 4: Application updates (ILIKE search, DTO updates)
-   - Update repository queries to use ILIKE for search
-   - Add `search` parameter to DTOs (FindBrandsDto, FindLinesDto, FindTobaccosDto)
-2. Phase 5: Testing
+1. Phase 5: Testing
    - Test case-insensitive search with Latin and Cyrillic characters
    - Verify all data migrated correctly
    - Test API endpoints with search functionality
+2. Fix database schema issue: `id` columns are `text` type instead of `uuid` (migration bug from initial schema)
+   - Migration `1706328000001-FixIdColumnsToUuid.ts` created but not yet successfully run
+   - Foreign key constraints need to be dropped before altering column types
 3. Phase 6: Deployment (if needed)
 
 ### API Key Request Count Bug Fix
@@ -204,6 +206,60 @@ Complete NestJS-based project structure has been created with:
 - Made 3 API requests (brands, tobaccos)
 - Verified `requestCount` incremented from 0 to 4
 - CLI `stats` command now shows accurate usage data
+
+### PostgreSQL Migration - Phase 4 Completed
+**Status:** ✅ COMPLETED (2026-01-31)
+
+**Phase 4: Application Updates (ILIKE Search)**
+- ✅ Added `search` parameter to [`FindBrandsDto`](src/brands/dto/find-brands.dto.ts:17) with `@IsString()` and `@IsOptional()` decorators
+- ✅ Added `search` parameter to [`FindLinesDto`](src/lines/dto/find-lines.dto.ts:9) with `@IsString()` and `@IsOptional()` decorators
+- ✅ Added `search` parameter to [`FindTobaccosDto`](src/tobaccos/dto/find-tobaccos.dto.ts:53) with `@IsString()` and `@IsOptional()` decorators
+- ✅ Updated [`BrandsRepository`](src/brands/brands.repository.ts:23) to use ILIKE filter for `brand.name`
+- ✅ Updated [`LinesRepository`](src/lines/lines.repository.ts:23) to use ILIKE filter for `line.name`
+- ✅ Updated [`TobaccosRepository`](src/tobaccos/tobaccos.repository.ts:48) to use ILIKE filter for `tobacco.name`
+- ✅ Fixed [`FindTobaccosDto`](src/tobaccos/dto/find-tobaccos.dto.ts:53) by removing non-existent filters (`category`, `year`, `productionStatus`) and renaming `productionStatus` → `status`
+- ✅ Fixed [`TobaccosRepository`](src/tobaccos/tobaccos.repository.ts:48) by removing filters for non-existent fields
+
+**ILIKE Search Implementation:**
+All three repositories now support case-insensitive search using PostgreSQL's ILIKE operator:
+```typescript
+if (dto.search) {
+  queryBuilder.andWhere('entity.name ILIKE :search', {
+    search: `%${dto.search}%`,
+  });
+}
+```
+
+This enables:
+- **Case-insensitive search**: "dogma", "Dogma", "DOGMA" all return same results
+- **Partial match**: "dog" returns "Dogma", "dogmatic", etc.
+- **Multi-language support**: Works with both Latin and Cyrillic characters (UTF-8 encoding)
+
+**API Endpoints Updated:**
+- **GET /brands?search=dogma** - Search brands by name
+- **GET /lines?search=pank** - Search lines by name
+- **GET /tobaccos?search=tangiers** - Search tobaccos by name
+
+### Database Schema Issue Discovered
+**Status:** ⚠️ IDENTIFIED (2026-01-31)
+
+**Problem:** Database `id` columns are `text` type instead of `uuid` type (migration bug from initial schema migration `1706328000000-InitialSchema.ts`).
+
+**Impact:** TypeORM expects UUID type for `id` columns but database has TEXT type, which may cause issues with UUID generation and foreign key relationships.
+
+**Attempted Fix:**
+- Created migration [`1706328000001-FixIdColumnsToUuid.ts`](src/migrations/1706328000001-FixIdColumnsToUuid.ts) to:
+  1. Drop foreign key constraints
+  2. Alter `id` columns from TEXT to UUID
+  3. Recreate foreign key constraints
+- Migration encountered PostgreSQL foreign key constraint errors during execution
+
+**Root Cause:** PostgreSQL requires dropping foreign key constraints before altering column types that are referenced by foreign keys. The migration attempts to do this but encounters issues with column name case sensitivity in raw SQL queries.
+
+**Next Steps:**
+1. Manually fix database schema or debug migration execution
+2. Verify all foreign key relationships after schema fix
+3. Test API key creation and other CRUD operations after fix
 
 ## PostgreSQL Migration Plan
 
@@ -318,7 +374,7 @@ If migration fails:
 - ✅ Search works with both Latin and Cyrillic
 - ✅ API performance maintained or improved
 - ✅ Zero data corruption
-- ✅ All tests passing
+- ⏳ All tests passing (pending)
 
 ## Technical Decisions
 
@@ -348,6 +404,7 @@ If migration fails:
 - ✅ Scheduled task structure for data refresh
 - ✅ DTOs for validation with filtering, sorting, and pagination
 - ✅ API endpoints with filtering/sorting (brands, tobaccos, lines)
+- ✅ ILIKE-based case-insensitive search for brands, lines, and tobaccos
 - ✅ Global exception filter with consistent error responses
 - ✅ Brand parser implementation (scraping htreviews.org)
 - ✅ Line parser implementation (scraping htreviews.org)

@@ -19,12 +19,11 @@ export class TobaccosRepository {
       order = 'desc',
       brandId,
       lineId,
-      category,
       minRating,
       maxRating,
-      year,
       country,
-      productionStatus,
+      status,
+      search,
     } = query;
     const skip = (page - 1) * limit;
 
@@ -38,10 +37,6 @@ export class TobaccosRepository {
       queryBuilder.andWhere('tobacco.lineId = :lineId', { lineId });
     }
 
-    if (category) {
-      queryBuilder.andWhere('tobacco.category = :category', { category });
-    }
-
     if (minRating !== undefined) {
       queryBuilder.andWhere('tobacco.rating >= :minRating', { minRating });
     }
@@ -50,17 +45,17 @@ export class TobaccosRepository {
       queryBuilder.andWhere('tobacco.rating <= :maxRating', { maxRating });
     }
 
-    if (year) {
-      queryBuilder.andWhere('tobacco.year = :year', { year });
-    }
-
     if (country) {
       queryBuilder.andWhere('tobacco.country = :country', { country });
     }
 
-    if (productionStatus) {
-      queryBuilder.andWhere('tobacco.productionStatus = :productionStatus', {
-        productionStatus,
+    if (status) {
+      queryBuilder.andWhere('tobacco.status = :status', { status });
+    }
+
+    if (search) {
+      queryBuilder.andWhere('tobacco.name ILIKE :search', {
+        search: `%${search}%`,
       });
     }
 

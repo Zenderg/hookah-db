@@ -230,9 +230,9 @@ All endpoints require API key authentication via:
 ### Tobaccos
 
 **GET /tobaccos**
-- Query params: `?page=1&limit=20&sortBy=rating&order=desc&brandId=xxx&lineId=xxx&category=fruity&minRating=4&maxRating=5&search=tobacco`
+- Query params: `?page=1&limit=20&sortBy=rating&order=desc&brandId=xxx&lineId=xxx&minRating=4&maxRating=5&country=Russia&status=Выпускается&search=tobacco`
 - Returns: Paginated list of tobaccos
-- Filtering: by brandId, lineId, category, rating range, year, country, productionStatus, case-insensitive name search (ILIKE, partial match)
+- Filtering: by brandId, lineId, rating range, country, status, case-insensitive name search (ILIKE, partial match)
 - Sorting: by rating, views, dateAdded, name
 - Search: `search` parameter performs case-insensitive partial match on tobacco name (works with both Latin and Cyrillic characters)
 
@@ -277,12 +277,12 @@ Located in [`src/common/dto/pagination.dto.ts`](src/common/dto/pagination.dto.ts
   - `order`: 'asc' | 'desc' (default: 'desc')
   - `brandId`: Optional UUID filter
   - `lineId`: Optional UUID filter
-  - `category`: Optional string filter
   - `minRating`/`maxRating`: Optional number range filter (0-5)
-  - `year`: Optional number filter (≥2000)
   - `country`: Optional string filter
-  - `productionStatus`: Optional 'active' | 'discontinued' filter
+  - `status`: Optional string filter (e.g., "Выпускается", "Лимитированная", "Снята с производства")
   - `search`: Optional string filter for case-insensitive partial match on tobacco name
+
+**Note:** The following filters were removed as they don't exist in the Tobacco entity: `category`, `year`, `productionStatus` (replaced with `status`)
 
 **Lines** ([`src/lines/dto/find-lines.dto.ts`](src/lines/dto/find-lines.dto.ts)):
 - [`FindLinesDto`](src/lines/dto/find-lines.dto.ts:5) - Extends PaginationDto with:
@@ -309,11 +309,12 @@ All repositories use TypeORM QueryBuilder for:
 **Available filters:**
 - `brandId`: Filter by brand UUID
 - `lineId`: Filter by line UUID
-- `category`: Filter by flavor category
 - `minRating`, `maxRating`: Filter by rating range
-- `year`: Filter by release year
 - `country`: Filter by country of origin
-- `productionStatus`: Filter by production status (active, discontinued)
+- `status`: Filter by production status (e.g., "Выпускается", "Лимитированная", "Снята с производства")
+- `search`: Case-insensitive partial match on name fields (brands, lines, tobaccos)
+
+**Note:** The following filters were removed as they don't exist in the Tobacco entity: `category`, `year`, `productionStatus` (replaced with `status`)
 
 **Available sort fields:**
 - `rating`: Sort by rating
@@ -558,4 +559,28 @@ volumes:
 2. **Manual API Key Management**: No web UI for key management
 3. **No Backup Automation**: Manual backup required
 4. **Limited Monitoring**: Basic logging only, no metrics dashboard
-5. **API Key Request Count Not Incrementing**: API key requestCount stays at 0 despite multiple API requests (bug logged for future fix)
+5. **Database Schema Issue**: `id` columns are `text` type instead of `uuid` (migration bug from initial schema). Migration `1706328000001-FixIdColumnsToUuid.ts` created but not yet successfully run due to foreign key constraint issues.
+
+## Architecture Implementation Status
+
+**Implemented:**
+- ✅ Modular architecture with feature-based modules
+- ✅ Layered design (Controller → Service → Repository)
+- ✅ TypeORM entities with proper relationships
+- ✅ Entity schema fixes (Line imageUrl, Tobacco schema corrections, Line entity nullable fields)
+- ✅ API key authentication guard
+- ✅ Request/response logging interceptor
+- ✅ Environment-based configuration
+- ✅ Docker containerization
+- ✅ CLI commands for API key management (create, delete, list, stats)
+- ✅ Scheduled task structure for data refresh
+- ✅ DTOs for validation with filtering, sorting, and pagination
+- ✅ API endpoints with filtering/sorting (brands, tobaccos, lines)
+- ✅ ILIKE-based case-insensitive search for brands, lines, and tobaccos
+- ✅ Global exception filter with consistent error responses
+- ✅ Brand parser implementation (scraping htreviews.org)
+- ✅ Line parser implementation (scraping htreviews.org)
+- ✅ Tobacco parser implementation (scraping htreviews.org)
+
+**Pending Implementation:**
+- ⏳ Tests (unit tests for services and repositories)

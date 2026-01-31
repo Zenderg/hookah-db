@@ -12,13 +12,19 @@ export class LinesRepository {
   ) {}
 
   async findAll(query: FindLinesDto): Promise<{ data: Line[]; total: number }> {
-    const { page = 1, limit = 20, brandId } = query;
+    const { page = 1, limit = 20, brandId, search } = query;
     const skip = (page - 1) * limit;
 
     const queryBuilder = this.lineRepository.createQueryBuilder('line');
 
     if (brandId) {
       queryBuilder.andWhere('line.brandId = :brandId', { brandId });
+    }
+
+    if (search) {
+      queryBuilder.andWhere('line.name ILIKE :search', {
+        search: `%${search}%`,
+      });
     }
 
     queryBuilder
