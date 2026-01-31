@@ -2,7 +2,7 @@
 
 ## Current State
 
-**Status:** All three parsers (Brand, Line, Tobacco) fully implemented and integrated. Entity schemas now match database migrations. All parsers have CLI commands available for manual testing.
+**Status:** All three parsers (Brand, Line, Tobacco) fully implemented and integrated. Entity schemas now match database migrations. All parsers have CLI commands available for manual testing. **Migration to PostgreSQL 18.1 planned for case-insensitive search functionality.**
 
 The project structure has been successfully initialized with all necessary files and directories. Dependencies have been installed and the application startup has been verified. The memory bank contains comprehensive documentation covering:
 
@@ -81,7 +81,7 @@ Complete NestJS-based project structure has been created with:
 - `.dockerignore` - Docker build ignore rules
 
 **Data Directory:**
-- `data/` - Directory for SQLite database persistence (mounted volume)
+- `data/` - Directory for SQLite database persistence (mounted volume) - **To be replaced with PostgreSQL Docker volume**
 
 ## Next Steps
 
@@ -123,8 +123,123 @@ Complete NestJS-based project structure has been created with:
 - No user accounts or social features
 - No admin panel or web UI
 - Deployment on local server via Docker Compose
-- Single database (SQLite)
+- Single database (PostgreSQL 18.1)
 - Simple authentication (API keys only)
+
+## PostgreSQL Migration Plan
+
+### Migration Goals
+1. **Case-Insensitive Search**: Implement ILIKE-based search for all entity name fields (brands, lines, tobaccos)
+2. **Multi-Language Support**: Ensure UTF-8 encoding properly handles both Latin and Cyrillic characters
+3. **Data Integrity**: Preserve all existing data during migration
+4. **Zero Downtime**: Minimize service disruption during migration
+
+### Technical Specifications
+- **Database Version**: PostgreSQL 18.1 (latest stable as of 2026-01-31)
+- **Search Operator**: ILIKE (PostgreSQL case-insensitive pattern matching)
+- **Search Behavior**: Partial match (contains), case-insensitive
+- **Query Parameter**: `search` (optional string, e.g., `?search=dogma`)
+- **Languages**: Supports both Latin and Cyrillic characters
+- **Encoding**: UTF-8 (PostgreSQL default)
+
+### Migration Steps
+
+**Phase 1: Preparation**
+- Backup current SQLite database
+- Remove `sqlite3` package, install `pg` package
+- Update TypeORM configuration to use PostgreSQL driver
+
+**Phase 2: Database Setup**
+- Update docker-compose.yml with PostgreSQL 18.1 service
+- Configure environment variables (DATABASE_HOST, DATABASE_PORT, DATABASE_USERNAME, DATABASE_PASSWORD, DATABASE_NAME)
+- Set up Docker volume for data persistence
+
+**Phase 3: Schema Migration**
+- Review and update entity definitions for PostgreSQL compatibility
+- Generate new migration for PostgreSQL schema
+- Export data from SQLite, transform, and import to PostgreSQL
+
+**Phase 4: Application Updates**
+- Update repository queries to use ILIKE for search
+- Add `search` parameter to DTOs (FindBrandsDto, FindLinesDto, FindTobaccosDto)
+- Update environment variables
+
+**Phase 5: Testing**
+- Test case-insensitive search with Latin and Cyrillic characters
+- Verify all data migrated correctly
+- Test API endpoints with search functionality
+
+**Phase 6: Deployment**
+- Deploy to staging, run full test suite
+- Schedule maintenance window for production deployment
+- Monitor logs and metrics after deployment
+
+### Key Code Changes Required
+
+**1. Update TypeORM Configuration** ([`src/data-source.ts`](src/data-source.ts))
+- Change driver from `sqlite3` to `pg`
+- Update connection parameters for PostgreSQL
+
+**2. Update Docker Compose** ([`docker-compose.yml`](docker-compose.yml))
+```yaml
+services:
+  postgres:
+    image: postgres:18.1
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=hookah_db
+```
+
+**3. Update Repository Search Queries**
+- Add ILIKE filter in [`brands.repository.ts`](src/brands/brands.repository.ts)
+- Add ILIKE filter in [`lines.repository.ts`](src/lines/lines.repository.ts)
+- Add ILIKE filter in [`tobaccos.repository.ts`](src/tobaccos/tobaccos.repository.ts)
+
+Example:
+```typescript
+if (dto.search) {
+  query.andWhere('brand.name ILIKE :search', {
+    search: `%${dto.search}%`,
+  });
+}
+```
+
+**4. Update DTOs**
+- Add `search` field to [`FindBrandsDto`](src/brands/dto/find-brands.dto.ts)
+- Add `search` field to [`FindLinesDto`](src/lines/dto/find-lines.dto.ts)
+- Add `search` field to [`FindTobaccosDto`](src/tobaccos/dto/find-tobaccos.dto.ts)
+
+**5. Update Environment Variables** ([`.env.example`](.env.example))
+- Add DATABASE_HOST, DATABASE_PORT, DATABASE_USERNAME, DATABASE_PASSWORD, DATABASE_NAME
+
+### Rollback Plan
+If migration fails:
+1. Stop PostgreSQL service: `docker-compose down`
+2. Revert package.json, data-source.ts, docker-compose.yml changes
+3. Restore data/ directory from backup
+4. Restart service: `docker-compose up -d`
+
+### Estimated Timeline
+- Phase 1: 2 hours
+- Phase 2: 1 hour
+- Phase 3: 4 hours
+- Phase 4: 3 hours
+- Phase 5: 4 hours
+- Phase 6: 2 hours
+- **Total**: ~16 hours
+
+### Success Criteria
+- ✅ All data migrated without loss
+- ✅ Case-insensitive search works for all entities
+- ✅ Search works with both Latin and Cyrillic
+- ✅ API performance maintained or improved
+- ✅ Zero data corruption
+- ✅ All tests passing
 
 ## Technical Decisions
 

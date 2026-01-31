@@ -23,11 +23,12 @@ The system follows a monolithic architecture with clear separation of concerns:
 │  └──────────────────────────────────────────────────────┘  │
 │                           ↓                                  │
 │  ┌──────────────────────────────────────────────────────┐  │
-│  │              SQLite Database                          │  │
-│  │  - Brands                                            │  │
-│  │  - Tobaccos                                          │  │
-│  │  - Lines                                             │  │
+│  │              PostgreSQL 18.1 Database                 │  │
+│  │  - Brands (with case-insensitive search)             │  │
+│  │  - Tobaccos (with case-insensitive search)          │  │
+│  │  - Lines (with case-insensitive search)             │  │
 │  │  - API Keys                                          │  │
+│  │  - UTF-8 encoding for multi-language support        │  │
 │  └──────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -213,10 +214,11 @@ All endpoints require API key authentication via:
 ### Brands
 
 **GET /brands**
-- Query params: `?page=1&limit=20&sortBy=rating&order=desc&country=Russia`
+- Query params: `?page=1&limit=20&sortBy=rating&order=desc&country=Russia&search=dogma`
 - Returns: Paginated list of brands
-- Filtering: by country
+- Filtering: by country, case-insensitive name search (ILIKE, partial match)
 - Sorting: by rating, name
+- Search: `search` parameter performs case-insensitive partial match on brand name (works with both Latin and Cyrillic characters)
 
 **GET /brands/:id**
 - Returns: Single brand details
@@ -228,10 +230,11 @@ All endpoints require API key authentication via:
 ### Tobaccos
 
 **GET /tobaccos**
-- Query params: `?page=1&limit=20&sortBy=rating&order=desc&brandId=xxx&lineId=xxx&category=fruity&minRating=4&maxRating=5`
+- Query params: `?page=1&limit=20&sortBy=rating&order=desc&brandId=xxx&lineId=xxx&category=fruity&minRating=4&maxRating=5&search=tobacco`
 - Returns: Paginated list of tobaccos
-- Filtering: by brandId, lineId, category, rating range, year, country, productionStatus
+- Filtering: by brandId, lineId, category, rating range, year, country, productionStatus, case-insensitive name search (ILIKE, partial match)
 - Sorting: by rating, views, dateAdded, name
+- Search: `search` parameter performs case-insensitive partial match on tobacco name (works with both Latin and Cyrillic characters)
 
 **GET /tobaccos/:id**
 - Returns: Single tobacco details
@@ -239,9 +242,10 @@ All endpoints require API key authentication via:
 ### Lines
 
 **GET /lines**
-- Query params: `?page=1&limit=20&brandId=xxx`
+- Query params: `?page=1&limit=20&brandId=xxx&search=line`
 - Returns: Paginated list of lines
-- Filtering: by brandId
+- Filtering: by brandId, case-insensitive name search (ILIKE, partial match)
+- Search: `search` parameter performs case-insensitive partial match on line name (works with both Latin and Cyrillic characters)
 
 **GET /lines/:id**
 - Returns: Single line details
@@ -265,6 +269,7 @@ Located in [`src/common/dto/pagination.dto.ts`](src/common/dto/pagination.dto.ts
   - `sortBy`: 'rating' | 'name' (default: 'rating')
   - `order`: 'asc' | 'desc' (default: 'desc')
   - `country`: Optional string filter
+  - `search`: Optional string filter for case-insensitive partial match on brand name
 
 **Tobaccos** ([`src/tobaccos/dto/find-tobaccos.dto.ts`](src/tobaccos/dto/find-tobaccos.dto.ts)):
 - [`FindTobaccosDto`](src/tobaccos/dto/find-tobaccos.dto.ts:5) - Extends PaginationDto with:
@@ -277,10 +282,12 @@ Located in [`src/common/dto/pagination.dto.ts`](src/common/dto/pagination.dto.ts
   - `year`: Optional number filter (≥2000)
   - `country`: Optional string filter
   - `productionStatus`: Optional 'active' | 'discontinued' filter
+  - `search`: Optional string filter for case-insensitive partial match on tobacco name
 
 **Lines** ([`src/lines/dto/find-lines.dto.ts`](src/lines/dto/find-lines.dto.ts)):
 - [`FindLinesDto`](src/lines/dto/find-lines.dto.ts:5) - Extends PaginationDto with:
   - `brandId`: Optional UUID filter
+  - `search`: Optional string filter for case-insensitive partial match on line name
 
 ### Validation Decorators
 All DTOs use `class-validator` decorators for automatic validation:
@@ -321,10 +328,12 @@ All repositories use TypeORM QueryBuilder for:
 ## Key Technical Decisions
 
 ### Database Choice
-- **SQLite**: Chosen for simplicity and zero-configuration deployment
-- Single file database, perfect for local server deployment
+- **PostgreSQL 18.1**: Chosen for robust case-insensitive search and multi-language support
+- ILIKE operator provides case-insensitive search for both Latin and Cyrillic characters
+- UTF-8 encoding ensures proper handling of Russian and other non-Latin text
+- Docker Compose integration for easy deployment and management
 - Sufficient for expected data volume (~10,000 records)
-- Easy backup and migration (single file copy)
+- Connection pooling for better performance under concurrent load
 
 ### ORM Choice
 - **TypeORM**: TypeScript-native ORM with excellent NestJS integration
@@ -473,8 +482,10 @@ All repositories use TypeORM QueryBuilder for:
 - Efficient queries with LIMIT/OFFSET
 
 ### Connection Pooling
-- SQLite doesn't need connection pooling
-- Single connection per application instance
+- PostgreSQL connection pooling configured via TypeORM
+- Default pool size: 10 connections
+- Supports concurrent writes without blocking
+- Connection reuse for better performance
 
 ## Deployment Architecture
 
@@ -485,17 +496,37 @@ services:
     build: .
     ports:
       - "3000:3000"
-    volumes:
-      - ./data:/app/data  # SQLite database persistence
+    depends_on:
+      - postgres
     environment:
       - NODE_ENV=production
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_USERNAME=postgres
+      - DATABASE_PASSWORD=postgres
+      - DATABASE_NAME=hookah_db
     restart: unless-stopped
+
+  postgres:
+    image: postgres:18.1
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=hookah_db
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
 ```
 
 ### Data Persistence
-- SQLite database file stored in mounted volume
+- PostgreSQL data stored in Docker volume
 - Survives container restarts
-- Easy backup by copying database file
+- Easy backup using pg_dump or volume export
 
 ### Monitoring
 - Application logs output to stdout/stderr
@@ -511,17 +542,15 @@ services:
 - Low to medium load
 
 ### Future Scaling Options
-- Migrate to PostgreSQL if data volume grows significantly
 - Add Redis caching layer if needed
 - Implement rate limiting if abuse detected
 - Consider horizontal scaling with load balancer
+- Optimize database queries with proper indexing
 
 ## Known Limitations
 
-1. **Single Database**: SQLite limits concurrent writes
-2. **No Real-time Updates**: Daily refresh only
-3. **Manual API Key Management**: No web UI for key management
-4. **No Backup Automation**: Manual backup required
-5. **Limited Monitoring**: Basic logging only, no metrics dashboard
-6. **API Key Request Count Not Incrementing**: API key requestCount stays at 0 despite multiple API requests (bug logged for future fix)
-7. **Brands Country Filter Issue**: Filtering by country returns empty results, possibly due to encoding issue with Cyrillic characters (bug logged for future fix)
+1. **No Real-time Updates**: Daily refresh only
+2. **Manual API Key Management**: No web UI for key management
+3. **No Backup Automation**: Manual backup required
+4. **Limited Monitoring**: Basic logging only, no metrics dashboard
+5. **API Key Request Count Not Incrementing**: API key requestCount stays at 0 despite multiple API requests (bug logged for future fix)

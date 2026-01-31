@@ -13,9 +13,9 @@
 - Rationale: Standard package manager for Node.js projects
 
 ### Database
-- **SQLite**: Lightweight, file-based SQL database
-- Version: Latest stable (via TypeORM)
-- Rationale: Zero-configuration, perfect for local deployment, sufficient for expected data volume
+- **PostgreSQL 18.1**: Advanced open-source relational database
+- Version: 18.1 (latest stable as of 2026-01-31)
+- Rationale: Robust case-insensitive search with ILIKE, UTF-8 encoding for multi-language support, connection pooling, Docker Compose integration
 
 ### ORM
 - **TypeORM**: TypeScript ORM for Node.js
@@ -61,7 +61,7 @@
 - `@nestjs/config`: Configuration management (v4.0.0)
 - `@nestjs/terminus`: Health check integration (v11.0.0)
 - `typeorm`: ORM library (v0.3.28)
-- `sqlite3`: SQLite database driver (v5.1.7)
+- `pg`: PostgreSQL database driver (latest stable)
 - `class-validator`: Request validation (v0.14.3)
 - `class-transformer`: Object transformation (v0.5.1)
 - `uuid`: UUID generation (v13.0.0)
@@ -115,7 +115,11 @@
 ### Environment Variables
 - `NODE_ENV`: Development/Production
 - `PORT`: API port (default: 3000)
-- `DATABASE_PATH`: SQLite database file path
+- `DATABASE_HOST`: PostgreSQL host (default: localhost)
+- `DATABASE_PORT`: PostgreSQL port (default: 5432)
+- `DATABASE_USERNAME`: PostgreSQL username (default: postgres)
+- `DATABASE_PASSWORD`: PostgreSQL password (default: postgres)
+- `DATABASE_NAME`: PostgreSQL database name (default: hookah_db)
 - `API_KEY_SECRET`: Secret for API key generation (if needed)
 
 ### Configuration Management
@@ -133,7 +137,7 @@
 ### Performance Constraints
 - Expected load: Low to medium (~10 clients)
 - No specific performance requirements defined
-- SQLite sufficient for current scale
+- PostgreSQL sufficient for current scale
 
 ### Security Constraints
 - API key authentication only
@@ -142,7 +146,7 @@
 - Maximum 10 API keys enforced
 
 ### Scalability Constraints
-- Single database instance (SQLite)
+- Single database instance (PostgreSQL)
 - No horizontal scaling required
 - No caching layer initially
 - Can be enhanced later if needed
@@ -239,13 +243,13 @@
 ## Backup and Recovery
 
 ### Database Backup
-- SQLite database file backup
+- PostgreSQL database backup using pg_dump
 - Scheduled daily backups
 - Manual backup before major changes
 
 ### Recovery Procedure
 - Stop service
-- Restore database file from backup
+- Restore database from backup using pg_restore or psql
 - Restart service
 - Verify data integrity
 
