@@ -270,3 +270,11 @@
 - Docker Compose setup guide
 - Environment configuration guide
 - Troubleshooting guide
+
+### User Documentation
+- Comprehensive README.md in Russian
+- Quick start guide for users
+- API endpoint documentation with curl examples
+- CLI command documentation
+- Docker deployment instructions
+- Development workflow documentation

@@ -1,98 +1,421 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Hookah Tobacco Database API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+RESTful API сервис, предоставляющий структурированный доступ к данным о кальянном табаке. Проект автоматически собирает информацию с [htreviews.org](https://htreviews.org) и предоставляет её через авторизованные API endpoints.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Возможности
 
-## Description
+- 🔄 **Автоматический парсинг данных** с htreviews.org (ежедневное обновление в 02:00)
+- 🔐 **API-ключ аутентификация** для защищённого доступа
+- 🔍 **Поиск без учёта регистра** для брендов, линий и табаков (поддержка латиницы и кириллицы)
+- 📊 **Фильтрация и сортировка** по различным параметрам
+- 📄 **Пагинация** для эффективной работы с большими объёмами данных
+- 🏥 **Health check endpoint** для мониторинга состояния системы
+- 🐳 **Docker Compose** для простого развёртывания
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Технологический стек
 
-## Project setup
+- **Backend**: [NestJS](https://nestjs.com/) 11.1.12
+- **База данных**: [PostgreSQL](https://www.postgresql.org/) 18.1
+- **ORM**: [TypeORM](https://typeorm.io/) 0.3.28
+- **Парсер**: [Playwright](https://playwright.dev/) 1.58.0
+- **Контейнеризация**: Docker & Docker Compose
 
-```bash
-$ npm install
-```
+## Быстрый старт
 
-## Compile and run the project
+### Требования
 
-```bash
-# development
-$ npm run start
+- Node.js (LTS версия)
+- npm
+- Docker и Docker Compose
+- Git
 
-# watch mode
-$ npm run start:dev
+### Установка
 
-# production mode
-$ npm run start:prod
-```
-
-## Run tests
+1. **Клонируйте репозиторий**
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+git clone <repository-url>
+cd hookah-db
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+2. **Установите зависимости**
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+npm install
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+3. **Настройте переменные окружения**
 
-## Resources
+```bash
+cp .env.example .env
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+Отредактируйте `.env` при необходимости:
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+```env
+NODE_ENV=development
+PORT=3000
+DATABASE_HOST=localhost
+DATABASE_PORT=5432
+DATABASE_USERNAME=postgres
+DATABASE_PASSWORD=postgres
+DATABASE_NAME=hookah_db
+CORS_ORIGIN=*
+```
 
-## Support
+4. **Запустите PostgreSQL**
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+```bash
+docker-compose up -d postgres
+```
 
-## Stay in touch
+5. **Запустите приложение**
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+```bash
+# Режим разработки
+npm run start:dev
 
-## License
+# Режим продакшена
+npm run build
+npm run start:prod
+```
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+## Docker развёртывание
+
+Для полного развёртывания с Docker Compose:
+
+```bash
+# Запуск всех сервисов
+docker-compose up -d
+
+# Просмотр логов
+docker-compose logs -f
+
+# Остановка сервисов
+docker-compose down
+```
+
+API будет доступен по адресу: `http://localhost:3000`
+
+## API Документация
+
+### Аутентификация
+
+Все endpoints требуют API-ключ аутентификацию:
+
+```bash
+# Через заголовок X-API-Key
+curl -H "X-API-Key: <your-api-key>" http://localhost:3000/brands
+
+# Или через заголовок Authorization
+curl -H "Authorization: Bearer <your-api-key>" http://localhost:3000/brands
+```
+
+### Health Check
+
+Публичный endpoint для проверки состояния системы:
+
+```bash
+curl http://localhost:3000/health
+```
+
+**Ответ:**
+
+```json
+{
+  "status": "ok",
+  "info": {
+    "database": {
+      "status": "up"
+    }
+  },
+  "error": {},
+  "details": {
+    "database": {
+      "status": "up"
+    }
+  }
+}
+```
+
+### Бренды
+
+**Получить список брендов**
+
+```bash
+curl -H "X-API-Key: <your-api-key>" \
+  "http://localhost:3000/brands?page=1&limit=20&sortBy=rating&order=desc&country=Russia&search=dogma"
+```
+
+**Параметры запроса:**
+- `page` (default: 1) - номер страницы
+- `limit` (default: 20, max: 100) - элементов на странице
+- `sortBy` (default: 'rating') - поле сортировки: `rating`, `name`
+- `order` (default: 'desc') - порядок сортировки: `asc`, `desc`
+- `country` - фильтр по стране
+- `search` - поиск по названию (без учёта регистра, частичное совпадение)
+
+**Получить бренд по ID**
+
+```bash
+curl -H "X-API-Key: <your-api-key>" \
+  http://localhost:3000/brands/<id>
+```
+
+**Получить табаки бренда**
+
+```bash
+curl -H "X-API-Key: <your-api-key>" \
+  "http://localhost:3000/brands/<id>/tobaccos?page=1&limit=20&sortBy=rating&order=desc"
+```
+
+### Табаки
+
+**Получить список табаков**
+
+```bash
+curl -H "X-API-Key: <your-api-key>" \
+  "http://localhost:3000/tobaccos?page=1&limit=20&sortBy=rating&order=desc&brandId=<uuid>&lineId=<uuid>&minRating=4&maxRating=5&country=Russia&status=Выпускается&search=tobacco"
+```
+
+**Параметры запроса:**
+- `page`, `limit`, `sortBy`, `order` - как у брендов
+- `brandId` - фильтр по ID бренда (UUID)
+- `lineId` - фильтр по ID линии (UUID)
+- `minRating`, `maxRating` - фильтр по рейтингу (0-5)
+- `country` - фильтр по стране
+- `status` - фильтр по статусу: `Выпускается`, `Лимитированная`, `Снята с производства`
+- `search` - поиск по названию (без учёта регистра, частичное совпадение)
+
+**Получить табак по ID**
+
+```bash
+curl -H "X-API-Key: <your-api-key>" \
+  http://localhost:3000/tobaccos/<id>
+```
+
+### Линии
+
+**Получить список линий**
+
+```bash
+curl -H "X-API-Key: <your-api-key>" \
+  "http://localhost:3000/lines?page=1&limit=20&brandId=<uuid>&search=line"
+```
+
+**Параметры запроса:**
+- `page`, `limit` - как у брендов
+- `brandId` - фильтр по ID бренда (UUID)
+- `search` - поиск по названию (без учёта регистра, частичное совпадение)
+
+**Получить линию по ID**
+
+```bash
+curl -H "X-API-Key: <your-api-key>" \
+  http://localhost:3000/lines/<id>
+```
+
+**Получить табаки линии**
+
+```bash
+curl -H "X-API-Key: <your-api-key>" \
+  "http://localhost:3000/lines/<id>/tobaccos?page=1&limit=20&sortBy=rating&order=desc"
+```
+
+## Управление API ключами
+
+Для управления API ключами используется CLI интерфейс:
+
+### Создать новый API ключ
+
+```bash
+npm run cli -- create "My Client"
+```
+
+Возвращает новый API ключ в формате UUID v4.
+
+### Удалить API ключ
+
+```bash
+npm run cli -- delete <key-id>
+```
+
+### Список всех API ключей
+
+```bash
+npm run cli -- list
+```
+
+Показывает все ключи с маскировкой (первые 8 + последние 4 символа).
+
+### Статистика использования
+
+```bash
+npm run cli -- stats
+```
+
+Показывает общую статистику: общее количество ключей, активные/неактивные ключи, общее количество запросов.
+
+## Парсинг данных
+
+### Ручной запуск парсинга
+
+Вы можете запустить парсинг вручную через CLI:
+
+```bash
+# Парсинг брендов (с ограничением количества)
+npm run cli -- parse brands --limit 10
+
+# Парсинг линий (с ограничением количества)
+npm run cli -- parse lines --limit 10
+
+# Парсинг табаков (с ограничением количества)
+npm run cli -- parse tobaccos --limit 10
+```
+
+### Автоматическое обновление
+
+Парсинг автоматически запускается каждый день в 02:00 по расписанию cron.
+
+## Структура данных
+
+### Brand (Бренд)
+
+```typescript
+{
+  id: string (UUID)
+  name: string
+  slug: string
+  country: string
+  rating: number
+  ratingsCount: number
+  description: string
+  logoUrl: string
+  createdAt: Date
+  updatedAt: Date
+}
+```
+
+### Tobacco (Табак)
+
+```typescript
+{
+  id: string (UUID)
+  name: string
+  slug: string
+  brandId: string (UUID)
+  lineId: string (UUID, nullable)
+  rating: number
+  ratingsCount: number
+  country: string
+  strengthOfficial: string
+  strengthByRatings: string
+  status: string
+  htreviewsId: string
+  imageUrl: string
+  description: string
+  createdAt: Date
+  updatedAt: Date
+}
+```
+
+### Line (Линия)
+
+```typescript
+{
+  id: string (UUID)
+  name: string
+  slug: string
+  brandId: string (UUID)
+  description: string
+  imageUrl: string
+  rating: number
+  ratingsCount: number
+  strengthOfficial: string
+  strengthByRatings: string
+  status: string
+  createdAt: Date
+  updatedAt: Date
+}
+```
+
+## Разработка
+
+### Запуск тестов
+
+```bash
+# Запуск всех тестов
+npm test
+
+# Запуск тестов с покрытием
+npm run test:cov
+
+# Запуск e2e тестов
+npm run test:e2e
+```
+
+### Линтинг и форматирование
+
+```bash
+# Проверка кода
+npm run lint
+
+# Форматирование кода
+npm run format
+```
+
+### Миграции базы данных
+
+```bash
+# Показать статус миграций
+npm run migration:show
+
+# Запустить миграции
+npm run migration:run
+
+# Откатить последнюю миграцию
+npm run migration:revert
+```
+
+## Архитектура проекта
+
+```
+src/
+├── main.ts                 # Точка входа приложения
+├── app.module.ts           # Корневой модуль
+├── common/                 # Общие утилиты
+│   ├── guards/             # Guards (API key)
+│   ├── middleware/         # Middleware
+│   ├── decorators/         # Декораторы
+│   ├── interceptors/       # Интерсепторы
+│   ├── filters/            # Фильтры исключений
+│   └── dto/               # Общие DTO
+├── brands/                 # Модуль брендов
+├── tobaccos/               # Модуль табаков
+├── lines/                  # Модуль линий
+├── auth/                   # Модуль аутентификации
+├── parser/                 # Модуль парсера
+│   └── strategies/        # Стратегии парсинга
+├── api-keys/               # Управление API ключами
+├── health/                 # Health check
+└── cli/                    # CLI команды
+```
+
+## Ограничения
+
+- Обновление данных происходит только раз в день (в 02:00)
+- Нет web интерфейса для управления API ключами (только CLI)
+- Нет автоматического резервного копирования (используйте Docker volumes)
+- Базовое логирование без метрик и дашбордов
+
+## Лицензия
+
+UNLICENSED
+
+## Вклад
+
+Contributions, issues and feature requests are welcome!
+
+## Контакты
+
+Для вопросов и предложений создайте issue в репозитории.

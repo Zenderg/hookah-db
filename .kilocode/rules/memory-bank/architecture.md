@@ -588,6 +588,7 @@ volumes:
 - ✅ Brand parser implementation (scraping htreviews.org)
 - ✅ Line parser implementation (scraping htreviews.org)
 - ✅ Tobacco parser implementation (scraping htreviews.org)
+- ✅ README.md documentation (comprehensive user documentation in Russian)
 
 **Pending Implementation:**
 - ⏳ Tests (unit tests for services and repositories)

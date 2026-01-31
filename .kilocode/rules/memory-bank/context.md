@@ -2,7 +2,7 @@
 
 ## Current State
 
-**Status:** PostgreSQL 18.1 migration completed. Database is running with all tables created with UUID types. Application successfully connected to PostgreSQL. **All migration phases completed.**
+**Status:** PostgreSQL 18.1 migration completed. Database is running with all tables created with UUID types. Application successfully connected to PostgreSQL. **All migration phases completed. README.md documentation created.**
 
 The project structure has been successfully initialized with all necessary files and directories. Dependencies have been installed and the application startup has been verified. The memory bank contains comprehensive documentation covering:
 
@@ -10,6 +10,7 @@ The project structure has been successfully initialized with all necessary files
 - Product description explaining why the project exists and what problems it solves
 - Architecture documentation with complete system design
 - Technology stack details with all dependencies
+- Complete README.md documentation for users and developers
 
 ## Project Structure Created
 
@@ -102,6 +103,7 @@ Complete NestJS-based project structure has been created with:
 14. ✅ Implement tobacco parser: Build Playwright parser for tobaccos from htreviews.org - **COMPLETED**
 15. ✅ Test business logic in services: API endpoints tested via curl requests - **COMPLETED** (2026-01-30)
 16. ✅ Implement ILIKE search: Add case-insensitive search for brands, lines, and tobaccos - **COMPLETED** (2026-01-31)
+17. ✅ Create README.md documentation: Comprehensive user documentation in Russian - **COMPLETED** (2026-01-31)
 
 ### Implementation Priority
 1. ✅ Core infrastructure (NestJS setup, database, entities) - **COMPLETED**
@@ -117,6 +119,7 @@ Complete NestJS-based project structure has been created with:
 11. ✅ Update Line entity to match migration 1706328000007 - **COMPLETED**
 12. ✅ Tobacco parser implementation - **COMPLETED**
 13. ✅ Business logic in services (tested via API requests) - **COMPLETED**
+14. ✅ README.md documentation (comprehensive user documentation) - **COMPLETED** (2026-01-31)
 
 ## Known Constraints
 
@@ -316,6 +319,50 @@ This enables:
 - GET /lines returned 3 lines with `createdAt` and `updatedAt` fields
 - GET /tobaccos returned 3 tobaccos with `createdAt` and `updatedAt` fields
 
+### README.md Documentation Created
+**Status:** ✅ COMPLETED (2026-01-31)
+
+**Changes Made:**
+- ✅ Created comprehensive [`README.md`](README.md:1) documentation in Russian
+- ✅ Documentation follows open source project standards
+- ✅ Includes all major sections: Quick Start, API Documentation, CLI commands, Architecture
+- ✅ Contains practical examples with curl commands
+- ✅ Covers all API endpoints with parameters and examples
+- ✅ Documents data structures for Brand, Tobacco, and Line entities
+- ✅ Includes Docker deployment instructions
+- ✅ Describes development workflow (tests, linting, migrations)
+- ✅ Lists project limitations and constraints
+
+**Documentation Sections:**
+1. **Возможности** (Features) - Project capabilities overview
+2. **Технологический стек** (Technology Stack) - Core technologies and versions
+3. **Быстрый старт** (Quick Start) - Installation and setup instructions
+4. **Docker развёртывание** (Docker Deployment) - Docker Compose setup
+5. **API Документация** (API Documentation):
+   - Authentication methods
+   - Health check endpoint
+   - Brands endpoints with parameters
+   - Tobaccos endpoints with parameters
+   - Lines endpoints with parameters
+6. **Управление API ключами** (API Key Management) - CLI commands
+7. **Парсинг данных** (Data Parsing) - Manual and automatic parsing
+8. **Структура данных** (Data Structure) - Entity schemas
+9. **Разработка** (Development) - Testing, linting, migrations
+10. **Архитектура проекта** (Project Architecture) - Directory structure
+11. **Ограничения** (Limitations) - Known system limitations
+
+**Documentation Features:**
+- Uses emojis for better readability
+- Practical curl examples for all endpoints
+- Clear parameter descriptions with defaults and constraints
+- Case-insensitive search examples
+- Pagination examples
+- CLI command examples for API key management
+- Docker deployment instructions
+- Development workflow documentation
+
+**Language:** Russian (as requested)
+
 ## PostgreSQL Migration Plan
 
 ### Migration Goals
@@ -464,6 +511,7 @@ If migration fails:
 - ✅ Brand parser implementation (scraping htreviews.org)
 - ✅ Line parser implementation (scraping htreviews.org)
 - ✅ Tobacco parser implementation (scraping htreviews.org)
+- ✅ README.md documentation (comprehensive user documentation in Russian)
 
 **Pending Implementation:**
 - ⏳ Tests (unit tests for services and repositories)
