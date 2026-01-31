@@ -50,6 +50,10 @@ export class InitialSchema1706328000000 implements MigrationInterface {
             type: 'varchar',
           },
           {
+            name: 'status',
+            type: 'varchar',
+          },
+          {
             name: 'createdAt',
             type: 'timestamp',
           },
@@ -76,6 +80,14 @@ export class InitialSchema1706328000000 implements MigrationInterface {
       new TableIndex({
         name: 'idx_brands_rating',
         columnNames: ['rating'],
+      }),
+    );
+
+    await queryRunner.createIndex(
+      'brands',
+      new TableIndex({
+        name: 'idx_brands_status',
+        columnNames: ['status'],
       }),
     );
 
@@ -395,6 +407,7 @@ export class InitialSchema1706328000000 implements MigrationInterface {
     await queryRunner.dropIndex('lines', 'idx_lines_slug');
 
     await queryRunner.dropIndex('brands', 'idx_brands_rating');
+    await queryRunner.dropIndex('brands', 'idx_brands_status');
     await queryRunner.dropIndex('brands', 'idx_brands_slug');
 
     // Drop tables

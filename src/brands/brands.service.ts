@@ -68,4 +68,8 @@ export class BrandsService {
   async getCountries(): Promise<string[]> {
     return this.brandsRepository.getCountries();
   }
+
+  async getStatuses(): Promise<string[]> {
+    return this.brandsRepository.getStatuses();
+  }
 }

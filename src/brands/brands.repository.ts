@@ -12,7 +12,7 @@ export class BrandsRepository {
   ) {}
 
   async findAll(query: FindBrandsDto): Promise<{ data: Brand[]; total: number }> {
-    const { page = 1, limit = 20, sortBy = 'rating', order = 'desc', country, search } = query;
+    const { page = 1, limit = 20, sortBy = 'rating', order = 'desc', country, search, status } = query;
     const skip = (page - 1) * limit;
 
     const queryBuilder = this.brandRepository.createQueryBuilder('brand');
@@ -25,6 +25,10 @@ export class BrandsRepository {
       queryBuilder.andWhere('brand.name ILIKE :search', {
         search: `%${search}%`,
       });
+    }
+
+    if (status) {
+      queryBuilder.andWhere('brand.status = :status', { status });
     }
 
     queryBuilder
@@ -50,5 +54,16 @@ export class BrandsRepository {
       .getRawMany();
 
     return result.map((row: { country: string }) => row.country);
+  }
+
+  async getStatuses(): Promise<string[]> {
+    const result = await this.brandRepository
+      .createQueryBuilder('brand')
+      .select('DISTINCT brand.status')
+      .where('brand.status IS NOT NULL')
+      .orderBy('brand.status', 'ASC')
+      .getRawMany();
+
+    return result.map((row: { status: string }) => row.status);
   }
 }

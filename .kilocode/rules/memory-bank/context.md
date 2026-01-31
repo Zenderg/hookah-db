@@ -2,7 +2,7 @@
 
 ## Current State
 
-**Status:** PostgreSQL 18.1 migration completed. Database is running with all tables created with UUID types. Application successfully connected to PostgreSQL. **All migration phases completed. README.md documentation created.**
+**Status:** PostgreSQL 18.1 migration completed. Database is running with all tables created with UUID types. Application successfully connected to PostgreSQL. **All migration phases completed. README.md documentation created. Brand status implementation completed (2026-01-31).**
 
 The project structure has been successfully initialized with all necessary files and directories. Dependencies have been installed and the application startup has been verified. The memory bank contains comprehensive documentation covering:
 
@@ -471,6 +471,54 @@ This enables:
 - For line/tobacco parsing by URL, the brand/line must exist in database first (CLI queries by slug)
 - URL-based parsing is useful for parsing specific items without running full batch parsing
 - Both `--url` and `--limit` options cannot be used together (validation enforced)
+
+### Brand Status Implementation - Completed
+**Status:** ✅ COMPLETED (2026-01-31)
+
+**Changes Made:**
+- ✅ Added `status` field to [`Brand`](src/brands/brands.entity.ts:37) entity (required, NOT NULL)
+- ✅ Updated migration ([`src/migrations/1706328000000-InitialSchema.ts`](src/migrations/1706328000000-InitialSchema.ts:53-55)) to add status column to brands table
+- ✅ Added index `idx_brands_status` for status column (migration lines 86-92)
+- ✅ Updated [`BrandParserStrategy`](src/parser/strategies/brand-parser.strategy.ts) to extract status from htreviews.org:
+  - Added `status` field to [`ParsedBrandData`](src/parser/strategies/brand-parser.strategy.ts:14) type
+  - [`parseBrandDetail()`](src/parser/strategies/brand-parser.strategy.ts:253) extracts status from brand detail pages (lines 278-295)
+  - [`parseBrandByUrl()`](src/parser/strategies/brand-parser.strategy.ts:312) extracts status (lines 363-380)
+  - [`normalizeToEntity()`](src/parser/strategies/brand-parser.strategy.ts:408) includes status field (line 417)
+- ✅ Added status filtering to [`BrandsRepository.findAll()`](src/brands/brands.repository.ts:30-32)
+- ✅ Added [`getStatuses()`](src/brands/brands.repository.ts:59) method to repository
+- ✅ Added [`getStatuses()`](src/brands/brands.service.ts:72) method to service
+- ✅ Added [`GET /brands/statuses`](src/brands/brands.controller.ts:34) endpoint to controller
+- ✅ Added `status` parameter to [`FindBrandsDto`](src/brands/dto/find-brands.dto.ts:21-23)
+
+**Implementation Details:**
+
+**Brand Entity** ([`src/brands/brands.entity.ts`](src/brands/brands.entity.ts:37-39)):
+```typescript
+@Column()
+@Index('idx_brands_status')
+status: string;
+```
+
+**Status Extraction**:
+- Parser looks for `.object_info_item` elements with "Статус" label
+- Default value: "Не указано" if status not found
+- Status values match lines and tobaccos: "Выпускается", "Лимитированная", "Снята с производства"
+
+**API Endpoints:**
+- **GET /brands?status=Выпускается** - Filter brands by status
+- **GET /brands/statuses** - Returns list of unique statuses from brands table
+
+**Status Values:**
+- "Выпускается" (Currently produced)
+- "Лимитированная" (Limited edition)
+- "Снята с производства" (Discontinued)
+- "Не указано" (Not specified - default)
+
+**Important Notes:**
+- Status is required for all entities (brands, lines, tobaccos)
+- Implementation follows the same pattern as lines and tobaccos
+- Status column is indexed for efficient filtering
+- Parser extracts status from brand detail pages on htreviews.org
 
 ## PostgreSQL Migration Plan
 

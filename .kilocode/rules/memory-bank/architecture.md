@@ -106,12 +106,13 @@ src/
   ratingsCount: number
   description: string
   logoUrl: string
+  status: string (required) - "Выпускается", "Лимитированная", "Снята с производства", "Не указано"
   createdAt: Date
   updatedAt: Date
 }
 ```
 
-**Note**: Slug and name are now required fields. Slug is extracted from the brand detail URL (format: `/tobaccos/{slug}`) and stored for use in line and tobacco parsing. The reviewsCount and views columns have been removed as they were not being parsed or used.
+**Note**: Slug and name are now required fields. Slug is extracted from the brand detail URL (format: `/tobaccos/{slug}`) and stored for use in line and tobacco parsing. The reviewsCount and views columns have been removed as they were not being parsed or used. Status is required (2026-01-31) and follows the same pattern as lines and tobaccos.
 
 ### Tobacco Entity
 
@@ -214,9 +215,9 @@ All endpoints require API key authentication via:
 ### Brands
 
 **GET /brands**
-- Query params: `?page=1&limit=20&sortBy=rating&order=desc&country=Russia&search=dogma`
+- Query params: `?page=1&limit=20&sortBy=rating&order=desc&country=Russia&status=Выпускается&search=dogma`
 - Returns: Paginated list of brands
-- Filtering: by country, case-insensitive name search (ILIKE, partial match)
+- Filtering: by country, status, case-insensitive name search (ILIKE, partial match)
 - Sorting: by rating, name
 - Search: `search` parameter performs case-insensitive partial match on brand name (works with both Latin and Cyrillic characters)
 
@@ -225,6 +226,12 @@ All endpoints require API key authentication via:
 - Authentication: Required (API key)
 - Response format: `["Россия", "США"]`
 - Used by client applications to populate country filter dropdowns
+
+**GET /brands/statuses**
+- Returns: List of unique statuses from brands table
+- Authentication: Required (API key)
+- Response format: `["Выпускается", "Лимитированная", "Снята с производства"]`
+- Used by client applications to populate status filter dropdowns
 
 **GET /brands/:id**
 - Returns: Single brand details
@@ -288,6 +295,7 @@ Located in [`src/common/dto/pagination.dto.ts`](src/common/dto/pagination.dto.ts
   - `sortBy`: 'rating' | 'name' (default: 'rating')
   - `order`: 'asc' | 'desc' (default: 'desc')
   - `country`: Optional string filter
+  - `status`: Optional string filter (e.g., "Выпускается", "Лимитированная", "Снята с производства")
   - `search`: Optional string filter for case-insensitive partial match on brand name
 
 **Tobaccos** ([`src/tobaccos/dto/find-tobaccos.dto.ts`](src/tobaccos/dto/find-tobaccos.dto.ts)):
@@ -330,7 +338,7 @@ All repositories use TypeORM QueryBuilder for:
 - `brandId`: Filter by brand UUID
 - `lineId`: Filter by line UUID
 - `minRating`, `maxRating`: Filter by rating range
-- `country`: Filter by country of origin (for tobaccos, uses JOIN with brands table)
+- `country`: Filter by country of origin (for brands and tobaccos; for tobaccos uses JOIN with brands table)
 - `status`: Filter by production status (e.g., "Выпускается", "Лимитированная", "Снята с производства")
 - `search`: Case-insensitive partial match on name fields (brands, lines, tobaccos)
 
@@ -622,6 +630,7 @@ volumes:
 - ✅ README.md documentation (comprehensive user documentation in Russian)
 - ✅ Filter value endpoints (2026-01-31):
   - GET /brands/countries - Returns list of unique countries
+  - GET /brands/statuses - Returns list of unique statuses
   - GET /tobaccos/statuses - Returns list of unique statuses
   - GET /lines/statuses - Returns list of unique statuses
 - ✅ Country column removal from tobaccos table (2026-01-31):
@@ -635,6 +644,13 @@ volumes:
   - Added three new methods to ParserService for URL-based parsing
   - URL formats: `/tobaccos/{slug}`, `/tobaccos/{brand}/{line}`, `/tobaccos/{brand}/{line}/{tobacco}`
   - Validation: `--url` and `--limit` options cannot be used together
+- ✅ Brand status implementation (2026-01-31):
+  - Status field added to Brand entity (required, NOT NULL)
+  - Migration updated to add status column with index
+  - Brand parser updated to extract status from htreviews.org
+  - API endpoints added: GET /brands/statuses and status filtering
+  - Implementation follows same pattern as lines and tobaccos
+  - Status is required for all entities (brands, lines, tobaccos)
 
 **Pending Implementation:**
 - ⏳ Tests (unit tests for services and repositories)

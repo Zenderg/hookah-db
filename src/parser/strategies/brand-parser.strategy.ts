@@ -11,6 +11,7 @@ export type ParsedBrandData = {
   description: string;
   logoUrl: string;
   detailUrl: string;
+  status: string;
 };
 
 @Injectable()
@@ -91,6 +92,7 @@ export class BrandParserStrategy {
           ...brand,
           logoUrl: detailData.logoUrl,
           description: detailData.description,
+          status: detailData.status,
         };
       } catch (error) {
         this.logger.error(
@@ -212,6 +214,7 @@ export class BrandParserStrategy {
               detailUrl,
               description: descriptionDiv?.textContent?.trim() || '',
               logoUrl: imageElement?.getAttribute('src') || '',
+              status: 'Не указано',
             };
           });
         },
@@ -247,9 +250,12 @@ export class BrandParserStrategy {
     return brands;
   }
 
-  private async parseBrandDetail(detailUrl: string): Promise<{
+  private async parseBrandDetail(
+    detailUrl: string,
+  ): Promise<{
     logoUrl: string;
     description: string;
+    status: string;
   }> {
     if (!this.page) {
       throw new Error('Browser not initialized');
@@ -269,9 +275,29 @@ export class BrandParserStrategy {
         '.object_card_discr span',
       );
 
+      // Extract status - look for object_info_item with "Статус" label
+      let status = 'Не указано';
+      const infoItems = document.querySelectorAll('.object_info_item');
+      for (const item of infoItems) {
+        const spans = Array.from(item.querySelectorAll('span'));
+        // Find the span that contains exactly "Статус" (without the icon)
+        const labelSpan = spans.find((span) => span.textContent?.trim() === 'Статус');
+        // The status value is in the last span (index 3 in the status item)
+        const valueSpan = spans[spans.length - 1];
+        if (
+          labelSpan &&
+          valueSpan?.textContent &&
+          valueSpan.textContent.trim() !== ''
+        ) {
+          status = valueSpan.textContent.trim();
+          break;
+        }
+      }
+
       return {
         logoUrl: logoImg?.getAttribute('src') || '',
         description: descriptionElement?.textContent?.trim() || '',
+        status,
       };
     });
 
@@ -334,12 +360,32 @@ export class BrandParserStrategy {
         }
       }
 
+      // Extract status - look for object_info_item with "Статус" label
+      let status = 'Не указано';
+      const infoItems = document.querySelectorAll('.object_info_item');
+      for (const item of infoItems) {
+        const spans = Array.from(item.querySelectorAll('span'));
+        // Find the span that contains exactly "Статус" (without the icon)
+        const labelSpan = spans.find((span) => span.textContent?.trim() === 'Статус');
+        // The status value is in the last span (index 3 in the status item)
+        const valueSpan = spans[spans.length - 1];
+        if (
+          labelSpan &&
+          valueSpan?.textContent &&
+          valueSpan.textContent.trim() !== ''
+        ) {
+          status = valueSpan.textContent.trim();
+          break;
+        }
+      }
+
       return {
         name,
         slug,
         country,
         rating,
         ratingsCount,
+        status,
       };
     });
 
@@ -355,6 +401,7 @@ export class BrandParserStrategy {
       description: detailData.description,
       logoUrl: detailData.logoUrl,
       detailUrl: url,
+      status: data.status,
     };
   }
 
@@ -367,6 +414,7 @@ export class BrandParserStrategy {
       ratingsCount: data.ratingsCount,
       description: data.description,
       logoUrl: data.logoUrl,
+      status: data.status,
       createdAt: new Date(),
       updatedAt: new Date(),
     };

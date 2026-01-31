@@ -34,6 +34,10 @@ export class Brand {
   @Column({ type: 'varchar' })
   logoUrl: string;
 
+  @Column()
+  @Index('idx_brands_status')
+  status: string;
+
   @CreateDateColumn()
   createdAt: Date;
 

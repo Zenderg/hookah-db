@@ -17,4 +17,8 @@ export class FindBrandsDto extends PaginationDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @IsOptional()
+  @IsString()
+  status?: string;
 }
