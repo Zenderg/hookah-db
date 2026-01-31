@@ -531,6 +531,59 @@ export class LineParserStrategy {
     }
   }
 
+  /**
+   * Parse a single line from its detail URL
+   * @param url - Line detail URL (e.g., "/tobaccos/dogma/100-sigarnyy-pank" or "https://htreviews.org/tobaccos/dogma/100-sigarnyy-pank")
+   * @param brandId - Brand ID for the line
+   * @returns Parsed line data
+   */
+  async parseLineByUrl(url: string, brandId: string): Promise<ParsedLineData> {
+    if (!this.page) {
+      throw new Error('Browser not initialized. Call initialize() first.');
+    }
+
+    const fullUrl = url.startsWith('http')
+      ? url
+      : `https://htreviews.org${url}`;
+
+    this.logger.log(`Parsing line from URL: ${fullUrl}`);
+
+    // Extract brand slug and line slug from URL
+    const urlMatch = fullUrl.match(/\/tobaccos\/([^/]+)\/([^/?]+)/);
+    const brandSlug = urlMatch ? urlMatch[1] : '';
+    const lineSlug = urlMatch ? urlMatch[2] : '';
+
+    if (!brandSlug || !lineSlug) {
+      throw new Error(`Invalid line URL format: ${fullUrl}`);
+    }
+
+    // Extract additional data from line detail page
+    const additionalData = await this.extractAdditionalDataFromDetailPage(
+      lineSlug,
+      brandSlug,
+    );
+
+    // Extract basic line data from brand page
+    const brandPageUrl = `/tobaccos/${brandSlug}`;
+    const lineDataList = await this.extractLinesFromBrandPage(brandPageUrl, brandId);
+    const lineData = lineDataList.find((line) => line.slug === lineSlug);
+
+    if (!lineData) {
+      throw new Error(`Line not found on brand page: ${lineSlug}`);
+    }
+
+    // Merge data from brand page and detail page
+    return {
+      ...lineData,
+      brandId,
+      imageUrl: additionalData.imageUrl,
+      ratingsCount: additionalData.ratingsCount,
+      strengthOfficial: additionalData.strengthOfficial,
+      strengthByRatings: additionalData.strengthByRatings,
+      description: additionalData.description || lineData.description,
+    };
+  }
+
   normalizeToEntity(data: ParsedLineData): Partial<Line> {
     return {
       name: data.name,

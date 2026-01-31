@@ -278,6 +278,86 @@ export class BrandParserStrategy {
     return data;
   }
 
+  /**
+   * Parse a single brand from its detail URL
+   * @param url - Brand detail URL (e.g., "/tobaccos/dogma" or "https://htreviews.org/tobaccos/dogma")
+   * @returns Parsed brand data
+   */
+  async parseBrandByUrl(url: string): Promise<ParsedBrandData> {
+    if (!this.page) {
+      throw new Error('Browser not initialized. Call initialize() first.');
+    }
+
+    const fullUrl = url.startsWith('http')
+      ? url
+      : `https://htreviews.org${url}`;
+
+    this.logger.log(`Parsing brand from URL: ${fullUrl}`);
+
+    await this.page.goto(fullUrl, { waitUntil: 'networkidle' });
+
+    // Extract basic brand data from detail page
+    const data = await this.page.evaluate(() => {
+      // Extract brand name from h1
+      const nameElement = document.querySelector('h1');
+      const name = nameElement?.textContent?.trim() || '';
+
+      // Extract slug from URL
+      const slugMatch = window.location.pathname.match(/\/tobaccos\/([^/?]+)/);
+      const slug = slugMatch ? slugMatch[1] : '';
+
+      // Extract country from page
+      let country = '';
+      const countryElement = document.querySelector('.country');
+      if (countryElement) {
+        country = countryElement.textContent?.trim() || '';
+      }
+
+      // Extract rating
+      let rating = 0;
+      const ratingDiv = document.querySelector('div[data-rating]');
+      if (ratingDiv) {
+        const ratingValue = ratingDiv.getAttribute('data-rating');
+        if (ratingValue) {
+          rating = parseFloat(ratingValue);
+        }
+      }
+
+      // Extract ratings count
+      let ratingsCount = 0;
+      const statsDiv = document.querySelector('div[data-stats]');
+      if (statsDiv) {
+        const firstStat = statsDiv.firstElementChild;
+        if (firstStat) {
+          const ratingsText = firstStat.querySelector('span')?.textContent?.trim() || '';
+          ratingsCount = parseInt(ratingsText, 10);
+        }
+      }
+
+      return {
+        name,
+        slug,
+        country,
+        rating,
+        ratingsCount,
+      };
+    });
+
+    // Extract logoUrl and description using existing method
+    const detailData = await this.parseBrandDetail(url);
+
+    return {
+      name: data.name,
+      slug: data.slug,
+      country: data.country,
+      rating: data.rating,
+      ratingsCount: data.ratingsCount,
+      description: detailData.description,
+      logoUrl: detailData.logoUrl,
+      detailUrl: url,
+    };
+  }
+
   normalizeToEntity(data: ParsedBrandData): Partial<Brand> {
     return {
       name: data.name,

@@ -174,43 +174,136 @@ program
 program
   .command('parse')
   .description('Parse data from htreviews.org')
-  .argument('<type>', 'Type of data to parse: brands, lines, or tobaccos')
-  .option('--limit <number>', 'Limit the number of items to parse', undefined)
+  .argument('<type>', 'Type of data to parse: brand, line, or tobacco')
+  .option('--limit <number>', 'Limit number of items to parse')
+  .option('--url <url>', 'Parse specific item by URL')
   .action(async (type, options) => {
     let app: any = null;
     try {
       const { service, app: appContext } = await getParserService();
       app = appContext;
       const limit = options.limit ? parseInt(options.limit, 10) : undefined;
+      const url = options.url;
+
+      if (url && limit) {
+        console.error('❌ Cannot use both --url and --limit options together.');
+        process.exit(1);
+      }
 
       if (limit !== undefined && (isNaN(limit) || limit < 1)) {
         console.error('❌ Invalid limit value. Must be a positive number.');
         process.exit(1);
       }
 
-      console.log(
-        `🚀 Starting ${type} parsing${limit ? ` (limit: ${limit})` : ''}...`,
-      );
-      console.log('');
-
       const startTime = Date.now();
 
-      switch (type.toLowerCase()) {
-        case 'brands':
-          await service.parseBrandsManually(limit);
-          break;
-        case 'lines':
-          await service.parseLinesManually(limit);
-          break;
-        case 'tobaccos':
-          await service.parseTobaccosManually(limit);
-          break;
-        default:
-          console.error(
-            `❌ Invalid type: ${type}. Must be 'brands', 'lines', or 'tobaccos'.`,
-          );
-          process.exit(1);
-          break;
+      if (url) {
+        // Parse specific item by URL
+        console.log(`🚀 Starting ${type} parsing from URL: ${url}`);
+        console.log('');
+
+        switch (type.toLowerCase()) {
+          case 'brand': {
+            await service.parseBrandByUrl(url);
+            break;
+          }
+          case 'line': {
+            // Extract brandId from URL for line parsing
+            const urlMatch = url.match(/\/tobaccos\/([^/]+)\/([^/?]+)/);
+            if (!urlMatch) {
+              console.error(
+                '❌ Invalid line URL format. Expected: /tobaccos/{brand}/{line}',
+              );
+              process.exit(1);
+            }
+
+            // Find brand by slug to get brandId
+            const brandSlug = urlMatch[1];
+            const brands = await service['brandRepository'].find({
+              where: { slug: brandSlug },
+            });
+            if (!brands || brands.length === 0) {
+              console.error(
+                `❌ Brand not found in database: ${brandSlug}`,
+              );
+              process.exit(1);
+            }
+
+            const brandId = brands[0].id;
+            await service.parseLineByUrl(url, brandId);
+            break;
+          }
+          case 'tobacco': {
+            // Extract brandId and lineId from URL for tobacco parsing
+            const urlMatch = url.match(/\/tobaccos\/([^/]+)\/([^/]+)\/([^/?]+)/);
+            if (!urlMatch) {
+              console.error(
+                '❌ Invalid tobacco URL format. Expected: /tobaccos/{brand}/{line}/{tobacco}',
+              );
+              process.exit(1);
+            }
+
+            // Find brand by slug to get brandId
+            const brandSlug = urlMatch[1];
+            const brands = await service['brandRepository'].find({
+              where: { slug: brandSlug },
+            });
+            if (!brands || brands.length === 0) {
+              console.error(
+                `❌ Brand not found in database: ${brandSlug}`,
+              );
+              process.exit(1);
+            }
+
+            const brandId = brands[0].id;
+
+            // Find line by slug and brandId to get lineId
+            const lineSlug = urlMatch[2];
+            const lines = await service['lineRepository'].find({
+              where: { slug: lineSlug, brandId },
+            });
+            if (!lines || lines.length === 0) {
+              console.error(
+                `❌ Line not found in database: ${lineSlug}`,
+              );
+              process.exit(1);
+            }
+
+            const lineId = lines[0].id;
+            await service.parseTobaccoByUrl(url, brandId, lineId);
+            break;
+          }
+          default:
+            console.error(
+              `❌ Invalid type: ${type}. Must be 'brand', 'line', or 'tobacco'.`,
+            );
+            process.exit(1);
+            break;
+        }
+      } else {
+        // Parse all items with limit
+        console.log(
+          `🚀 Starting ${type}s parsing${limit ? ` (limit: ${limit})` : ''}...`,
+        );
+        console.log('');
+
+        switch (type.toLowerCase()) {
+          case 'brand':
+            await service.parseBrandsManually(limit);
+            break;
+          case 'line':
+            await service.parseLinesManually(limit);
+            break;
+          case 'tobacco':
+            await service.parseTobaccosManually(limit);
+            break;
+          default:
+            console.error(
+              `❌ Invalid type: ${type}. Must be 'brand', 'line', or 'tobacco'.`,
+            );
+            process.exit(1);
+            break;
+        }
       }
 
       const duration = ((Date.now() - startTime) / 1000).toFixed(2);

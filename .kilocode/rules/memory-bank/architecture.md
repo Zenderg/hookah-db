@@ -412,11 +412,22 @@ All repositories use TypeORM QueryBuilder for:
   - `delete <id>` - Deletes API key by ID with existence check
   - `list` - Lists all API keys with masked keys (first 8 + last 4 chars)
   - `stats` - Shows overall statistics (totalKeys, activeKeys, inactiveKeys, totalRequests)
+  - `parse <type> --url <url>` - Parses a single brand/line/tobacco by URL (new feature 2026-01-31)
+  - `parse <type> --limit <number>` - Parses multiple brands/lines/tobaccos with limit
 - No limit on number of keys (despite architecture mentioning 10)
 - Keys stored in plain text (not hashed)
 - Request tracking per key for usage monitoring
 - CLI uses NestJS ApplicationContext to access services
 - **Request Count Tracking:** Guard validates API key against database and increments `requestCount` on every authenticated request (fixed 2026-01-31)
+- **URL-Based Parsing (2026-01-31):**
+  - Type argument: `brand`, `line`, or `tobacco` (singular)
+  - `--url <url>` option: URL of the brand/line/tobacco page on htreviews.org
+  - For line/tobacco parsing by URL, CLI queries database to extract brandId and lineId from slugs
+  - URL formats:
+    - Brand: `https://htreviews.org/tobaccos/{brand-slug}`
+    - Line: `https://htreviews.org/tobaccos/{brand-slug}/{line-slug}`
+    - Tobacco: `https://htreviews.org/tobaccos/{brand-slug}/{line-slug}/{tobacco-slug}`
+  - Both `--url` and `--limit` options cannot be used together (validation enforced)
 
 ### Data Refresh
 - **Cron Jobs**: Daily automatic refresh at 2:00 AM
@@ -617,6 +628,13 @@ volumes:
   - Database recreated without country column
   - Country filter for tobaccos works via JOIN with brands table
   - Parser no longer extracts country from tobacco detail pages
+- ✅ URL-based parsing feature (2026-01-31):
+  - CLI parse command now supports `--url <url>` option for parsing single items
+  - Type argument changed from plural (brands/lines/tobaccos) to singular (brand/line/tobacco)
+  - Added URL-based parsing methods to all three parser strategies
+  - Added three new methods to ParserService for URL-based parsing
+  - URL formats: `/tobaccos/{slug}`, `/tobaccos/{brand}/{line}`, `/tobaccos/{brand}/{line}/{tobacco}`
+  - Validation: `--url` and `--limit` options cannot be used together
 
 **Pending Implementation:**
 - ⏳ Tests (unit tests for services and repositories)

@@ -451,6 +451,38 @@ export class TobaccoParserStrategy {
     };
   }
 
+  /**
+   * Parse a single tobacco from its detail URL
+   * @param url - Tobacco detail URL (e.g., "/tobaccos/dogma/100-sigarnyy-pank/lemon-drops" or "https://htreviews.org/tobaccos/dogma/100-sigarnyy-pank/lemon-drops")
+   * @param brandId - Brand ID for tobacco
+   * @param lineId - Line ID for tobacco
+   * @returns Parsed tobacco data
+   */
+  async parseTobaccoByUrl(
+    url: string,
+    brandId: string,
+    lineId: string,
+  ): Promise<ParsedTobaccoData> {
+    if (!this.page) {
+      throw new Error('Browser not initialized. Call initialize() first.');
+    }
+
+    const fullUrl = url.startsWith('http')
+      ? url
+      : `https://htreviews.org${url}`;
+
+    this.logger.log(`Parsing tobacco from URL: ${fullUrl}`);
+
+    // Parse tobacco detail page
+    const tobaccoData = await this.parseTobaccoDetailPage(
+      fullUrl,
+      brandId,
+      lineId,
+    );
+
+    return tobaccoData;
+  }
+
   normalizeToEntity(data: ParsedTobaccoData): Partial<Tobacco> {
     return {
       name: data.name,

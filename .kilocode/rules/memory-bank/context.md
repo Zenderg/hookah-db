@@ -104,6 +104,7 @@ Complete NestJS-based project structure has been created with:
 15. ✅ Test business logic in services: API endpoints tested via curl requests - **COMPLETED** (2026-01-30)
 16. ✅ Implement ILIKE search: Add case-insensitive search for brands, lines, and tobaccos - **COMPLETED** (2026-01-31)
 17. ✅ Create README.md documentation: Comprehensive user documentation in Russian - **COMPLETED** (2026-01-31)
+18. ✅ Add URL-based parsing to CLI: Implement parse by URL for brands, lines, and tobaccos - **COMPLETED** (2026-01-31)
 
 ### Implementation Priority
 1. ✅ Core infrastructure (NestJS setup, database, entities) - **COMPLETED**
@@ -120,6 +121,7 @@ Complete NestJS-based project structure has been created with:
 12. ✅ Tobacco parser implementation - **COMPLETED**
 13. ✅ Business logic in services (tested via API requests) - **COMPLETED**
 14. ✅ README.md documentation (comprehensive user documentation) - **COMPLETED** (2026-01-31)
+15. ✅ URL-based parsing feature for CLI (parse by URL) - **COMPLETED** (2026-01-31)
 
 ## Known Constraints
 
@@ -410,6 +412,65 @@ This enables:
 - Development workflow documentation
 
 **Language:** Russian (as requested)
+
+### URL-Based Parsing Feature - Implemented
+**Status:** ✅ COMPLETED (2026-01-31)
+
+**Changes Made:**
+- ✅ Added [`parseBrandByUrl()`](src/parser/strategies/brand-parser.strategy.ts:233) method to BrandParserStrategy - Parses a single brand from its detail URL
+- ✅ Added [`parseLineByUrl()`](src/parser/strategies/line-parser.strategy.ts:426) method to LineParserStrategy - Parses a single line from its detail URL
+- ✅ Added [`parseTobaccoByUrl()`](src/parser/strategies/tobacco-parser.strategy.ts:437) method to TobaccoParserStrategy - Parses a single tobacco from its detail URL
+- ✅ Added [`parseBrandByUrl()`](src/parser/parser.service.ts:96) method to ParserService - Orchestrates brand parsing by URL
+- ✅ Added [`parseLineByUrl()`](src/parser/parser.service.ts:104) method to ParserService - Orchestrates line parsing by URL
+- ✅ Added [`parseTobaccoByUrl()`](src/parser/parser.service.ts:112) method to ParserService - Orchestrates tobacco parsing by URL
+- ✅ Updated CLI [`parse`](src/cli/index.ts:71) command:
+  - Changed type argument from plural (brands/lines/tobaccos) to singular (brand/line/tobacco)
+  - Added `--url <url>` option for URL-based parsing
+  - Added validation: `--url` and `--limit` cannot be used together
+  - For line/tobacco parsing, extracts brandId and lineId from URL by querying database
+
+**Implementation Details:**
+
+**BrandParserStrategy.parseBrandByUrl()** ([`src/parser/strategies/brand-parser.strategy.ts:233`](src/parser/strategies/brand-parser.strategy.ts:233)):
+- Navigates to the provided URL
+- Extracts brand data using page.evaluate()
+- Combines basic data with logoUrl and description from existing `parseBrandDetail()` method
+- Returns ParsedBrandData object
+
+**LineParserStrategy.parseLineByUrl()** ([`src/parser/strategies/line-parser.strategy.ts:426`](src/parser/strategies/line-parser.strategy.ts:426)):
+- Extracts brandSlug and lineSlug from URL pattern: `/tobaccos/{brand-slug}/{line-slug}`
+- Merges data from brand page (basic line info) and detail page (ratingsCount, imageUrl, strength data)
+- Requires brandId parameter to establish relationship
+
+**TobaccoParserStrategy.parseTobaccoByUrl()** ([`src/parser/strategies/tobacco-parser.strategy.ts:437`](src/parser/strategies/tobacco-parser.strategy.ts:437)):
+- Delegates to existing `parseTobaccoDetailPage()` method for data extraction
+- Requires brandId and lineId parameters to establish relationships
+
+**ParserService Methods:**
+- [`parseBrandByUrl(url)`](src/parser/parser.service.ts:96) - Initializes BrandParserStrategy, parses, normalizes, and creates/updates brand
+- [`parseLineByUrl(url, brandId)`](src/parser/parser.service.ts:104) - Initializes LineParserStrategy, parses, normalizes, and creates/updates line
+- [`parseTobaccoByUrl(url, brandId, lineId)`](src/parser/parser.service.ts:112) - Initializes TobaccoParserStrategy, parses, normalizes, and creates/updates tobacco
+
+**CLI Command Updates:**
+- Type argument: `brand`, `line`, or `tobacco` (singular)
+- `--url <url>` option: URL of the brand/line/tobacco page on htreviews.org
+- `--limit <number>` option: Still supported for batch parsing (cannot be used with --url)
+- For line/tobacco parsing by URL, CLI queries database to extract brandId and lineId from slugs
+
+**URL Formats:**
+- Brand: `https://htreviews.org/tobaccos/{brand-slug}` (e.g., `https://htreviews.org/tobaccos/dogma`)
+- Line: `https://htreviews.org/tobaccos/{brand-slug}/{line-slug}` (e.g., `https://htreviews.org/tobaccos/dogma/100-sigarnyy-pank`)
+- Tobacco: `https://htreviews.org/tobaccos/{brand-slug}/{line-slug}/{tobacco-slug}` (e.g., `https://htreviews.org/tobaccos/dogma/100-sigarnyy-pank/lemon-drops`)
+
+**Testing Results:**
+- ✅ `npm run cli -- parse brand --url "https://htreviews.org/tobaccos/dogma"` - Successfully parsed and created brand "Догма" in 8.95s
+- ✅ `npm run cli -- parse line --url "https://htreviews.org/tobaccos/dogma/100-sigarnyy-pank"` - Successfully parsed and created line "100% сигарный панк" in 9.91s
+- ✅ `npm run cli -- parse tobacco --url "https://htreviews.org/tobaccos/dogma/100-sigarnyy-pank/lemon-drops"` - Successfully parsed and created tobacco "Лемон дропс" in 6.55s
+
+**Important Notes:**
+- For line/tobacco parsing by URL, the brand/line must exist in database first (CLI queries by slug)
+- URL-based parsing is useful for parsing specific items without running full batch parsing
+- Both `--url` and `--limit` options cannot be used together (validation enforced)
 
 ## PostgreSQL Migration Plan
 

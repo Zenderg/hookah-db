@@ -270,4 +270,122 @@ export class ParserService {
       await this.tobaccoParserStrategy.close();
     }
   }
+
+  async parseBrandByUrl(url: string): Promise<void> {
+    this.logger.log(`Parsing brand from URL: ${url}`);
+
+    try {
+      await this.brandParserStrategy.initialize();
+
+      // Parse brand from URL
+      const parsedBrand = await this.brandParserStrategy.parseBrandByUrl(url);
+      this.logger.log(`Parsed brand: ${parsedBrand.name}`);
+
+      // Normalize to entity
+      const brandData = this.brandParserStrategy.normalizeToEntity(parsedBrand);
+
+      // Check if brand already exists by slug
+      const existingBrand = await this.brandRepository.findOne({
+        where: { slug: brandData.slug },
+      });
+
+      if (existingBrand) {
+        // Update existing brand
+        await this.brandRepository.update(existingBrand.id, brandData);
+        this.logger.log(`Updated brand: ${brandData.name} (ID: ${existingBrand.id})`);
+      } else {
+        // Create new brand
+        const newBrand = this.brandRepository.create(brandData);
+        await this.brandRepository.save(newBrand);
+        this.logger.log(`Created brand: ${brandData.name}`);
+      }
+    } catch (error) {
+      this.logger.error(
+        `Failed to parse brand from URL ${url}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw error;
+    } finally {
+      await this.brandParserStrategy.close();
+    }
+  }
+
+  async parseLineByUrl(url: string, brandId: string): Promise<void> {
+    this.logger.log(`Parsing line from URL: ${url}`);
+
+    try {
+      await this.lineParserStrategy.initialize();
+
+      // Parse line from URL
+      const parsedLine = await this.lineParserStrategy.parseLineByUrl(url, brandId);
+      this.logger.log(`Parsed line: ${parsedLine.name}`);
+
+      // Normalize to entity
+      const lineData = this.lineParserStrategy.normalizeToEntity(parsedLine);
+
+      // Check if line already exists by slug and brandId
+      const existingLine = await this.lineRepository.findOne({
+        where: { slug: lineData.slug, brandId: lineData.brandId },
+      });
+
+      if (existingLine) {
+        // Update existing line
+        await this.lineRepository.update(existingLine.id, lineData);
+        this.logger.log(`Updated line: ${lineData.name} (ID: ${existingLine.id})`);
+      } else {
+        // Create new line
+        const newLine = this.lineRepository.create(lineData);
+        await this.lineRepository.save(newLine);
+        this.logger.log(`Created line: ${lineData.name}`);
+      }
+    } catch (error) {
+      this.logger.error(
+        `Failed to parse line from URL ${url}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw error;
+    } finally {
+      await this.lineParserStrategy.close();
+    }
+  }
+
+  async parseTobaccoByUrl(url: string, brandId: string, lineId: string): Promise<void> {
+    this.logger.log(`Parsing tobacco from URL: ${url}`);
+
+    try {
+      await this.tobaccoParserStrategy.initialize();
+
+      // Parse tobacco from URL
+      const parsedTobacco = await this.tobaccoParserStrategy.parseTobaccoByUrl(
+        url,
+        brandId,
+        lineId,
+      );
+      this.logger.log(`Parsed tobacco: ${parsedTobacco.name}`);
+
+      // Normalize to entity
+      const tobaccoData = this.tobaccoParserStrategy.normalizeToEntity(parsedTobacco);
+
+      // Check if tobacco already exists by htreviewsId
+      const existingTobacco = await this.tobaccoRepository.findOne({
+        where: { htreviewsId: tobaccoData.htreviewsId },
+      });
+
+      if (existingTobacco) {
+        // Update existing tobacco
+        await this.tobaccoRepository.update(existingTobacco.id, tobaccoData);
+        this.logger.log(`Updated tobacco: ${tobaccoData.name} (ID: ${existingTobacco.id})`);
+      } else {
+        // Create new tobacco
+        const newTobacco = this.tobaccoRepository.create(tobaccoData);
+        await this.tobaccoRepository.save(newTobacco);
+        this.logger.log(`Created tobacco: ${tobaccoData.name}`);
+      }
+    } catch (error) {
+      this.logger.error(
+        `Failed to parse tobacco from URL ${url}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw error;
+    } finally {
+      await this.tobaccoParserStrategy.close();
+    }
+  }
 }
