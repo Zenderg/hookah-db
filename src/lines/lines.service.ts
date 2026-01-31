@@ -63,4 +63,8 @@ export class LinesService {
       },
     };
   }
+
+  async getStatuses(): Promise<string[]> {
+    return this.linesRepository.getStatuses();
+  }
 }

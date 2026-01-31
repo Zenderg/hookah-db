@@ -40,4 +40,15 @@ export class LinesRepository {
   async findOne(id: string): Promise<Line | null> {
     return this.lineRepository.findOne({ where: { id } });
   }
+
+  async getStatuses(): Promise<string[]> {
+    const result = await this.lineRepository
+      .createQueryBuilder('line')
+      .select('DISTINCT line.status')
+      .where('line.status IS NOT NULL')
+      .orderBy('line.status', 'ASC')
+      .getRawMany();
+
+    return result.map((row: { status: string }) => row.status);
+  }
 }

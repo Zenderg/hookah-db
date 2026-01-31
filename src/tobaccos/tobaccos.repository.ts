@@ -11,7 +11,9 @@ export class TobaccosRepository {
     private readonly tobaccoRepository: Repository<Tobacco>,
   ) {}
 
-  async findAll(query: FindTobaccosDto): Promise<{ data: Tobacco[]; total: number }> {
+  async findAll(
+    query: FindTobaccosDto,
+  ): Promise<{ data: Tobacco[]; total: number }> {
     const {
       page = 1,
       limit = 20,
@@ -28,6 +30,12 @@ export class TobaccosRepository {
     const skip = (page - 1) * limit;
 
     const queryBuilder = this.tobaccoRepository.createQueryBuilder('tobacco');
+
+    // Join with brands table for country filtering
+    queryBuilder.leftJoin('tobacco.brand', 'brand');
+
+    // Select tobacco columns only (brand is joined only for filtering)
+    queryBuilder.select('tobacco');
 
     if (brandId) {
       queryBuilder.andWhere('tobacco.brandId = :brandId', { brandId });
@@ -46,7 +54,7 @@ export class TobaccosRepository {
     }
 
     if (country) {
-      queryBuilder.andWhere('tobacco.country = :country', { country });
+      queryBuilder.andWhere('brand.country = :country', { country });
     }
 
     if (status) {
@@ -71,5 +79,16 @@ export class TobaccosRepository {
 
   async findOne(id: string): Promise<Tobacco | null> {
     return this.tobaccoRepository.findOne({ where: { id } });
+  }
+
+  async getStatuses(): Promise<string[]> {
+    const result = await this.tobaccoRepository
+      .createQueryBuilder('tobacco')
+      .select('DISTINCT tobacco.status')
+      .where('tobacco.status IS NOT NULL')
+      .orderBy('tobacco.status', 'ASC')
+      .getRawMany();
+
+    return result.map((row: { status: string }) => row.status);
   }
 }

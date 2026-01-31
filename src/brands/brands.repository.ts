@@ -40,4 +40,15 @@ export class BrandsRepository {
   async findOne(id: string): Promise<Brand | null> {
     return this.brandRepository.findOne({ where: { id } });
   }
+
+  async getCountries(): Promise<string[]> {
+    const result = await this.brandRepository
+      .createQueryBuilder('brand')
+      .select('DISTINCT brand.country')
+      .where('brand.country IS NOT NULL')
+      .orderBy('brand.country', 'ASC')
+      .getRawMany();
+
+    return result.map((row: { country: string }) => row.country);
+  }
 }

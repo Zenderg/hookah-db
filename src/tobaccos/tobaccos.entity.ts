@@ -42,9 +42,6 @@ export class Tobacco {
   ratingsCount: number;
 
   @Column()
-  country: string;
-
-  @Column()
   strengthOfficial: string;
 
   @Column()

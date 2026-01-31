@@ -26,6 +26,11 @@ export class BrandsController {
     return this.brandsService.findAll(query);
   }
 
+  @Get('countries')
+  async getCountries() {
+    return this.brandsService.getCountries();
+  }
+
   @Get(':id')
   async findOne(@Param('id') id: string) {
     try {

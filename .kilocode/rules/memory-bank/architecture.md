@@ -124,7 +124,6 @@ src/
   lineId: string (FK, nullable)
   rating: number
   ratingsCount: number
-  country: string
   strengthOfficial: string (required) - "Лёгкая", "Средне-лёгкая", "Средняя", "Средне-крепкая", "Крепкая", "Не указано"
   strengthByRatings: string (required) - "Лёгкая", "Средне-лёгкая", "Средняя", "Средне-крепкая", "Крепкая", "Не указано", "Мало оценок"
   status: string (required) - "Выпускается", "Лимитированная", "Снята с производства"
@@ -137,11 +136,12 @@ src/
 ```
 
 **Note**: Entity schema has been corrected via migration (2026-01-27):
-- Removed fields: nameRu, nameEn (replaced with single `name`), reviewsCount, views, category, flavorDescriptors, dateAdded, year, tier, productionStatus
+- Removed fields: nameRu, nameEn (replaced with single `name`), reviewsCount, views, category, flavorDescriptors, dateAdded, year, tier, productionStatus, **country**
 - Added fields: slug, imageUrl, description
 - Renamed: productionStatus → status
 - Fixed: strengthByRatings type from `decimal` to `string` (critical bug)
 - All fields are now required except lineId and description (nullable)
+- **Country removed (2026-01-31)**: Tobacco country is now derived from associated brand via JOIN query
 - Migration: [`src/migrations/1706328000000-InitialSchema.ts`](src/migrations/1706328000000-InitialSchema.ts)
 
 ### Line Entity
@@ -220,6 +220,12 @@ All endpoints require API key authentication via:
 - Sorting: by rating, name
 - Search: `search` parameter performs case-insensitive partial match on brand name (works with both Latin and Cyrillic characters)
 
+**GET /brands/countries**
+- Returns: List of unique countries from brands table
+- Authentication: Required (API key)
+- Response format: `["Россия", "США"]`
+- Used by client applications to populate country filter dropdowns
+
 **GET /brands/:id**
 - Returns: Single brand details
 
@@ -235,6 +241,13 @@ All endpoints require API key authentication via:
 - Filtering: by brandId, lineId, rating range, country, status, case-insensitive name search (ILIKE, partial match)
 - Sorting: by rating, views, dateAdded, name
 - Search: `search` parameter performs case-insensitive partial match on tobacco name (works with both Latin and Cyrillic characters)
+- Country filter: Uses JOIN with brands table to filter by brand's country (tobacco table doesn't have country column)
+
+**GET /tobaccos/statuses**
+- Returns: List of unique statuses from tobaccos table
+- Authentication: Required (API key)
+- Response format: `["Выпускается"]`
+- Used by client applications to populate status filter dropdowns
 
 **GET /tobaccos/:id**
 - Returns: Single tobacco details
@@ -246,6 +259,12 @@ All endpoints require API key authentication via:
 - Returns: Paginated list of lines
 - Filtering: by brandId, case-insensitive name search (ILIKE, partial match)
 - Search: `search` parameter performs case-insensitive partial match on line name (works with both Latin and Cyrillic characters)
+
+**GET /lines/statuses**
+- Returns: List of unique statuses from lines table
+- Authentication: Required (API key)
+- Response format: `["Выпускается", "Лимитированная"]`
+- Used by client applications to populate status filter dropdowns
 
 **GET /lines/:id**
 - Returns: Single line details
@@ -303,6 +322,7 @@ All repositories use TypeORM QueryBuilder for:
 - Sorting with uppercase order ('ASC' | 'DESC')
 - Pagination with skip/take
 - Efficient `getManyAndCount()` for data + total count
+- **Country filter fix (2026-01-31)**: [`TobaccosRepository`](src/tobaccos/tobaccos.repository.ts:38) now includes `queryBuilder.select('tobacco')` to ensure correct JOIN behavior with brands table for country filtering
 
 ### Filtering and Sorting
 
@@ -310,11 +330,11 @@ All repositories use TypeORM QueryBuilder for:
 - `brandId`: Filter by brand UUID
 - `lineId`: Filter by line UUID
 - `minRating`, `maxRating`: Filter by rating range
-- `country`: Filter by country of origin
+- `country`: Filter by country of origin (for tobaccos, uses JOIN with brands table)
 - `status`: Filter by production status (e.g., "Выпускается", "Лимитированная", "Снята с производства")
 - `search`: Case-insensitive partial match on name fields (brands, lines, tobaccos)
 
-**Note:** The following filters were removed as they don't exist in the Tobacco entity: `category`, `year`, `productionStatus` (replaced with `status`)
+**Note:** The following filters were removed as they don't exist in the Tobacco entity: `category`, `year`, `productionStatus` (replaced with `status`), **country** (removed 2026-01-31, now uses brand's country via JOIN)
 
 **Available sort fields:**
 - `rating`: Sort by rating
@@ -589,6 +609,14 @@ volumes:
 - ✅ Line parser implementation (scraping htreviews.org)
 - ✅ Tobacco parser implementation (scraping htreviews.org)
 - ✅ README.md documentation (comprehensive user documentation in Russian)
+- ✅ Filter value endpoints (2026-01-31):
+  - GET /brands/countries - Returns list of unique countries
+  - GET /tobaccos/statuses - Returns list of unique statuses
+  - GET /lines/statuses - Returns list of unique statuses
+- ✅ Country column removal from tobaccos table (2026-01-31):
+  - Database recreated without country column
+  - Country filter for tobaccos works via JOIN with brands table
+  - Parser no longer extracts country from tobacco detail pages
 
 **Pending Implementation:**
 - ⏳ Tests (unit tests for services and repositories)

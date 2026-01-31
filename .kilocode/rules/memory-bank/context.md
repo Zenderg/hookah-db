@@ -133,6 +133,54 @@ Complete NestJS-based project structure has been created with:
 
 ## Recent Changes (2026-01-31)
 
+### Filter Value Endpoints and Country Column Removal - Implemented
+**Status:** ✅ COMPLETED (2026-01-31)
+
+**Changes Made:**
+- ✅ Added three new endpoints to return filter values:
+  - **GET /brands/countries** - Returns list of unique countries from brands table
+  - **GET /tobaccos/statuses** - Returns list of unique statuses from tobaccos table
+  - **GET /lines/statuses** - Returns list of unique statuses from lines table
+- ✅ Removed `country` column from `tobaccos` table (tobacco country is now derived from associated brand)
+- ✅ Dropped Docker volume `hookah-db_postgres_data` and recreated database without `country` column
+- ✅ Fixed country filter for tobaccos in [`TobaccosRepository.findAll()`](src/tobaccos/tobaccos.repository.ts:38) by adding `queryBuilder.select('tobacco')` statement
+- ✅ Country filter now works via JOIN with brands table (lines 34-35, 53-55)
+
+**Implementation Details:**
+- **Brands Countries Endpoint** ([`src/brands/brands.controller.ts:29`](src/brands/brands.controller.ts:29)):
+  - Controller: `@Get('countries')` endpoint
+  - Service: [`BrandsService.getCountries()`](src/brands/brands.service.ts:68)
+  - Repository: [`BrandsRepository.getCountries()`](src/brands/brands.repository.ts:44) uses QueryBuilder with DISTINCT
+
+- **Tobaccos Statuses Endpoint** ([`src/tobaccos/tobaccos.controller.ts:26`](src/tobaccos/tobaccos.controller.ts:26)):
+  - Controller: `@Get('statuses')` endpoint
+  - Service: [`TobaccosService.getStatuses()`](src/tobaccos/tobaccos.service.ts:35)
+  - Repository: [`TobaccosRepository.getStatuses()`](src/tobaccos/tobaccos.repository.ts:81) uses QueryBuilder with DISTINCT
+
+- **Lines Statuses Endpoint** ([`src/lines/lines.controller.ts:27`](src/lines/lines.controller.ts:27)):
+  - Controller: `@Get('statuses')` endpoint
+  - Service: [`LinesService.getStatuses()`](src/lines/lines.service.ts:67)
+  - Repository: [`LinesRepository.getStatuses()`](src/lines/lines.repository.ts:44) uses QueryBuilder with DISTINCT
+
+- **Country Filter for Tobaccos**:
+  - Filter parameter: `country` in [`FindTobaccosDto`](src/tobaccos/dto/find-tobaccos.dto.ts:37)
+  - Repository implementation: [`TobaccosRepository.findAll()`](src/tobaccos/tobaccos.repository.ts:53) uses LEFT JOIN with brands table
+  - Query: `queryBuilder.leftJoin('tobacco.brand', 'brand')` followed by `andWhere('brand.country = :country', { country })`
+
+**Testing Results:**
+- ✅ GET /brands/countries returns `["Россия", "США"]`
+- ✅ GET /tobaccos/statuses returns `["Выпускается"]`
+- ✅ GET /lines/statuses returns `["Выпускается", "Лимитированная"]`
+- ✅ GET /tobaccos?country=Россия (URL-encoded: `%D0%A0%D0%BE%D1%81%D1%81%D0%B8%D1%8F`) returns 98 tobaccos from Russia
+- ✅ All endpoints work correctly with URL-encoded Cyrillic parameters
+
+**Important Notes:**
+- When using Cyrillic characters in query parameters, URL encoding is required:
+  - `Россия` → `%D0%A0%D0%BE%D1%81%D1%81%D0%B8%D1%8F`
+  - `Выпускается` → `%D0%92%D1%8B%D0%BF%D1%83%D1%81%D0%BA%D0%B0%D0%B5%D1%82%D1%81%D1%8F`
+- These endpoints provide filter values for client applications to use in filtering requests
+- Country filter for tobaccos works without storing country in tobacco table (uses brand's country via JOIN)
+
 ### Automatic Migrations on Startup - Implemented
 **Status:** ✅ COMPLETED (2026-01-31)
 

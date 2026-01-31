@@ -23,11 +23,16 @@ export class TobaccosController {
     return this.tobaccosService.findAll(query);
   }
 
+  @Get('statuses')
+  async getStatuses() {
+    return this.tobaccosService.getStatuses();
+  }
+
   @Get(':id')
   async findOne(@Param('id') id: string) {
     try {
       return this.tobaccosService.findOne(id);
-    } catch (error) {
+    } catch {
       throw new NotFoundException('Tobacco not found');
     }
   }

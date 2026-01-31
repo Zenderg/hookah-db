@@ -31,4 +31,8 @@ export class TobaccosService {
     }
     return tobacco;
   }
+
+  async getStatuses(): Promise<string[]> {
+    return this.tobaccosRepository.getStatuses();
+  }
 }

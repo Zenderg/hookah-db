@@ -194,9 +194,9 @@ curl -H "X-API-Key: <your-api-key>" \
   http://localhost:3000/tobaccos/<id>
 ```
 
-### Линии
+### Линейки
 
-**Получить список линий**
+**Получить список линеек**
 
 ```bash
 curl -H "X-API-Key: <your-api-key>" \
@@ -208,14 +208,14 @@ curl -H "X-API-Key: <your-api-key>" \
 - `brandId` - фильтр по ID бренда (UUID)
 - `search` - поиск по названию (без учёта регистра, частичное совпадение)
 
-**Получить линию по ID**
+**Получить линейку по ID**
 
 ```bash
 curl -H "X-API-Key: <your-api-key>" \
   http://localhost:3000/lines/<id>
 ```
 
-**Получить табаки линии**
+**Получить табаки линейки**
 
 ```bash
 curl -H "X-API-Key: <your-api-key>" \

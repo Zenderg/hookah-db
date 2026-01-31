@@ -64,4 +64,8 @@ export class BrandsService {
       },
     };
   }
+
+  async getCountries(): Promise<string[]> {
+    return this.brandsRepository.getCountries();
+  }
 }

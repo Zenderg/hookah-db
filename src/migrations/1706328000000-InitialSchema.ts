@@ -242,10 +242,6 @@ export class InitialSchema1706328000000 implements MigrationInterface {
             default: 0,
           },
           {
-            name: 'country',
-            type: 'varchar',
-          },
-          {
             name: 'strengthOfficial',
             type: 'varchar',
           },
@@ -306,14 +302,6 @@ export class InitialSchema1706328000000 implements MigrationInterface {
       new TableIndex({
         name: 'idx_tobaccos_rating',
         columnNames: ['rating'],
-      }),
-    );
-
-    await queryRunner.createIndex(
-      'tobaccos',
-      new TableIndex({
-        name: 'idx_tobaccos_country',
-        columnNames: ['country'],
       }),
     );
 
@@ -396,7 +384,6 @@ export class InitialSchema1706328000000 implements MigrationInterface {
     await queryRunner.dropForeignKey('lines', 'fk_lines_brand');
 
     // Drop indexes
-    await queryRunner.dropIndex('tobaccos', 'idx_tobaccos_country');
     await queryRunner.dropIndex('tobaccos', 'idx_tobaccos_rating');
     await queryRunner.dropIndex('tobaccos', 'idx_tobaccos_lineId');
     await queryRunner.dropIndex('tobaccos', 'idx_tobaccos_brandId');

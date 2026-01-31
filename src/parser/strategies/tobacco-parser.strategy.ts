@@ -17,7 +17,6 @@ export type ParsedTobaccoData = {
   lineId: string | null;
   rating: number;
   ratingsCount: number;
-  country: string;
   strengthOfficial: string | null;
   strengthByRatings: string | null;
   status: string | null;
@@ -151,7 +150,10 @@ export class TobaccoParserStrategy {
     const maxScrollAttempts = 10;
     let scrollAttempts = 0;
 
-    while (noNewContentCount < maxNoNewContent && scrollAttempts < maxScrollAttempts) {
+    while (
+      noNewContentCount < maxNoNewContent &&
+      scrollAttempts < maxScrollAttempts
+    ) {
       scrollAttempts++;
 
       // Scroll gradually to trigger infinite scroll
@@ -179,7 +181,9 @@ export class TobaccoParserStrategy {
           const match = href.match(/\/tobaccos\/([^/]+)\/([^/]+)\/([^/?#]+)/);
           if (match) {
             // Convert to absolute URL for consistency
-            const absoluteUrl = href.startsWith('http') ? href : `https://htreviews.org${href}`;
+            const absoluteUrl = href.startsWith('http')
+              ? href
+              : `https://htreviews.org${href}`;
             urls.push(absoluteUrl);
           }
         }
@@ -273,38 +277,6 @@ export class TobaccoParserStrategy {
       const descriptionElement = document.querySelector('.object_card_discr');
       if (descriptionElement) {
         description = descriptionElement.textContent?.trim() || '';
-      }
-
-      // Extract country: look for "Страна" label
-      let country = '';
-      const countryLabelElement = allElements.find((el) => {
-        const text = el.textContent?.trim() || '';
-        return text === 'Страна';
-      });
-      if (countryLabelElement) {
-        // Find the sibling element that contains the country value
-        // The country value should be in a sibling element after the label
-        const parentContainer = countryLabelElement.parentElement;
-        if (parentContainer) {
-          // Look for sibling elements that contain country names
-          const siblings = Array.from(parentContainer.children);
-          for (const sibling of siblings) {
-            const text = sibling.textContent?.trim() || '';
-            // Skip the label itself and empty elements
-            if (text === 'Страна' || !text) continue;
-            
-            // Check if this looks like a country value
-            // Country values are typically short (2-20 chars) and don't contain newlines or tabs
-            const isShortText = text.length > 2 && text.length < 30;
-            const hasNoWhitespace = !text.includes('\n') && !text.includes('\t');
-            const isNotALabel = !text.includes(':') && !text.includes('Бренд') && !text.includes('Линейка');
-            
-            if (isShortText && hasNoWhitespace && isNotALabel) {
-              country = text;
-              break;
-            }
-          }
-        }
       }
 
       // Extract strengthOfficial: look for "Крепость официальная" label
@@ -421,7 +393,7 @@ export class TobaccoParserStrategy {
 
       // Find rating box in object_stats section
       // Structure:
-      //   - div[data-rating="4.8"] contains the rating value
+      //   - div[data-rating="4.8"] contains rating value
       //   - div[data-stats="1"] contains 3 stats (ratings, reviews, views)
       const ratingDiv = document.querySelector('div[data-rating]');
       if (ratingDiv) {
@@ -446,7 +418,6 @@ export class TobaccoParserStrategy {
         name,
         imageUrl,
         description,
-        country,
         strengthOfficial,
         strengthByRatings,
         status,
@@ -461,7 +432,6 @@ export class TobaccoParserStrategy {
         `name=${tobaccoData.name}, ` +
         `rating=${tobaccoData.rating}, ` +
         `ratingsCount=${tobaccoData.ratingsCount}, ` +
-        `country=${tobaccoData.country}, ` +
         `htreviewsId=${tobaccoData.htreviewsId}`,
     );
 
@@ -472,7 +442,6 @@ export class TobaccoParserStrategy {
       lineId,
       rating: tobaccoData.rating || 0,
       ratingsCount: tobaccoData.ratingsCount || 0,
-      country: tobaccoData.country || '',
       strengthOfficial: tobaccoData.strengthOfficial || 'Не указано',
       strengthByRatings: tobaccoData.strengthByRatings || 'Не указано',
       status: tobaccoData.status || 'Выпускается',
@@ -490,7 +459,6 @@ export class TobaccoParserStrategy {
       lineId: data.lineId || undefined,
       rating: data.rating,
       ratingsCount: data.ratingsCount,
-      country: data.country,
       strengthOfficial: data.strengthOfficial || 'Не указано',
       strengthByRatings: data.strengthByRatings || 'Не указано',
       status: data.status || 'Выпускается',

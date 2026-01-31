@@ -24,6 +24,11 @@ export class LinesController {
     return this.linesService.findAll(query);
   }
 
+  @Get('statuses')
+  async getStatuses() {
+    return this.linesService.getStatuses();
+  }
+
   @Get(':id')
   async findOne(@Param('id') id: string) {
     try {
