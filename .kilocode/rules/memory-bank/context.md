@@ -128,6 +128,38 @@ Complete NestJS-based project structure has been created with:
 
 ## Recent Changes (2026-01-31)
 
+### PostgreSQL Migration - Phase 1 & 2 Completed
+**Status:** ✅ COMPLETED (2026-01-31)
+
+**Phase 1: Preparation**
+- ✅ Removed `sqlite3` package from dependencies
+- ✅ Installed `pg` package for PostgreSQL driver
+- ✅ Updated [`src/data-source.ts`](src/data-source.ts) - Changed type from `sqlite` to `postgres`, added connection parameters (host, port, username, password, database)
+- ✅ Updated [`src/app.module.ts`](src/app.module.ts) - Updated TypeORM configuration to use PostgreSQL with environment variables
+
+**Phase 2: Database Setup**
+- ✅ Updated [`docker-compose.yml`](docker-compose.yml) - Added PostgreSQL 18.1 service with:
+  - Image: `postgres:18.1`
+  - Port mapping: `5432:5432`
+  - Volume: `postgres_data` for data persistence
+  - Environment variables: `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`
+  - API service updated with dependency on PostgreSQL and new environment variables
+- ✅ Updated [`.env.example`](.env.example) - Added PostgreSQL environment variables:
+  - `DATABASE_HOST=localhost`
+  - `DATABASE_PORT=5432`
+  - `DATABASE_USERNAME=postgres`
+  - `DATABASE_PASSWORD=postgres`
+  - `DATABASE_NAME=hookah_db`
+  - Removed unused `API_KEY_SECRET` variable
+- ✅ Created [`.env`](.env) - Environment file for local development with PostgreSQL configuration
+
+**Next Steps Required:**
+1. Start PostgreSQL server: `docker-compose up -d postgres`
+2. Stop current dev server
+3. Restart application: `npm run start:dev`
+4. Proceed with Phase 3: Schema migration (generate PostgreSQL migrations, export/import data)
+5. Proceed with Phase 4: Application updates (ILIKE search, DTO updates)
+
 ### API Key Request Count Bug Fix
 **Status:** ✅ FIXED (2026-01-31)
 

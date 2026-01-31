@@ -61,7 +61,7 @@
 - `@nestjs/config`: Configuration management (v4.0.0)
 - `@nestjs/terminus`: Health check integration (v11.0.0)
 - `typeorm`: ORM library (v0.3.28)
-- `pg`: PostgreSQL database driver (latest stable)
+- `pg`: PostgreSQL database driver (latest stable) - **MIGRATED FROM sqlite3**
 - `class-validator`: Request validation (v0.14.3)
 - `class-transformer`: Object transformation (v0.5.1)
 - `uuid`: UUID generation (v13.0.0)
@@ -105,10 +105,11 @@
 5. Run tests: `npm test`
 
 ### Docker Development
-1. Build Docker image: `docker-compose build`
-2. Start services: `docker-compose up -d`
+1. Start PostgreSQL service: `docker-compose up -d postgres`
+2. Build and start all services: `docker-compose up -d`
 3. View logs: `docker-compose logs -f`
 4. Stop services: `docker-compose down`
+5. View PostgreSQL logs: `docker-compose logs -f postgres`
 
 ## Environment Configuration
 
@@ -120,7 +121,6 @@
 - `DATABASE_USERNAME`: PostgreSQL username (default: postgres)
 - `DATABASE_PASSWORD`: PostgreSQL password (default: postgres)
 - `DATABASE_NAME`: PostgreSQL database name (default: hookah_db)
-- `API_KEY_SECRET`: Secret for API key generation (if needed)
 
 ### Configuration Management
 - Use `@nestjs/config` for environment-based configuration
@@ -246,11 +246,12 @@
 - PostgreSQL database backup using pg_dump
 - Scheduled daily backups
 - Manual backup before major changes
+- Docker volume `postgres_data` provides automatic data persistence
 
 ### Recovery Procedure
-- Stop service
+- Stop service: `docker-compose down`
 - Restore database from backup using pg_restore or psql
-- Restart service
+- Restart service: `docker-compose up -d`
 - Verify data integrity
 
 ## Documentation

@@ -23,8 +23,12 @@ import { TobaccosModule } from './tobaccos/tobaccos.module';
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
-        type: 'sqlite',
-        database: configService.get('DATABASE_PATH') || './data/hookah.db',
+        type: 'postgres',
+        host: configService.get('DATABASE_HOST') || 'localhost',
+        port: parseInt(configService.get('DATABASE_PORT') || '5432'),
+        username: configService.get('DATABASE_USERNAME') || 'postgres',
+        password: configService.get('DATABASE_PASSWORD') || 'postgres',
+        database: configService.get('DATABASE_NAME') || 'hookah_db',
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
         synchronize: false,
         migrations: [__dirname + '/migrations/*{.ts,.js}'],

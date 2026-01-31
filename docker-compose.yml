@@ -1,14 +1,33 @@
 version: '3.8'
 
 services:
+  postgres:
+    image: postgres:18.1
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=hookah_db
+    restart: unless-stopped
+
   api:
     build: .
     ports:
       - "3000:3000"
-    volumes:
-      - ./data:/app/data
+    depends_on:
+      - postgres
     environment:
       - NODE_ENV=production
-      - DATABASE_PATH=/app/data/hookah.db
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_USERNAME=postgres
+      - DATABASE_PASSWORD=postgres
+      - DATABASE_NAME=hookah_db
       - CORS_ORIGIN=*
     restart: unless-stopped
+
+volumes:
+  postgres_data:
