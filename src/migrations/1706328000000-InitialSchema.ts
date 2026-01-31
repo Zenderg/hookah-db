@@ -47,11 +47,11 @@ export class InitialSchema1706328000000 implements MigrationInterface {
           },
           {
             name: 'createdAt',
-            type: 'datetime',
+            type: 'timestamp',
           },
           {
             name: 'updatedAt',
-            type: 'datetime',
+            type: 'timestamp',
           },
         ],
       }),
@@ -132,11 +132,11 @@ export class InitialSchema1706328000000 implements MigrationInterface {
           },
           {
             name: 'createdAt',
-            type: 'datetime',
+            type: 'timestamp',
           },
           {
             name: 'updatedAt',
-            type: 'datetime',
+            type: 'timestamp',
           },
         ],
       }),
@@ -267,11 +267,11 @@ export class InitialSchema1706328000000 implements MigrationInterface {
           },
           {
             name: 'createdAt',
-            type: 'datetime',
+            type: 'timestamp',
           },
           {
             name: 'updatedAt',
-            type: 'datetime',
+            type: 'timestamp',
           },
         ],
       }),
@@ -365,16 +365,16 @@ export class InitialSchema1706328000000 implements MigrationInterface {
           },
           {
             name: 'lastUsedAt',
-            type: 'datetime',
+            type: 'timestamp',
             isNullable: true,
           },
           {
             name: 'createdAt',
-            type: 'datetime',
+            type: 'timestamp',
           },
           {
             name: 'updatedAt',
-            type: 'datetime',
+            type: 'timestamp',
           },
         ],
       }),

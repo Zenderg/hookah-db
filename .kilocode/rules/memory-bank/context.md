@@ -2,7 +2,7 @@
 
 ## Current State
 
-**Status:** All three parsers (Brand, Line, Tobacco) fully implemented and integrated. Entity schemas now match database migrations. All parsers have CLI commands available for manual testing. **Migration to PostgreSQL 18.1 planned for case-insensitive search functionality.**
+**Status:** PostgreSQL 18.1 migration Phase 1 & 2 completed. Database is running with all tables created. Application successfully connected to PostgreSQL. **Phase 3 (Schema Migration) completed. Phase 4 (ILIKE search) pending.**
 
 The project structure has been successfully initialized with all necessary files and directories. Dependencies have been installed and the application startup has been verified. The memory bank contains comprehensive documentation covering:
 
@@ -141,7 +141,7 @@ Complete NestJS-based project structure has been created with:
 - ✅ Updated [`docker-compose.yml`](docker-compose.yml) - Added PostgreSQL 18.1 service with:
   - Image: `postgres:18.1`
   - Port mapping: `5432:5432`
-  - Volume: `postgres_data` for data persistence
+  - Volume: `postgres_data` for data persistence (mounted at `/var/lib/postgresql` for PostgreSQL 18.1+ compatibility)
   - Environment variables: `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`
   - API service updated with dependency on PostgreSQL and new environment variables
 - ✅ Updated [`.env.example`](.env.example) - Added PostgreSQL environment variables:
@@ -153,12 +153,37 @@ Complete NestJS-based project structure has been created with:
   - Removed unused `API_KEY_SECRET` variable
 - ✅ Created [`.env`](.env) - Environment file for local development with PostgreSQL configuration
 
+**Phase 3: Schema Migration**
+- ✅ Fixed migration file ([`src/migrations/1706328000000-InitialSchema.ts`](src/migrations/1706328000000-InitialSchema.ts)):
+  - Replaced all `datetime` types with `timestamp` for PostgreSQL compatibility (5 occurrences: brands, lines, tobaccos, api_keys tables)
+- ✅ Successfully ran TypeORM migration to create all tables:
+  - `brands` (with indexes on slug, rating)
+  - `lines` (with indexes on slug, rating, status, strengthOfficial, brandId)
+  - `tobaccos` (with indexes on brandId, lineId, rating, country)
+  - `api_keys` (with unique constraint on key)
+  - `migrations` table
+
+**Additional Fixes:**
+- ✅ Fixed health endpoint authentication ([`src/health/health.controller.ts`](src/health/health.controller.ts)):
+  - Added `@Public()` decorator to make health endpoint publicly accessible
+  - Updated [`ApiKeyGuard`](src/common/guards/api-key.guard.ts) to respect `@Public()` decorator
+
+**Current State:**
+- PostgreSQL 18.1 running in Docker container
+- NestJS application running on http://localhost:3000
+- Health check endpoint accessible and reporting database status as "up"
+- All database tables created successfully
+- Application successfully connected to PostgreSQL
+
 **Next Steps Required:**
-1. Start PostgreSQL server: `docker-compose up -d postgres`
-2. Stop current dev server
-3. Restart application: `npm run start:dev`
-4. Proceed with Phase 3: Schema migration (generate PostgreSQL migrations, export/import data)
-5. Proceed with Phase 4: Application updates (ILIKE search, DTO updates)
+1. Phase 4: Application updates (ILIKE search, DTO updates)
+   - Update repository queries to use ILIKE for search
+   - Add `search` parameter to DTOs (FindBrandsDto, FindLinesDto, FindTobaccosDto)
+2. Phase 5: Testing
+   - Test case-insensitive search with Latin and Cyrillic characters
+   - Verify all data migrated correctly
+   - Test API endpoints with search functionality
+3. Phase 6: Deployment (if needed)
 
 ### API Key Request Count Bug Fix
 **Status:** ✅ FIXED (2026-01-31)

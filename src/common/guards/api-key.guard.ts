@@ -7,6 +7,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { ApiKeysService } from '../../api-keys/api-keys.service';
 import { ApiKey } from '../../api-keys/api-keys.entity';
+import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 
 interface RequestWithApiKey {
   apiKey?: ApiKey;
@@ -24,6 +25,16 @@ export class ApiKeyGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    // Check if route is marked as public
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
+    if (isPublic) {
+      return true;
+    }
+
     const request = context.switchToHttp().getRequest<RequestWithApiKey>();
     const apiKey =
       request.headers['x-api-key'] ||
