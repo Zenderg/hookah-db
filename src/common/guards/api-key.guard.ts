@@ -1,23 +1,47 @@
-import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { ApiKeysService } from '../../api-keys/api-keys.service';
+import { ApiKey } from '../../api-keys/api-keys.entity';
+
+interface RequestWithApiKey {
+  apiKey?: ApiKey;
+  headers: {
+    'x-api-key'?: string;
+    authorization?: string;
+  };
+}
 
 @Injectable()
 export class ApiKeyGuard implements CanActivate {
-  constructor(private reflector: Reflector) {}
+  constructor(
+    private reflector: Reflector,
+    private readonly apiKeysService: ApiKeysService,
+  ) {}
 
-  canActivate(context: ExecutionContext): boolean {
-    const request = context.switchToHttp().getRequest();
-    const apiKey = request.headers['x-api-key'] || request.headers['authorization']?.replace('Bearer ', '');
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const request = context.switchToHttp().getRequest<RequestWithApiKey>();
+    const apiKey =
+      request.headers['x-api-key'] ||
+      request.headers['authorization']?.replace('Bearer ', '');
 
     if (!apiKey) {
       throw new UnauthorizedException('API key is required');
     }
 
-    // TODO: Validate API key against database
-    // For now, just check if key exists
-    if (!apiKey || apiKey.length === 0) {
-      throw new UnauthorizedException('Invalid API key');
+    // Validate API key against database and increment request count
+    const validatedApiKey = await this.apiKeysService.validateApiKey(apiKey);
+
+    if (!validatedApiKey) {
+      throw new UnauthorizedException('Invalid or inactive API key');
     }
+
+    // Attach validated API key to request for potential use in controllers
+    request.apiKey = validatedApiKey;
 
     return true;
   }

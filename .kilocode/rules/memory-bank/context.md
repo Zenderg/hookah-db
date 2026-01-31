@@ -126,6 +126,28 @@ Complete NestJS-based project structure has been created with:
 - Single database (PostgreSQL 18.1)
 - Simple authentication (API keys only)
 
+## Recent Changes (2026-01-31)
+
+### API Key Request Count Bug Fix
+**Status:** ✅ FIXED (2026-01-31)
+
+**Problem:** API key `requestCount` field was staying at 0 despite multiple API requests.
+
+**Root Cause:** [`ApiKeyGuard`](src/common/guards/api-key.guard.ts) was not calling [`ApiKeysService.validateApiKey()`](src/api-keys/api-keys.service.ts:53) method, which is responsible for validating API keys against database and incrementing request count.
+
+**Solution Implemented:**
+1. Updated [`ApiKeyGuard`](src/common/guards/api-key.guard.ts) to inject and use [`ApiKeysService`](src/api-keys/api-keys.service.ts)
+2. Guard now calls [`validateApiKey()`](src/api-keys/api-keys.service.ts:53) on every authenticated request
+3. [`validateApiKey()`](src/api-keys/api-keys.service.ts:53) method calls [`incrementRequestCount()`](src/api-keys/api-keys.repository.ts:30) and [`updateLastUsed()`](src/api-keys/api-keys.repository.ts:26)
+4. Made [`ApiKeysModule`](src/api-keys/api-keys.module.ts:7) global with [`@Global()`](src/api-keys/api-keys.module.ts:7) decorator for availability across all modules
+5. Moved [`APP_GUARD`](src/app.module.ts:50) registration from [`AuthModule`](src/auth/auth.module.ts) to [`AppModule`](src/app.module.ts) for proper dependency resolution
+
+**Testing Results:**
+- Created test API key
+- Made 3 API requests (brands, tobaccos)
+- Verified `requestCount` incremented from 0 to 4
+- CLI `stats` command now shows accurate usage data
+
 ## PostgreSQL Migration Plan
 
 ### Migration Goals

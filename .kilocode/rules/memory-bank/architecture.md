@@ -387,6 +387,7 @@ All repositories use TypeORM QueryBuilder for:
 - Keys stored in plain text (not hashed)
 - Request tracking per key for usage monitoring
 - CLI uses NestJS ApplicationContext to access services
+- **Request Count Tracking:** Guard validates API key against database and increments `requestCount` on every authenticated request (fixed 2026-01-31)
 
 ### Data Refresh
 - **Cron Jobs**: Daily automatic refresh at 2:00 AM
@@ -432,6 +433,10 @@ All repositories use TypeORM QueryBuilder for:
 - API key validation implemented as NestJS guards
 - Reusable across all protected endpoints
 - Easy to extend for additional authentication methods
+- **Guard Implementation (2026-01-31):** [`ApiKeyGuard`](src/common/guards/api-key.guard.ts) now properly validates API keys against database and increments request count on every authenticated request
+- Guard injects [`ApiKeysService`](src/api-keys/api-keys.service.ts) and calls [`validateApiKey()`](src/api-keys/api-keys.service.ts:53) method
+- [`ApiKeysModule`](src/api-keys/api-keys.module.ts) is global with [`@Global()`](src/api-keys/api-keys.module.ts:7) decorator for availability across all modules
+- [`APP_GUARD`](src/app.module.ts:50) registered in [`AppModule`](src/app.module.ts) for proper dependency resolution
 
 ### Service Layer Pattern
 - Business logic encapsulated in services
