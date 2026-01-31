@@ -559,7 +559,6 @@ volumes:
 2. **Manual API Key Management**: No web UI for key management
 3. **No Backup Automation**: Manual backup required
 4. **Limited Monitoring**: Basic logging only, no metrics dashboard
-5. **Database Schema Issue**: `id` columns are `text` type instead of `uuid` (migration bug from initial schema). Migration `1706328000001-FixIdColumnsToUuid.ts` created but not yet successfully run due to foreign key constraint issues.
 
 ## Architecture Implementation Status
 

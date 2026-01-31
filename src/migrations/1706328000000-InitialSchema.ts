@@ -2,6 +2,9 @@ import { MigrationInterface, QueryRunner, Table, TableForeignKey, TableIndex } f
 
 export class InitialSchema1706328000000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
+    // Enable UUID extension for PostgreSQL
+    await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`);
+
     // Create brands table
     await queryRunner.createTable(
       new Table({
@@ -9,8 +12,9 @@ export class InitialSchema1706328000000 implements MigrationInterface {
         columns: [
           {
             name: 'id',
-            type: 'text',
+            type: 'uuid',
             isPrimary: true,
+            default: 'uuid_generate_v4()',
           },
           {
             name: 'name',
@@ -82,8 +86,9 @@ export class InitialSchema1706328000000 implements MigrationInterface {
         columns: [
           {
             name: 'id',
-            type: 'text',
+            type: 'uuid',
             isPrimary: true,
+            default: 'uuid_generate_v4()',
           },
           {
             name: 'name',
@@ -95,7 +100,7 @@ export class InitialSchema1706328000000 implements MigrationInterface {
           },
           {
             name: 'brandId',
-            type: 'text',
+            type: 'uuid',
           },
           {
             name: 'description',
@@ -203,8 +208,9 @@ export class InitialSchema1706328000000 implements MigrationInterface {
         columns: [
           {
             name: 'id',
-            type: 'text',
+            type: 'uuid',
             isPrimary: true,
+            default: 'uuid_generate_v4()',
           },
           {
             name: 'name',
@@ -216,11 +222,11 @@ export class InitialSchema1706328000000 implements MigrationInterface {
           },
           {
             name: 'brandId',
-            type: 'text',
+            type: 'uuid',
           },
           {
             name: 'lineId',
-            type: 'text',
+            type: 'uuid',
             isNullable: true,
           },
           {
@@ -341,8 +347,9 @@ export class InitialSchema1706328000000 implements MigrationInterface {
         columns: [
           {
             name: 'id',
-            type: 'text',
+            type: 'uuid',
             isPrimary: true,
+            default: 'uuid_generate_v4()',
           },
           {
             name: 'key',
@@ -408,5 +415,8 @@ export class InitialSchema1706328000000 implements MigrationInterface {
     await queryRunner.dropTable('tobaccos');
     await queryRunner.dropTable('lines');
     await queryRunner.dropTable('brands');
+
+    // Drop UUID extension
+    await queryRunner.query(`DROP EXTENSION IF EXISTS "uuid-ossp"`);
   }
 }

@@ -24,6 +24,8 @@ export class ApiKeysService {
       key: uuidv4(),
       isActive: true,
       requestCount: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
     return this.apiKeysRepository.create(apiKey);
   }
