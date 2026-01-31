@@ -287,6 +287,8 @@ export class BrandParserStrategy {
       ratingsCount: data.ratingsCount,
       description: data.description,
       logoUrl: data.logoUrl,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
   }
 }

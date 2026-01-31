@@ -370,6 +370,14 @@ All repositories use TypeORM QueryBuilder for:
 - **Cron Job**: Daily execution at 2:00 AM
 - **Data Persistence**: Updates existing brands/lines/tobaccos by slug/htreviewsId, creates new ones
 - **Selectors verified**: Tested against actual htreviews.org HTML structure using Playwright
+- **Parser Testing (2026-01-31)**: All three parsers tested successfully with PostgreSQL 18.1:
+  - Brand parser: 5 brands created (Догма, Bonche, Satyr, Kraken, World Tobacco Original)
+  - Line parser: 3 lines created (100% сигарный панк, Сигарный моносорт, Сигарный парфюм)
+  - Tobacco parser: 3 tobaccos created (Лемон дропс, Пушкин, Малиновый компот)
+- **Parser Fix (2026-01-31)**: All three parser strategies updated to include `createdAt` and `updatedAt` fields in `normalizeToEntity()` methods to satisfy PostgreSQL not-null constraints:
+  - [`BrandParserStrategy.normalizeToEntity()`](src/parser/strategies/brand-parser.strategy.ts:281)
+  - [`LineParserStrategy.normalizeToEntity()`](src/parser/strategies/line-parser.strategy.ts:534)
+  - [`TobaccoParserStrategy.normalizeToEntity()`](src/parser/strategies/tobacco-parser.strategy.ts:485)
 
 ### Authentication
 - **API Key-based**: Simple, stateless authentication

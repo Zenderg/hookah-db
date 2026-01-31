@@ -543,6 +543,8 @@ export class LineParserStrategy {
       status: data.status || undefined,
       rating: data.rating || 0,
       ratingsCount: data.ratingsCount || 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
   }
 }

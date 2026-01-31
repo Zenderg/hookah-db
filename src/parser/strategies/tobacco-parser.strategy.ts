@@ -497,6 +497,8 @@ export class TobaccoParserStrategy {
       htreviewsId: data.htreviewsId,
       imageUrl: data.imageUrl || '',
       description: data.description || '',
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
   }
 }

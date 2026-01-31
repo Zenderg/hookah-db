@@ -272,6 +272,33 @@ This enables:
 - All foreign key columns: `uuid` type
 - Migration table updated successfully
 
+### Parser Testing After PostgreSQL Migration
+**Status:** ✅ COMPLETED (2026-01-31)
+
+**Testing Results:**
+- ✅ Brand parser tested successfully: 5 brands created
+- ✅ Line parser tested successfully: 3 lines created
+- ✅ Tobacco parser tested successfully: 3 tobaccos created
+- ✅ All parsers working correctly with PostgreSQL 18.1
+
+**Problem Found:** All three parser strategies were missing `createdAt` and `updatedAt` fields in their `normalizeToEntity()` methods, causing "null value in column violates not-null constraint" errors when creating entities in PostgreSQL.
+
+**Solution Implemented:**
+1. **BrandParserStrategy** ([`src/parser/strategies/brand-parser.strategy.ts:281`](src/parser/strategies/brand-parser.strategy.ts:281)): Added `createdAt: new Date()` and `updatedAt: new Date()` to `normalizeToEntity()` method
+2. **LineParserStrategy** ([`src/parser/strategies/line-parser.strategy.ts:534`](src/parser/strategies/line-parser.strategy.ts:534)): Added `createdAt: new Date()` and `updatedAt: new Date()` to `normalizeToEntity()` method
+3. **TobaccoParserStrategy** ([`src/parser/strategies/tobacco-parser.strategy.ts:485`](src/parser/strategies/tobacco-parser.strategy.ts:485)): Added `createdAt: new Date()` and `updatedAt: new Date()` to `normalizeToEntity()` method
+
+**CLI Commands Used:**
+- `npm run cli -- parse brands --limit 5` - Parsed 5 brands (Догма, Bonche, Satyr, Kraken, World Tobacco Original)
+- `npm run cli -- parse lines --limit 3` - Parsed 3 lines (100% сигарный панк, Сигарный моносорт, Сигарный парфюм)
+- `npm run cli -- parse tobaccos --limit 3` - Parsed 3 tobaccos (Лемон дропс, Пушкин, Малиновый компот)
+
+**Verification:**
+- API queries confirmed all data saved with proper timestamps
+- GET /brands returned 5 brands with `createdAt` and `updatedAt` fields
+- GET /lines returned 3 lines with `createdAt` and `updatedAt` fields
+- GET /tobaccos returned 3 tobaccos with `createdAt` and `updatedAt` fields
+
 ## PostgreSQL Migration Plan
 
 ### Migration Goals
