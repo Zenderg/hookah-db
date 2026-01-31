@@ -130,6 +130,23 @@ Complete NestJS-based project structure has been created with:
 
 ## Recent Changes (2026-01-31)
 
+### Automatic Migrations on Startup - Implemented
+**Status:** ✅ COMPLETED (2026-01-31)
+
+**Changes Made:**
+- ✅ Updated [`src/app.module.ts`](src/app.module.ts:35) - Changed `migrationsRun: false` to `migrationsRun: true`
+- ✅ Updated [`src/data-source.ts`](src/data-source.ts:14) - Changed `migrationsRun: false` to `migrationsRun: true`
+- ✅ Rebuilt Docker image with new configuration
+- ✅ Verified automatic migration execution on startup
+
+**Verification:**
+- All tables created automatically on fresh database: `api_keys`, `brands`, `lines`, `tobaccos`, `migrations`
+- Migration recorded in migrations table: `InitialSchema1706328000000` (id=1)
+- Health check endpoint operational: `/health` returns database status "up"
+- No manual migration commands required on startup
+
+**Note:** TypeORM's `migrationsRun: true` option automatically runs pending migrations during DataSource initialization (see [DataSource.ts line 180](src/data-source/DataSource.ts:180))
+
 ### PostgreSQL Migration - Phase 1 & 2 Completed
 **Status:** ✅ COMPLETED (2026-01-31)
 

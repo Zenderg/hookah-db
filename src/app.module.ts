@@ -32,7 +32,7 @@ import { TobaccosModule } from './tobaccos/tobaccos.module';
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
         synchronize: false,
         migrations: [__dirname + '/migrations/*{.ts,.js}'],
-        migrationsRun: false,
+        migrationsRun: true,
         migrationsTableName: 'migrations',
       }),
       inject: [ConfigService],
