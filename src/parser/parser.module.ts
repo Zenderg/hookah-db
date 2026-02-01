@@ -10,7 +10,12 @@ import { Tobacco } from '../tobaccos/tobaccos.entity';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Brand, Line, Tobacco])],
-  providers: [ParserService, BrandParserStrategy, LineParserStrategy, TobaccoParserStrategy],
+  providers: [
+    ParserService,
+    BrandParserStrategy,
+    LineParserStrategy,
+    TobaccoParserStrategy,
+  ],
   exports: [ParserService],
 })
 export class ParserModule {}

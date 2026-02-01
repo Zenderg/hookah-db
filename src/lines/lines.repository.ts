@@ -27,10 +27,7 @@ export class LinesRepository {
       });
     }
 
-    queryBuilder
-      .orderBy('line.name', 'ASC')
-      .skip(skip)
-      .take(limit);
+    queryBuilder.orderBy('line.name', 'ASC').skip(skip).take(limit);
 
     const [data, total] = await queryBuilder.getManyAndCount();
 

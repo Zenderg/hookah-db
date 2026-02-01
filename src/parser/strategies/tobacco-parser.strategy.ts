@@ -244,7 +244,9 @@ export class TobaccoParserStrategy {
       throw new Error('Browser not initialized. Call initialize() first.');
     }
 
-    const fullUrl = url.startsWith('http') ? url : `https://htreviews.org${url}`;
+    const fullUrl = url.startsWith('http')
+      ? url
+      : `https://htreviews.org${url}`;
     this.logger.debug(`Parsing tobacco detail page: ${fullUrl}`);
 
     // Extract slug from URL
@@ -290,18 +292,20 @@ export class TobaccoParserStrategy {
         if (labelContainer) {
           const parentContainer = labelContainer.parentElement;
           if (parentContainer) {
-            const valueDiv = Array.from(parentContainer.children).find((child) => {
-              const text = child.textContent?.trim() || '';
-              const strengthValues = [
-                'Лёгкая',
-                'Средне-лёгкая',
-                'Средняя',
-                'Средне-крепкая',
-                'Крепкая',
-                'Не указано',
-              ];
-              return strengthValues.includes(text);
-            });
+            const valueDiv = Array.from(parentContainer.children).find(
+              (child) => {
+                const text = child.textContent?.trim() || '';
+                const strengthValues = [
+                  'Лёгкая',
+                  'Средне-лёгкая',
+                  'Средняя',
+                  'Средне-крепкая',
+                  'Крепкая',
+                  'Не указано',
+                ];
+                return strengthValues.includes(text);
+              },
+            );
             if (valueDiv) {
               strengthOfficial = valueDiv.textContent?.trim() || '';
             }
@@ -320,19 +324,21 @@ export class TobaccoParserStrategy {
         if (labelContainer) {
           const parentContainer = labelContainer.parentElement;
           if (parentContainer) {
-            const valueDiv = Array.from(parentContainer.children).find((child) => {
-              const text = child.textContent?.trim() || '';
-              const strengthValues = [
-                'Лёгкая',
-                'Средне-лёгкая',
-                'Средняя',
-                'Средне-крепкая',
-                'Крепкая',
-                'Не указано',
-                'Мало оценок',
-              ];
-              return strengthValues.includes(text);
-            });
+            const valueDiv = Array.from(parentContainer.children).find(
+              (child) => {
+                const text = child.textContent?.trim() || '';
+                const strengthValues = [
+                  'Лёгкая',
+                  'Средне-лёгкая',
+                  'Средняя',
+                  'Средне-крепкая',
+                  'Крепкая',
+                  'Не указано',
+                  'Мало оценок',
+                ];
+                return strengthValues.includes(text);
+              },
+            );
             if (valueDiv) {
               strengthByRatings = valueDiv.textContent?.trim() || '';
             }
@@ -351,15 +357,17 @@ export class TobaccoParserStrategy {
         if (labelContainer) {
           const parentContainer = labelContainer.parentElement;
           if (parentContainer) {
-            const valueDiv = Array.from(parentContainer.children).find((child) => {
-              const text = child.textContent?.trim() || '';
-              const statusValues = [
-                'Выпускается',
-                'Лимитированная',
-                'Снята с производства',
-              ];
-              return statusValues.includes(text);
-            });
+            const valueDiv = Array.from(parentContainer.children).find(
+              (child) => {
+                const text = child.textContent?.trim() || '';
+                const statusValues = [
+                  'Выпускается',
+                  'Лимитированная',
+                  'Снята с производства',
+                ];
+                return statusValues.includes(text);
+              },
+            );
             if (valueDiv) {
               status = valueDiv.textContent?.trim() || '';
             }
@@ -409,7 +417,8 @@ export class TobaccoParserStrategy {
         // First child is ratings count (Оценки)
         const firstStat = statsDiv.firstElementChild;
         if (firstStat) {
-          const ratingsText = firstStat.querySelector('span')?.textContent?.trim() || '';
+          const ratingsText =
+            firstStat.querySelector('span')?.textContent?.trim() || '';
           ratingsCount = parseInt(ratingsText, 10);
         }
       }

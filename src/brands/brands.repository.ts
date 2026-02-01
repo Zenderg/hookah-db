@@ -11,8 +11,18 @@ export class BrandsRepository {
     private readonly brandRepository: Repository<Brand>,
   ) {}
 
-  async findAll(query: FindBrandsDto): Promise<{ data: Brand[]; total: number }> {
-    const { page = 1, limit = 20, sortBy = 'rating', order = 'desc', country, search, status } = query;
+  async findAll(
+    query: FindBrandsDto,
+  ): Promise<{ data: Brand[]; total: number }> {
+    const {
+      page = 1,
+      limit = 20,
+      sortBy = 'rating',
+      order = 'desc',
+      country,
+      search,
+      status,
+    } = query;
     const skip = (page - 1) * limit;
 
     const queryBuilder = this.brandRepository.createQueryBuilder('brand');

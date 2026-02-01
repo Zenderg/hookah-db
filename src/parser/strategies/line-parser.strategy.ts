@@ -99,10 +99,11 @@ export class LineParserStrategy {
           // Extract additional data from line detail page (ratingsCount, imageUrl, strengthByRatings, description)
           if (brandSlug && line.slug) {
             try {
-              const additionalData = await this.extractAdditionalDataFromDetailPage(
-                line.slug,
-                brandSlug,
-              );
+              const additionalData =
+                await this.extractAdditionalDataFromDetailPage(
+                  line.slug,
+                  brandSlug,
+                );
               line.ratingsCount = additionalData.ratingsCount;
               line.imageUrl = additionalData.imageUrl;
               line.strengthOfficial = additionalData.strengthOfficial;
@@ -187,16 +188,18 @@ export class LineParserStrategy {
 
       // Find all line items - each line item is a child element (div/generic)
       // The first child contains link and heading
-      const lineElements = Array.from(linesContainer.children).filter((child) => {
-        // Check if first child contains a link with h3
-        const firstChild = child.firstElementChild;
-        if (firstChild) {
-          const link = firstChild.querySelector('a');
-          const heading = firstChild.querySelector('h3');
-          return link && heading;
-        }
-        return false;
-      });
+      const lineElements = Array.from(linesContainer.children).filter(
+        (child) => {
+          // Check if first child contains a link with h3
+          const firstChild = child.firstElementChild;
+          if (firstChild) {
+            const link = firstChild.querySelector('a');
+            const heading = firstChild.querySelector('h3');
+            return link && heading;
+          }
+          return false;
+        },
+      );
 
       console.log(`Found ${lineElements.length} line elements`);
 
@@ -262,7 +265,11 @@ export class LineParserStrategy {
           const allTextElements = Array.from(element.children).slice(1); // Skip first child (has link/heading)
           for (const textElement of allTextElements) {
             const text = textElement.textContent?.trim() || '';
-            if (text.length > 50 && text.length > description.length && !text.includes('вкусов')) {
+            if (
+              text.length > 50 &&
+              text.length > description.length &&
+              !text.includes('вкусов')
+            ) {
               description = text;
             }
           }
@@ -346,7 +353,9 @@ export class LineParserStrategy {
         let strengthByRatings = '';
 
         // Find ratings count by looking for div with data-hover-title="Оценки" and extracting the span value
-        const ratingsElement = document.querySelector('div[data-hover-title="Оценки"]');
+        const ratingsElement = document.querySelector(
+          'div[data-hover-title="Оценки"]',
+        );
         if (ratingsElement) {
           const ratingsSpan = ratingsElement.querySelector('span');
           const ratingsText = ratingsSpan?.textContent?.trim() || '';
@@ -392,7 +401,8 @@ export class LineParserStrategy {
               });
 
               if (valueDivForOfficial) {
-                strengthOfficial = valueDivForOfficial.textContent?.trim() || '';
+                strengthOfficial =
+                  valueDivForOfficial.textContent?.trim() || '';
               }
             }
           }
@@ -429,7 +439,8 @@ export class LineParserStrategy {
               });
 
               if (valueDivForRatings) {
-                strengthByRatings = valueDivForRatings.textContent?.trim() || '';
+                strengthByRatings =
+                  valueDivForRatings.textContent?.trim() || '';
               }
             }
           }
@@ -454,55 +465,64 @@ export class LineParserStrategy {
           }
         }
 
-          // Fallback: If no description from JSON-LD, try to extract from HTML
-          if (!description) {
-            // First fallback: Look for description in .object_card_discr container
-            const descriptionContainer = document.querySelector('.object_card_discr');
-            if (descriptionContainer) {
-              // The description is typically in a span element within this container
-              const descriptionSpan = descriptionContainer.querySelector('span');
-              if (descriptionSpan) {
-                const text = descriptionSpan.textContent?.trim() || '';
-                if (text.length > 50) {
-                  description = text;
-                }
+        // Fallback: If no description from JSON-LD, try to extract from HTML
+        if (!description) {
+          // First fallback: Look for description in .object_card_discr container
+          const descriptionContainer =
+            document.querySelector('.object_card_discr');
+          if (descriptionContainer) {
+            // The description is typically in a span element within this container
+            const descriptionSpan = descriptionContainer.querySelector('span');
+            if (descriptionSpan) {
+              const text = descriptionSpan.textContent?.trim() || '';
+              if (text.length > 50) {
+                description = text;
               }
             }
+          }
 
-            // Second fallback: Find h1 heading (line name) and look for description in its container
-            if (!description) {
-              const h1 = document.querySelector('h1');
-              if (h1) {
-                // Get container that holds h1
-                const h1Container = h1.parentElement;
-                if (h1Container) {
-                  // Get all children of the container
-                  const children = Array.from(h1Container.children);
-                  // The description is typically the second child (after h1)
-                  // Look for a generic element with long text content
-                  for (let i = 1; i < children.length; i++) {
-                    const child = children[i];
-                    const text = child.textContent?.trim() || '';
-                    // Check if it's a long text (>50 chars)
-                    // Either contains description keywords OR is very long (>100 chars) and not just whitespace
-                    if (text.length > 50) {
-                      // Prefer text with description keywords
-                      if (text.includes('Описание') || text.includes('Описание линейки')) {
-                        description = text;
-                        break;
-                      }
-                      // Fallback: use very long text that doesn't contain brand/line info
-                      // Skip if it contains brand info (like "Бренд", "Сайт", etc.)
-                      if (text.length > 100 && !text.includes('Бренд') && !text.includes('Сайт') && !text.includes('Крепость')) {
-                        description = text;
-                        break;
-                      }
+          // Second fallback: Find h1 heading (line name) and look for description in its container
+          if (!description) {
+            const h1 = document.querySelector('h1');
+            if (h1) {
+              // Get container that holds h1
+              const h1Container = h1.parentElement;
+              if (h1Container) {
+                // Get all children of the container
+                const children = Array.from(h1Container.children);
+                // The description is typically the second child (after h1)
+                // Look for a generic element with long text content
+                for (let i = 1; i < children.length; i++) {
+                  const child = children[i];
+                  const text = child.textContent?.trim() || '';
+                  // Check if it's a long text (>50 chars)
+                  // Either contains description keywords OR is very long (>100 chars) and not just whitespace
+                  if (text.length > 50) {
+                    // Prefer text with description keywords
+                    if (
+                      text.includes('Описание') ||
+                      text.includes('Описание линейки')
+                    ) {
+                      description = text;
+                      break;
+                    }
+                    // Fallback: use very long text that doesn't contain brand/line info
+                    // Skip if it contains brand info (like "Бренд", "Сайт", etc.)
+                    if (
+                      text.length > 100 &&
+                      !text.includes('Бренд') &&
+                      !text.includes('Сайт') &&
+                      !text.includes('Крепость')
+                    ) {
+                      description = text;
+                      break;
                     }
                   }
                 }
               }
             }
           }
+        }
 
         return {
           imageUrl,
@@ -565,7 +585,10 @@ export class LineParserStrategy {
 
     // Extract basic line data from brand page
     const brandPageUrl = `/tobaccos/${brandSlug}`;
-    const lineDataList = await this.extractLinesFromBrandPage(brandPageUrl, brandId);
+    const lineDataList = await this.extractLinesFromBrandPage(
+      brandPageUrl,
+      brandId,
+    );
     const lineData = lineDataList.find((line) => line.slug === lineSlug);
 
     if (!lineData) {

@@ -440,8 +440,12 @@ All repositories use TypeORM QueryBuilder for:
 ### Data Refresh
 - **Cron Jobs**: Daily automatic refresh at 2:00 AM
 - Parser service runs as scheduled task
-- Incremental updates where possible
-- Full refresh on first run or failure
+- **Sequential parsing**: Brands → Lines → Tobaccos (to maintain data dependencies)
+- **Incremental updates where possible**: Updates existing entities by slug/htreviewsId, creates new ones
+- **Full refresh on first run or failure**: Parses all data without limits
+- **Error handling**: Continue on error strategy - individual entity failures don't stop the process
+- **Skip dependent steps**: If brands parsing fails, lines and tobaccos are skipped; if lines parsing fails, tobaccos are skipped
+- **Manual parsing**: CLI commands support `--limit` parameter for batch parsing with limits
 
 ### Error Handling
 - Global exception filter for consistent error responses

@@ -15,7 +15,8 @@ export class LoggingInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest();
     const { method, url, headers } = request;
-    const apiKey = headers['x-api-key'] || headers['authorization']?.replace('Bearer ', '');
+    const apiKey =
+      headers['x-api-key'] || headers['authorization']?.replace('Bearer ', '');
 
     const now = Date.now();
     return next.handle().pipe(

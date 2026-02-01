@@ -42,7 +42,10 @@ export class ApiKeysService {
     const allKeys = await this.apiKeysRepository.findAll();
     const activeKeys = allKeys.filter((key) => key.isActive).length;
     const inactiveKeys = allKeys.filter((key) => !key.isActive).length;
-    const totalRequests = allKeys.reduce((sum, key) => sum + key.requestCount, 0);
+    const totalRequests = allKeys.reduce(
+      (sum, key) => sum + key.requestCount,
+      0,
+    );
 
     return {
       totalKeys: allKeys.length,

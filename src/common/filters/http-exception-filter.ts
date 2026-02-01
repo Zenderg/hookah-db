@@ -24,16 +24,26 @@ export class HttpExceptionFilter implements ExceptionFilter {
       const exceptionResponse = exception.getResponse();
       if (typeof exceptionResponse === 'string') {
         message = exceptionResponse;
-      } else if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
+      } else if (
+        typeof exceptionResponse === 'object' &&
+        exceptionResponse !== null
+      ) {
         const responseObj = exceptionResponse as Record<string, any>;
         message = responseObj.message || responseObj.error || exception.message;
       } else {
         message = exception.message;
       }
-    } else if (typeof exception === 'object' && exception !== null && 'status' in exception) {
+    } else if (
+      typeof exception === 'object' &&
+      exception !== null &&
+      'status' in exception
+    ) {
       const exceptionObj = exception as Record<string, any>;
       httpStatus = exceptionObj.status || HttpStatus.INTERNAL_SERVER_ERROR;
-      message = exceptionObj.response?.message || exceptionObj.message || 'Internal server error';
+      message =
+        exceptionObj.response?.message ||
+        exceptionObj.message ||
+        'Internal server error';
     } else if (exception instanceof Error) {
       httpStatus = HttpStatus.INTERNAL_SERVER_ERROR;
       message = 'Internal server error';

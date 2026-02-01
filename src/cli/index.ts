@@ -223,9 +223,7 @@ program
               where: { slug: brandSlug },
             });
             if (!brands || brands.length === 0) {
-              console.error(
-                `❌ Brand not found in database: ${brandSlug}`,
-              );
+              console.error(`❌ Brand not found in database: ${brandSlug}`);
               process.exit(1);
             }
 
@@ -235,7 +233,9 @@ program
           }
           case 'tobacco': {
             // Extract brandId and lineId from URL for tobacco parsing
-            const urlMatch = url.match(/\/tobaccos\/([^/]+)\/([^/]+)\/([^/?]+)/);
+            const urlMatch = url.match(
+              /\/tobaccos\/([^/]+)\/([^/]+)\/([^/?]+)/,
+            );
             if (!urlMatch) {
               console.error(
                 '❌ Invalid tobacco URL format. Expected: /tobaccos/{brand}/{line}/{tobacco}',
@@ -249,9 +249,7 @@ program
               where: { slug: brandSlug },
             });
             if (!brands || brands.length === 0) {
-              console.error(
-                `❌ Brand not found in database: ${brandSlug}`,
-              );
+              console.error(`❌ Brand not found in database: ${brandSlug}`);
               process.exit(1);
             }
 
@@ -263,9 +261,7 @@ program
               where: { slug: lineSlug, brandId },
             });
             if (!lines || lines.length === 0) {
-              console.error(
-                `❌ Line not found in database: ${lineSlug}`,
-              );
+              console.error(`❌ Line not found in database: ${lineSlug}`);
               process.exit(1);
             }
 

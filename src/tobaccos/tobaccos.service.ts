@@ -8,7 +8,9 @@ import { PaginatedResponseDto } from '../common/dto/pagination.dto';
 export class TobaccosService {
   constructor(private readonly tobaccosRepository: TobaccosRepository) {}
 
-  async findAll(query: FindTobaccosDto): Promise<PaginatedResponseDto<Tobacco>> {
+  async findAll(
+    query: FindTobaccosDto,
+  ): Promise<PaginatedResponseDto<Tobacco>> {
     const { data, total } = await this.tobaccosRepository.findAll(query);
     const { page = 1, limit = 20 } = query;
     const totalPages = Math.ceil(total / limit);

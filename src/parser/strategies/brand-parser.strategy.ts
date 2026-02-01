@@ -50,8 +50,10 @@ export class BrandParserStrategy {
     }
 
     // Parse both "Best Brands" and "Other Brands" pages
-    const bestBrandsUrl = 'https://htreviews.org/tobaccos/brands?r=position&s=rating&d=desc';
-    const otherBrandsUrl = 'https://htreviews.org/tobaccos/brands?r=others&s=rating&d=desc';
+    const bestBrandsUrl =
+      'https://htreviews.org/tobaccos/brands?r=position&s=rating&d=desc';
+    const otherBrandsUrl =
+      'https://htreviews.org/tobaccos/brands?r=others&s=rating&d=desc';
 
     this.logger.log('Parsing brands from Best Brands page...');
     const bestBrands = await this.parseBrandList(bestBrandsUrl, limit);
@@ -59,7 +61,9 @@ export class BrandParserStrategy {
 
     this.logger.log('Parsing brands from Other Brands page...');
     const otherBrands = await this.parseBrandList(otherBrandsUrl, limit);
-    this.logger.log(`Parsed ${otherBrands.length} brands from Other Brands page`);
+    this.logger.log(
+      `Parsed ${otherBrands.length} brands from Other Brands page`,
+    );
 
     // Combine and deduplicate by slug
     const allBrandsMap = new Map<string, ParsedBrandData>();
@@ -71,7 +75,8 @@ export class BrandParserStrategy {
     }
 
     const allBrands = Array.from(allBrandsMap.values());
-    const duplicateCount = bestBrands.length + otherBrands.length - allBrands.length;
+    const duplicateCount =
+      bestBrands.length + otherBrands.length - allBrands.length;
     this.logger.log(
       `Combined ${bestBrands.length} + ${otherBrands.length} brands, found ${duplicateCount} duplicates, total unique: ${allBrands.length}`,
     );
@@ -124,7 +129,9 @@ export class BrandParserStrategy {
 
     while (noNewContentCount < maxNoNewContent) {
       scrollCount++;
-      this.logger.log(`Scroll ${scrollCount}: Found ${brands.length} brands so far`);
+      this.logger.log(
+        `Scroll ${scrollCount}: Found ${brands.length} brands so far`,
+      );
 
       // Check if we've reached the limit
       if (limit && brands.length >= limit) {
@@ -250,9 +257,7 @@ export class BrandParserStrategy {
     return brands;
   }
 
-  private async parseBrandDetail(
-    detailUrl: string,
-  ): Promise<{
+  private async parseBrandDetail(detailUrl: string): Promise<{
     logoUrl: string;
     description: string;
     status: string;
@@ -281,7 +286,9 @@ export class BrandParserStrategy {
       for (const item of infoItems) {
         const spans = Array.from(item.querySelectorAll('span'));
         // Find the span that contains exactly "Статус" (without the icon)
-        const labelSpan = spans.find((span) => span.textContent?.trim() === 'Статус');
+        const labelSpan = spans.find(
+          (span) => span.textContent?.trim() === 'Статус',
+        );
         // The status value is in the last span (index 3 in the status item)
         const valueSpan = spans[spans.length - 1];
         if (
@@ -355,7 +362,8 @@ export class BrandParserStrategy {
       if (statsDiv) {
         const firstStat = statsDiv.firstElementChild;
         if (firstStat) {
-          const ratingsText = firstStat.querySelector('span')?.textContent?.trim() || '';
+          const ratingsText =
+            firstStat.querySelector('span')?.textContent?.trim() || '';
           ratingsCount = parseInt(ratingsText, 10);
         }
       }
@@ -366,7 +374,9 @@ export class BrandParserStrategy {
       for (const item of infoItems) {
         const spans = Array.from(item.querySelectorAll('span'));
         // Find the span that contains exactly "Статус" (without the icon)
-        const labelSpan = spans.find((span) => span.textContent?.trim() === 'Статус');
+        const labelSpan = spans.find(
+          (span) => span.textContent?.trim() === 'Статус',
+        );
         // The status value is in the last span (index 3 in the status item)
         const valueSpan = spans[spans.length - 1];
         if (
