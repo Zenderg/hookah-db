@@ -22,7 +22,7 @@
 - ✅ BrandsService tests (14 tests)
 - ✅ BrandsRepository tests (11 tests)
 - ✅ TobaccosService tests (8 tests)
-- ⏳ TobaccosRepository tests - PENDING
+- ✅ TobaccosRepository tests (21 tests)
 - ⏳ LinesService tests - PENDING
 - ⏳ LinesRepository tests - PENDING
 - ⏳ ApiKeysService tests - PENDING
@@ -71,6 +71,7 @@ Complete NestJS-based project with feature-based modules:
 - Added comprehensive unit tests for BrandsService (14 tests)
 - Added comprehensive unit tests for BrandsRepository (11 tests)
 - Added comprehensive unit tests for TobaccosService (8 tests)
+- Added comprehensive unit tests for TobaccosRepository (21 tests)
 
 ### 2026-01-31
 - Added filter value endpoints: GET /brands/countries, /brands/statuses, /tobaccos/statuses, /lines/statuses
