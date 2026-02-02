@@ -2,7 +2,7 @@
 
 ## Current State
 
-**Status:** PostgreSQL 18.1 migration completed. Database is running with all tables created with UUID types. Application successfully connected to PostgreSQL. **All migration phases completed. README.md documentation created. Brand status implementation completed (2026-01-31). Full auto-refresh implementation completed (2026-02-01). Unit tests for BrandsService and BrandsRepository completed (2026-02-02).**
+**Status:** PostgreSQL 18.1 migration completed. Database is running with all tables created with UUID types. Application successfully connected to PostgreSQL. **All migration phases completed. README.md documentation created. Brand status implementation completed (2026-01-31). Full auto-refresh implementation completed (2026-02-01). Unit tests for BrandsService, BrandsRepository, and TobaccosService completed (2026-02-02).**
 
 The project structure has been successfully initialized with all necessary files and directories. Dependencies have been installed and the application startup has been verified. The memory bank contains comprehensive documentation covering:
 
@@ -197,6 +197,42 @@ Complete NestJS-based project structure has been created with:
 - Service tests use mocked repositories (no database required)
 - Repository tests use TypeORM with test database configuration
 - All tests follow AAA pattern for clarity and maintainability
+
+### Unit Tests for TobaccosService - Completed
+**Status:** ✅ COMPLETED (2026-02-02)
+
+**Changes Made:**
+- ✅ Created comprehensive unit tests for [`TobaccosService`](src/tobaccos/tobaccos.service.spec.ts) (8 tests covering all methods)
+- ✅ All tests follow javascript-testing-patterns skill guidelines
+- ✅ All tests passing successfully
+
+**Implementation Details:**
+
+**TobaccosService Tests** ([`src/tobaccos/tobaccos.service.spec.ts`](src/tobaccos/tobaccos.service.spec.ts)):
+- **Test Methods Covered:**
+  - `findAll` with pagination and filters (4 tests)
+  - `findOne` with found and not found scenarios (2 tests)
+  - `getStatuses` returning distinct statuses (2 tests)
+
+- **Testing Patterns Used:**
+  - NestJS TestingModule for dependency injection
+  - `jest.Mocked<T>` for typed mocks
+  - Mock repositories with `provide` in TestingModule
+  - AAA pattern (Arrange, Act, Assert)
+  - Proper null handling for optional fields (brand, line, lineId)
+
+**Testing Results:**
+- ✅ All 8 TobaccosService tests passed
+- ✅ Test coverage for all public methods in TobaccosService
+- ✅ Proper mocking of external dependencies
+- ✅ Isolated unit tests (no database required)
+- ✅ Test execution time: 0.737s
+
+**Important Notes:**
+- Tests follow javascript-testing-patterns skill guidelines
+- Service tests use mocked repositories (no database required)
+- All tests follow AAA pattern for clarity and maintainability
+- ESLint disable comments used for nullable field assignments (brand, line, lineId)
 
 ### Navigation Race Condition Fix - Implemented
 **Status:** ✅ COMPLETED (2026-02-02)
@@ -903,7 +939,7 @@ If migration fails:
 - ✅ Search works with both Latin and Cyrillic
 - ✅ API performance maintained or improved
 - ✅ Zero data corruption
-- ⏳ All tests passing (pending)
+- ⏳ All tests passing (IN PROGRESS) - 33/33 tests completed (2026-02-02)
 
 ## Technical Decisions
 
@@ -942,11 +978,19 @@ If migration fails:
 
 **Pending Implementation:**
 - ⏳ Tests (unit tests for services and repositories) - **IN PROGRESS** (2026-02-02)
-  - ✅ BrandsService tests (14 tests) - COMPLETED
-  - ✅ BrandsRepository tests (11 tests) - COMPLETED
-  - ⏳ TobaccosService tests - PENDING
-  - ⏳ TobaccosRepository tests - PENDING
-  - ⏳ LinesService tests - PENDING
-  - ⏳ LinesRepository tests - PENDING
-  - ⏳ ApiKeysService tests - PENDING
-  - ⏳ ApiKeysRepository tests - PENDING
+   - ✅ BrandsService tests (14 tests) - COMPLETED
+   - ✅ BrandsRepository tests (11 tests) - COMPLETED
+   - ✅ TobaccosService tests (8 tests) - COMPLETED
+   - ⏳ TobaccosRepository tests - PENDING
+   - ⏳ LinesService tests - PENDING
+   - ⏳ LinesRepository tests - PENDING
+   - ⏳ ApiKeysService tests - PENDING
+   - ⏳ ApiKeysRepository tests - PENDING - **IN PROGRESS** (2026-02-02)
+   - ✅ BrandsService tests (14 tests) - COMPLETED
+   - ✅ BrandsRepository tests (11 tests) - COMPLETED
+   - ✅ TobaccosService tests (8 tests) - COMPLETED
+   - ⏳ TobaccosRepository tests - PENDING
+   - ⏳ LinesService tests - PENDING
+   - ⏳ LinesRepository tests - PENDING
+   - ⏳ ApiKeysService tests - PENDING
+   - ⏳ ApiKeysRepository tests - PENDING

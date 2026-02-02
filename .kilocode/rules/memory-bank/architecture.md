@@ -657,4 +657,12 @@ volumes:
   - Status is required for all entities (brands, lines, tobaccos)
 
 **Pending Implementation:**
-- ⏳ Tests (unit tests for services and repositories)
+- ⏳ Tests (unit tests for services and repositories) - **IN PROGRESS** (2026-02-02)
+   - ✅ BrandsService tests (14 tests) - COMPLETED
+   - ✅ BrandsRepository tests (11 tests) - COMPLETED
+   - ✅ TobaccosService tests (8 tests) - COMPLETED
+   - ⏳ TobaccosRepository tests - PENDING
+   - ⏳ LinesService tests - PENDING
+   - ⏳ LinesRepository tests - PENDING
+   - ⏳ ApiKeysService tests - PENDING
+   - ⏳ ApiKeysRepository tests - PENDING
