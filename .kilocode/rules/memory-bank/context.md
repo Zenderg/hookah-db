@@ -133,6 +133,129 @@ Complete NestJS-based project structure has been created with:
 - Single database (PostgreSQL 18.1)
 - Simple authentication (API keys only)
 
+## Recent Changes (2026-02-02)
+
+### Navigation Race Condition Fix - Implemented
+**Status:** ✅ COMPLETED (2026-02-02)
+
+**Problem:**
+During automatic nightly parsing, navigation errors occurred in TobaccoParserStrategy:
+```
+Navigation to "https://htreviews.org/tobaccos/starbuzz/starbuzz-vintage" is interrupted by another navigation to "https://htreviews.org/tobaccos/hook-by-chabacco/main"
+```
+
+This was a race condition where new navigation started before previous navigation completed, causing:
+- Some lines not being parsed
+- Loss of data for affected lines
+- Unstable automatic nightly parsing
+
+**Root Cause:**
+- Single page instance (`this.page`) used for all navigations
+- `waitUntil: 'networkidle'` parameter unreliable for pages with:
+  - Long-lived network requests
+  - JavaScript that continues loading resources
+  - Network instability
+- Infinite scroll mechanism could trigger JavaScript affecting page state
+- No delays between consecutive navigations
+
+**Solution Implemented:**
+
+1. **Added `safeNavigate()` method** ([`src/parser/strategies/tobacco-parser.strategy.ts:64`](src/parser/strategies/tobacco-parser.strategy.ts:64)):
+   - Retry mechanism with configurable attempts (default: 3)
+   - Progressive backoff: 1s, 2s, 3s wait between retries
+   - Better waiting strategy: `commit` → `domcontentloaded` → `load` → stability check
+   - 500ms additional wait after navigation to ensure page stability
+   - Detailed logging for each navigation attempt
+
+2. **Updated navigation calls**:
+   - [`extractTobaccoUrlsFromLinePage()`](src/parser/strategies/tobacco-parser.strategy.ts:191) now uses `safeNavigate()` instead of direct `page.goto()`
+   - [`parseTobaccoDetailPage()`](src/parser/strategies/tobacco-parser.strategy.ts:301) now uses `safeNavigate()` instead of direct `page.goto()`
+
+3. **Added delays between navigations**:
+   - 300ms delay between tobacco page navigations (line 167)
+   - 500ms delay between line page navigations (line 182)
+   - Prevents race conditions by giving page time to stabilize
+
+**Implementation Details:**
+
+**`safeNavigate()` Method:**
+```typescript
+private async safeNavigate(url: string, retries = 3): Promise<void> {
+  const fullUrl = url.startsWith('http')
+    ? url
+    : `https://htreviews.org${url}`;
+
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      this.logger.debug(
+        `Navigating to ${fullUrl} (attempt ${attempt}/${retries})`,
+      );
+
+      // Use 'commit' for faster initial response, then wait for domcontentloaded
+      await this.page.goto(fullUrl, {
+        waitUntil: 'commit',
+        timeout: 30000,
+      });
+
+      // Wait for DOM to be fully loaded
+      await this.page.waitForLoadState('domcontentloaded', {
+        timeout: 10000,
+      });
+
+      // Additional wait to ensure page is stable
+      await this.page.waitForTimeout(500);
+
+      // Verify page is stable (not loading)
+      const isStable = await this.page.evaluate(() => {
+        return document.readyState === 'complete';
+      });
+
+      if (!isStable) {
+        await this.page.waitForLoadState('load', { timeout: 10000 });
+      }
+
+      this.logger.debug(`Successfully navigated to ${fullUrl}`);
+      return;
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
+      if (attempt === retries) {
+        this.logger.error(
+          `Failed to navigate to ${fullUrl} after ${retries} attempts: ${errorMessage}`,
+        );
+        throw error;
+      }
+
+      this.logger.warn(
+        `Navigation attempt ${attempt}/${retries} failed for ${fullUrl}: ${errorMessage}. Retrying...`,
+      );
+
+      // Wait before retry
+      await this.page.waitForTimeout(1000 * attempt);
+    }
+  }
+}
+```
+
+**Testing Results:**
+- ✅ Build successful (`npm run build` completed without errors)
+- ✅ TypeScript compilation successful
+- ✅ ESLint formatting applied correctly
+- ✅ Manual parsing tested successfully:
+  - `npm run cli -- parse brand --url "https://htreviews.org/tobaccos/dogma"` - Completed in 9.03s
+  - `npm run cli -- parse line --url "https://htreviews.org/tobaccos/dogma/100-sigarnyy-pank"` - Completed in 9.17s
+  - `npm run cli -- parse tobacco --url "https://htreviews.org/tobaccos/dogma/100-sigarnyy-pank/lemon-drops"` - Completed in 2.68s
+- ✅ Navigation retry mechanism working correctly (logs show "Navigating to... (attempt 1/3)" and "Successfully navigated to...")
+- ✅ No navigation race condition errors during testing
+
+**Important Notes:**
+- Retry mechanism handles transient network errors and navigation interruptions
+- Progressive backoff prevents overwhelming the server with rapid retries
+- Delays between navigations prevent race conditions
+- Page stability check ensures DOM is fully loaded before data extraction
+- Better waiting strategy (`commit` + `domcontentloaded`) is faster and more reliable than `networkidle`
+
 ## Recent Changes (2026-01-31)
 
 ### Filter Value Endpoints and Country Column Removal - Implemented

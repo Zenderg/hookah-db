@@ -55,6 +55,73 @@ export class TobaccoParserStrategy {
     this.logger.log('Playwright browser closed');
   }
 
+  /**
+   * Navigate to URL with retry mechanism to handle race conditions
+   * @param url - URL to navigate to
+   * @param retries - Number of retry attempts (default: 3)
+   * @returns Promise that resolves when navigation is successful
+   */
+  private async safeNavigate(url: string, retries = 3): Promise<void> {
+    if (!this.page) {
+      throw new Error('Browser not initialized. Call initialize() first.');
+    }
+
+    const fullUrl = url.startsWith('http')
+      ? url
+      : `https://htreviews.org${url}`;
+
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        this.logger.debug(
+          `Navigating to ${fullUrl} (attempt ${attempt}/${retries})`,
+        );
+
+        // Use 'commit' for faster initial response, then wait for domcontentloaded
+        await this.page.goto(fullUrl, {
+          waitUntil: 'commit',
+          timeout: 30000,
+        });
+
+        // Wait for DOM to be fully loaded
+        await this.page.waitForLoadState('domcontentloaded', {
+          timeout: 10000,
+        });
+
+        // Additional wait to ensure page is stable
+        await this.page.waitForTimeout(500);
+
+        // Verify page is stable (not loading)
+        const isStable = await this.page.evaluate(() => {
+          return document.readyState === 'complete';
+        });
+
+        if (!isStable) {
+          await this.page.waitForLoadState('load', { timeout: 10000 });
+        }
+
+        this.logger.debug(`Successfully navigated to ${fullUrl}`);
+        return;
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+
+        if (attempt === retries) {
+          this.logger.error(
+            `Failed to navigate to ${fullUrl} after ${retries} attempts: ${errorMessage}`,
+          );
+          throw error;
+        }
+
+        this.logger.warn(
+          `Navigation attempt ${attempt}/${retries} failed for ${fullUrl}: ${errorMessage}. Retrying...`,
+        );
+
+        // Wait before retry
+        await this.page.waitForTimeout(1000 * attempt);
+      }
+    }
+  }
+
   async parseTobaccos(
     lineUrls: TobaccoUrlInfo[],
     limit?: number,
@@ -105,6 +172,9 @@ export class TobaccoParserStrategy {
             );
             // Continue with next tobacco
           }
+
+          // Add delay between tobacco page navigations to prevent race conditions
+          await this.page.waitForTimeout(300);
         }
 
         // Break outer loop if limit reached
@@ -117,6 +187,9 @@ export class TobaccoParserStrategy {
         );
         // Continue with next line on error
       }
+
+      // Add delay between line page navigations to prevent race conditions
+      await this.page.waitForTimeout(500);
     }
 
     return limit ? allTobaccos.slice(0, limit) : allTobaccos;
@@ -137,10 +210,7 @@ export class TobaccoParserStrategy {
       : `https://htreviews.org${lineInfo.url}`;
 
     this.logger.debug(`Navigating to: ${fullUrl}`);
-    await this.page.goto(fullUrl, { waitUntil: 'networkidle' });
-
-    // Wait for page to be fully loaded
-    await this.page.waitForLoadState('domcontentloaded');
+    await this.safeNavigate(fullUrl);
 
     // Handle infinite scroll
     const tobaccoUrls = new Set<string>();
@@ -254,7 +324,7 @@ export class TobaccoParserStrategy {
     const slugMatch = fullUrl.match(/\/tobaccos\/[^/]+\/[^/]+\/([^/?#]+)/);
     const slug = slugMatch ? slugMatch[1] : '';
 
-    await this.page.goto(fullUrl, { waitUntil: 'networkidle' });
+    await this.safeNavigate(fullUrl);
 
     const tobaccoData = await this.page.evaluate(() => {
       const allElements = Array.from(document.querySelectorAll('*'));
