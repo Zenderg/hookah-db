@@ -7,7 +7,7 @@ A RESTful API service that provides structured access to hookah tobacco data by 
 ## Core Goals
 
 - Parse and aggregate tobacco data from htreviews.org into a structured database
-- Provide authenticated API access for up to 10 clients
+- Provide authenticated API access
 - Maintain up-to-date tobacco information through scheduled parsing
 - Deliver reliable, fast API responses with key-based authentication
 

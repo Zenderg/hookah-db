@@ -23,9 +23,10 @@
 - Rationale: TypeScript-native, excellent NestJS integration, decorator-based entity definitions
 
 ### Parser
-- **Playwright** OR **Cheerio** (decision pending based on htreviews.org structure)
-- Playwright: Full browser automation, handles JavaScript-rendered content
-- Cheerio: Fast, lightweight, HTML parsing only
+- **Playwright**: Full browser automation, handles JavaScript-rendered content
+- Version: 1.58.0
+- **Status**: Implemented for Brand, Line, and Tobacco parsers
+- **Decision**: Playwright selected over Cheerio for JavaScript-rendered content support
 
 ### Containerization
 - **Docker**: Container platform
@@ -66,15 +67,10 @@
 - `class-transformer`: Object transformation (v0.5.1)
 - `uuid`: UUID generation (v13.0.0)
 
-### Parser Dependencies (Playwright option)
+### Parser Dependencies
 - `playwright`: Browser automation (v1.58.0)
 - Rationale: Handles JavaScript-rendered content, reliable scraping
 - **Status**: Implemented for Brand, Line, and Tobacco parsers
-
-### Parser Dependencies (Cheerio option)
-- `cheerio`: Fast HTML parsing
-- `axios`: HTTP client for fetching pages
-- Rationale: Lightweight, fast for static HTML
 
 ### CLI Dependencies
 - `commander`: CLI command framework (v14.0.0)
@@ -143,7 +139,7 @@
 - API key authentication only
 - No OAuth or JWT complexity
 - No rate limiting (only request logging)
-- Maximum 10 API keys enforced
+- No limit on number of API keys
 
 ### Scalability Constraints
 - Single database instance (PostgreSQL)

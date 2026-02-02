@@ -17,7 +17,7 @@ This project exists to provide a centralized, structured API for hookah tobacco 
 - Community members need current, accurate information
 
 ### Access Control
-- Data should be available only to authorized clients (maximum 10)
+- Data should be available only to authorized clients
 - Need to track usage and prevent abuse
 - API keys provide a simple, effective authentication mechanism
 
@@ -77,7 +77,7 @@ This project exists to provide a centralized, structured API for hookah tobacco 
 - Admin panel or web interface
 - Payment processing
 - Real-time data updates
-- Multi-tenancy beyond 10 clients
+- Multi-tenancy
 - Advanced analytics or reporting
 - Email notifications
 - Backup/restore functionality beyond Docker volumes
