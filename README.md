@@ -197,6 +197,18 @@ curl -H "X-API-Key: <your-api-key>" \
   http://localhost:3000/tobaccos/<id>
 ```
 
+**Получить табак по URL**
+
+```bash
+curl -H "X-API-Key: <your-api-key>" \
+  "http://localhost:3000/tobaccos/by-url?url=https://htreviews.org/tobaccos/dogma/100-sigarnyy-pank/pushkin"
+```
+
+**Параметры запроса:**
+- `url` (required) - URL табака на htreviews.org в формате `https://htreviews.org/tobaccos/{brand-slug}/{line-slug}/{tobacco-slug}`
+
+**Примечание:** Endpoint проверяет все три слага (бренд, линейка, табак) и возвращает табак только если все три совпадают в базе данных.
+
 ### Линейки
 
 **Получить список линеек**

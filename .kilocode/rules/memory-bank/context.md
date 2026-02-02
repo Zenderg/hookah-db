@@ -67,6 +67,9 @@ Complete NestJS-based project with feature-based modules:
 ## Recent Changes
 
 ### 2026-02-02
+- Fixed `/tobaccos/by-url` endpoint to properly validate all three slugs (brand, line, tobacco)
+- Updated [`TobaccosService.findByUrl()`](src/tobaccos/tobaccos.service.ts:41) to extract all three slugs from URL
+- Added new [`TobaccosRepository.findBySlugs()`](src/tobaccos/tobaccos.repository.ts:88) method that joins with brands and lines tables
 - Fixed navigation race condition in TobaccoParserStrategy with retry mechanism
 - Added comprehensive unit tests for BrandsService (14 tests)
 - Added comprehensive unit tests for BrandsRepository (11 tests)

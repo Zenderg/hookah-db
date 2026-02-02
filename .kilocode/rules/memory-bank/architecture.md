@@ -259,6 +259,15 @@ All endpoints require API key authentication via:
 **GET /tobaccos/:id**
 - Returns: Single tobacco details
 
+**GET /tobaccos/by-url**
+- Query params: `?url=https://htreviews.org/tobaccos/{brand-slug}/{line-slug}/{tobacco-slug}`
+- Returns: Single tobacco details matching all three slugs
+- Authentication: Required (API key)
+- URL validation: Must match format `https://htreviews.org/tobaccos/{brand}/{line}/{tobacco}`
+- Implementation: Extracts all three slugs from URL and joins with brands and lines tables for exact match
+- Returns 404 if no tobacco matches the combination of brand, line, and tobacco slugs
+- Example: `GET /tobaccos/by-url?url=https://htreviews.org/tobaccos/dogma/100-sigarnyy-pank/pushkin`
+
 ### Lines
 
 **GET /lines**
@@ -315,6 +324,12 @@ Located in [`src/common/dto/pagination.dto.ts`](src/common/dto/pagination.dto.ts
 - [`FindLinesDto`](src/lines/dto/find-lines.dto.ts:5) - Extends PaginationDto with:
   - `brandId`: Optional UUID filter
   - `search`: Optional string filter for case-insensitive partial match on line name
+
+**Tobaccos by URL** ([`src/tobaccos/dto/find-tobacco-by-url.dto.ts`](src/tobaccos/dto/find-tobacco-by-url.dto.ts)):
+- [`FindTobaccoByUrlDto`](src/tobaccos/dto/find-tobacco-by-url.dto.ts:3) - Validates URL format:
+  - `url`: Required URL parameter
+  - `@IsUrl()`: Validates that the parameter is a valid URL
+  - `@Matches()`: Ensures URL matches pattern `https://htreviews.org/tobaccos/{brand}/{line}/{tobacco}`
 
 ### Validation Decorators
 All DTOs use `class-validator` decorators for automatic validation:

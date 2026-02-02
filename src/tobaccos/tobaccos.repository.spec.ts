@@ -390,6 +390,38 @@ describe('TobaccosRepository', () => {
     });
   });
 
+  describe('findBySlug', () => {
+    it('should return tobacco when found by slug', async () => {
+      // Arrange
+      const slug = mockTobacco.slug;
+      mockTobaccoRepository.findOne.mockResolvedValue(mockTobacco);
+
+      // Act
+      const result = await repository.findBySlug(slug);
+
+      // Assert
+      expect(result).toEqual(mockTobacco);
+      expect(mockTobaccoRepository.findOne).toHaveBeenCalledWith({
+        where: { slug },
+      });
+    });
+
+    it('should return null when tobacco not found by slug', async () => {
+      // Arrange
+      const slug = 'non-existent-slug';
+      mockTobaccoRepository.findOne.mockResolvedValue(null);
+
+      // Act
+      const result = await repository.findBySlug(slug);
+
+      // Assert
+      expect(result).toBeNull();
+      expect(mockTobaccoRepository.findOne).toHaveBeenCalledWith({
+        where: { slug },
+      });
+    });
+  });
+
   describe('getStatuses', () => {
     it('should return list of unique statuses', async () => {
       // Arrange

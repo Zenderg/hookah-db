@@ -81,6 +81,27 @@ export class TobaccosRepository {
     return this.tobaccoRepository.findOne({ where: { id } });
   }
 
+  async findBySlug(slug: string): Promise<Tobacco | null> {
+    return this.tobaccoRepository.findOne({ where: { slug } });
+  }
+
+  async findBySlugs(
+    brandSlug: string,
+    lineSlug: string,
+    tobaccoSlug: string,
+  ): Promise<Tobacco | null> {
+    const queryBuilder = this.tobaccoRepository.createQueryBuilder('tobacco');
+
+    queryBuilder
+      .leftJoin('tobacco.brand', 'brand')
+      .leftJoin('tobacco.line', 'line')
+      .where('brand.slug = :brandSlug', { brandSlug })
+      .andWhere('line.slug = :lineSlug', { lineSlug })
+      .andWhere('tobacco.slug = :tobaccoSlug', { tobaccoSlug });
+
+    return queryBuilder.getOne();
+  }
+
   async getStatuses(): Promise<string[]> {
     const result = await this.tobaccoRepository
       .createQueryBuilder('tobacco')

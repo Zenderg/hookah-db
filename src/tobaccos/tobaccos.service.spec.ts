@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { TobaccosService } from './tobaccos.service';
 import { TobaccosRepository } from './tobaccos.repository';
 import { FindTobaccosDto } from './dto/find-tobaccos.dto';
@@ -34,6 +35,7 @@ describe('TobaccosService', () => {
     mockTobaccosRepository = {
       findAll: jest.fn(),
       findOne: jest.fn(),
+      findBySlug: jest.fn(),
       getStatuses: jest.fn(),
     } as unknown as jest.Mocked<TobaccosRepository>;
 
@@ -193,6 +195,71 @@ describe('TobaccosService', () => {
 
       // Assert
       expect(result).toEqual([]);
+    });
+  });
+
+  describe('findByUrl', () => {
+    it('should return tobacco when found by URL', async () => {
+      // Arrange
+      const url =
+        'https://htreviews.org/tobaccos/dogma/100-sigarnyy-pank/lemon-drops';
+      const expectedSlug = 'lemon-drops';
+      mockTobaccosRepository.findBySlug.mockResolvedValue(mockTobacco);
+
+      // Act
+      const result = await service.findByUrl(url);
+
+      // Assert
+      expect(result).toEqual(mockTobacco);
+      expect(mockTobaccosRepository.findBySlug).toHaveBeenCalledWith(
+        expectedSlug,
+      );
+    });
+
+    it('should throw NotFoundException when tobacco not found', async () => {
+      // Arrange
+      const url =
+        'https://htreviews.org/tobaccos/dogma/100-sigarnyy-pank/unknown-tobacco';
+      mockTobaccosRepository.findBySlug.mockResolvedValue(null);
+
+      // Act & Assert
+      await expect(service.findByUrl(url)).rejects.toThrow(NotFoundException);
+      await expect(service.findByUrl(url)).rejects.toThrow(
+        `Tobacco with URL '${url}' not found in database`,
+      );
+      expect(mockTobaccosRepository.findBySlug).toHaveBeenCalledWith(
+        'unknown-tobacco',
+      );
+    });
+
+    it('should throw BadRequestException for invalid URL format', async () => {
+      // Arrange
+      const invalidUrl = 'https://example.com/invalid-url';
+
+      // Act & Assert
+      await expect(service.findByUrl(invalidUrl)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.findByUrl(invalidUrl)).rejects.toThrow(
+        'Invalid URL format',
+      );
+      expect(mockTobaccosRepository.findBySlug).not.toHaveBeenCalled();
+    });
+
+    it('should extract correct slug from URL', async () => {
+      // Arrange
+      const url =
+        'https://htreviews.org/tobaccos/test-brand/test-line/test-tobacco';
+      const expectedSlug = 'test-tobacco';
+      mockTobaccosRepository.findBySlug.mockResolvedValue(mockTobacco);
+
+      // Act
+      await service.findByUrl(url);
+
+      // Assert
+      expect(mockTobaccosRepository.findBySlug).toHaveBeenCalledWith(
+        expectedSlug,
+      );
     });
   });
 });
