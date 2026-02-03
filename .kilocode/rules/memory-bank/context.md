@@ -2,7 +2,7 @@
 
 ## Current State
 
-**Status:** PostgreSQL 18.1 migration completed. All parsers implemented and tested. Full-text search for tobaccos implemented.
+**Status:** PostgreSQL 18.1 migration completed. All parsers implemented and tested. Full-text search for tobaccos implemented with multi-language support (Russian + English).
 
 **Completed Features:**
 - ✅ NestJS application with modular architecture
@@ -11,7 +11,7 @@
 - ✅ Brand, Line, and Tobacco parsers (Playwright-based)
 - ✅ RESTful API with filtering, sorting, and pagination
 - ✅ Case-insensitive search (ILIKE) for brands and lines
-- ✅ PostgreSQL Full-Text Search for tobaccos with relevance ranking (multi-field: tobacco.name, brand.name, line.name, simple configuration for multi-language support)
+- ✅ PostgreSQL Full-Text Search for tobaccos with relevance ranking (multi-field: tobacco.name, brand.name, line.name, combined Russian + English configurations)
 - ✅ Daily automatic data refresh (cron job at 2:00 AM)
 - ✅ CLI commands for API key management and manual parsing
 - ✅ Health check endpoint
@@ -23,7 +23,7 @@
 - ✅ BrandsService tests (14 tests)
 - ✅ BrandsRepository tests (11 tests)
 - ✅ TobaccosService tests (8 tests)
-- ✅ TobaccosRepository tests (23 tests) - updated with full-text search tests
+- ✅ TobaccosRepository tests (23 tests) - updated with multi-language full-text search tests
 - ✅ LinesService tests (12 tests)
 - ✅ LinesRepository tests (14 tests)
 - ✅ ApiKeysService tests (18 tests)
@@ -68,14 +68,16 @@ Complete NestJS-based project with feature-based modules:
 ## Recent Changes
 
 ### 2026-02-03
-  - ✅ Implemented improved tobacco search with PostgreSQL Full-Text Search
-  - Created migration [`1738572000000-AddFullTextSearch.ts`](src/migrations/1738572000000-AddFullTextSearch.ts) to add GIN indexes for full-text search
-  - Updated [`TobaccosRepository.findAll()`](src/tobaccos/tobaccos.repository.ts:14) to use full-text search with `to_tsvector()` and `to_tsquery()`
-  - Multi-field search across tobacco.name, brand.name, and line.name (description excluded per requirement)
-  - Implemented relevance ranking with `ts_rank()` - results sorted by relevance when search is provided
-  - Used 'simple' configuration for multi-language support (Russian + English names)
-  - Updated [`TobaccosRepository`](src/tobaccos/tobaccos.repository.spec.ts) tests to validate new full-text search functionality
-  - All 23 tests passing for TobaccosRepository
+  - ✅ Enhanced tobacco search with multi-language PostgreSQL Full-Text Search (Russian + English configurations)
+  - Created migration [`1738606800000-AddMultiLanguageFullTextSearch.ts`](src/migrations/1738606800000-AddMultiLanguageFullTextSearch.ts) to add 6 GIN indexes (3 for Russian, 3 for English)
+  - Updated [`TobaccosRepository.findAll()`](src/tobaccos/tobaccos.repository.ts:67) to use combined Russian and English full-text search with OR logic
+  - Multi-field search across tobacco.name, brand.name, and line.name with both language configurations
+  - Implemented relevance ranking with combined `ts_rank()` from both Russian and English configurations
+  - Results sorted by relevance when search is provided (override sortBy parameter)
+  - Benefits: Stemming (words in different forms), stop-word removal, proper Russian and English language processing
+  - Updated [`TobaccosRepository`](src/tobaccos/tobaccos.repository.spec.ts) tests to validate new multi-language full-text search functionality
+  - All 114 tests passing (including 23 TobaccosRepository tests)
+  - Example: "кола darkside" finds "Cola" from "Darkside", "Кола" from "Darkside", etc.
 
 ### 2026-02-02
 - Fixed `/tobaccos/by-url` endpoint to properly validate all three slugs (brand, line, tobacco)

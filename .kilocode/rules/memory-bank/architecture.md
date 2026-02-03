@@ -245,9 +245,13 @@ All endpoints require API key authentication via:
 **GET /tobaccos**
 - Query params: `?page=1&limit=20&sortBy=rating&order=desc&brandId=xxx&lineId=xxx&minRating=4&maxRating=5&country=Russia&status=Выпускается&search=tobacco`
 - Returns: Paginated list of tobaccos
-- Filtering: by brandId, lineId, rating range, country, status, case-insensitive name search (ILIKE, partial match)
-- Sorting: by rating, views, dateAdded, name
-- Search: `search` parameter performs case-insensitive partial match on tobacco name (works with both Latin and Cyrillic characters)
+- Filtering: by brandId, lineId, rating range, country, status, multi-language full-text search (PostgreSQL FTS with Russian + English configurations)
+- Sorting: by rating, views, dateAdded, name, or relevance (when search is provided)
+- Search: `search` parameter performs PostgreSQL Full-Text Search across tobacco.name, brand.name, and line.name with combined Russian and English configurations
+  - Supports stemming (words in different forms): "кола" finds "колы", "колу", etc.
+  - Supports stop-word removal for both Russian and English
+  - Results sorted by relevance when search is provided
+  - Example: "кола darkside" finds "Cola" from "Darkside", "Кола" from "Darkside", etc.
 - Country filter: Uses JOIN with brands table to filter by brand's country (tobacco table doesn't have country column)
 
 **GET /tobaccos/statuses**
@@ -355,7 +359,11 @@ All repositories use TypeORM QueryBuilder for:
 - `minRating`, `maxRating`: Filter by rating range
 - `country`: Filter by country of origin (for brands and tobaccos; for tobaccos uses JOIN with brands table)
 - `status`: Filter by production status (e.g., "Выпускается", "Лимитированная", "Снята с производства")
-- `search`: Case-insensitive partial match on name fields (brands, lines, tobaccos)
+- `search`: PostgreSQL Full-Text Search across tobacco.name, brand.name, and line.name with combined Russian and English configurations
+  - Supports stemming (words in different forms): "кола" finds "колы", "колу", etc.
+  - Supports stop-word removal for both Russian and English
+  - Results sorted by relevance when search is provided
+  - Example: "кола darkside" finds "Cola" from "Darkside", "Кола" from "Darkside", etc.
 
 **Note:** The following filters were removed as they don't exist in the Tobacco entity: `category`, `year`, `productionStatus` (replaced with `status`), **country** (removed 2026-01-31, now uses brand's country via JOIN)
 
@@ -363,6 +371,7 @@ All repositories use TypeORM QueryBuilder for:
 - `rating`: Sort by rating
 - `dateAdded`: Sort by date added to database
 - `name`: Sort by name
+- `relevance`: Sort by relevance (automatically used when search is provided, overrides sortBy parameter)
 
 **Pagination:**
 - `page`: Page number (default: 1)
@@ -375,6 +384,8 @@ All repositories use TypeORM QueryBuilder for:
 - **PostgreSQL 18.1**: Chosen for robust case-insensitive search and multi-language support
 - ILIKE operator provides case-insensitive search for both Latin and Cyrillic characters
 - UTF-8 encoding ensures proper handling of Russian and other non-Latin text
+- Full-Text Search with language-specific configurations (Russian, English) for advanced search capabilities
+- GIN indexes for full-text search performance (6 indexes: 3 for Russian, 3 for English)
 - Docker Compose integration for easy deployment and management
 - Sufficient for expected data volume (~10,000 records)
 - Connection pooling for better performance under concurrent load
@@ -542,6 +553,13 @@ All repositories use TypeORM QueryBuilder for:
 - Foreign keys indexed
 - Frequently filtered fields indexed (rating, dateAdded)
 - Composite indexes for common query patterns
+- GIN indexes for full-text search performance (6 indexes: 3 for Russian, 3 for English)
+  - `idx_tobaccos_name_fulltext_ru` - Russian full-text search on tobacco.name
+  - `idx_brands_name_fulltext_ru` - Russian full-text search on brand.name
+  - `idx_lines_name_fulltext_ru` - Russian full-text search on line.name
+  - `idx_tobaccos_name_fulltext_en` - English full-text search on tobacco.name
+  - `idx_brands_name_fulltext_en` - English full-text search on brand.name
+  - `idx_lines_name_fulltext_en` - English full-text search on line.name
 
 ### Caching
 - Consider caching frequently accessed data

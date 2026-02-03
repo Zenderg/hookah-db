@@ -224,9 +224,14 @@ describe('TobaccosRepository', () => {
 
       // Assert
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        `(to_tsvector('simple', tobacco.name) @@ to_tsquery('simple', :searchQuery) OR
-          to_tsvector('simple', brand.name) @@ to_tsquery('simple', :searchQuery) OR
-          to_tsvector('simple', line.name) @@ to_tsquery('simple', :searchQuery))`,
+        `(
+          (to_tsvector('russian', tobacco.name) @@ to_tsquery('russian', :searchQuery) OR
+           to_tsvector('english', tobacco.name) @@ to_tsquery('english', :searchQuery)) OR
+          (to_tsvector('russian', brand.name) @@ to_tsquery('russian', :searchQuery) OR
+           to_tsvector('english', brand.name) @@ to_tsquery('english', :searchQuery)) OR
+          (to_tsvector('russian', line.name) @@ to_tsquery('russian', :searchQuery) OR
+           to_tsvector('english', line.name) @@ to_tsquery('english', :searchQuery))
+        )`,
         { searchQuery: 'test' },
       );
       expect(mockQueryBuilder.addSelect).toHaveBeenCalled();
@@ -333,9 +338,14 @@ describe('TobaccosRepository', () => {
         { status: 'Выпускается' },
       );
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        `(to_tsvector('simple', tobacco.name) @@ to_tsquery('simple', :searchQuery) OR
-          to_tsvector('simple', brand.name) @@ to_tsquery('simple', :searchQuery) OR
-          to_tsvector('simple', line.name) @@ to_tsquery('simple', :searchQuery))`,
+        `(
+          (to_tsvector('russian', tobacco.name) @@ to_tsquery('russian', :searchQuery) OR
+           to_tsvector('english', tobacco.name) @@ to_tsquery('english', :searchQuery)) OR
+          (to_tsvector('russian', brand.name) @@ to_tsquery('russian', :searchQuery) OR
+           to_tsvector('english', brand.name) @@ to_tsquery('english', :searchQuery)) OR
+          (to_tsvector('russian', line.name) @@ to_tsquery('russian', :searchQuery) OR
+           to_tsvector('english', line.name) @@ to_tsquery('english', :searchQuery))
+        )`,
         { searchQuery: 'test' },
       );
       expect(mockQueryBuilder.addSelect).toHaveBeenCalled();
