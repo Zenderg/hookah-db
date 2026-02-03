@@ -31,10 +31,13 @@ export class TobaccosRepository {
 
     const queryBuilder = this.tobaccoRepository.createQueryBuilder('tobacco');
 
-    // Join with brands table for country filtering
+    // Join with brands table for country filtering and search
     queryBuilder.leftJoin('tobacco.brand', 'brand');
 
-    // Select tobacco columns only (brand is joined only for filtering)
+    // Join with lines table for search
+    queryBuilder.leftJoin('tobacco.line', 'line');
+
+    // Select tobacco columns only (brand and line are joined only for filtering/search)
     queryBuilder.select('tobacco');
 
     if (brandId) {
@@ -62,15 +65,37 @@ export class TobaccosRepository {
     }
 
     if (search) {
-      queryBuilder.andWhere('tobacco.name ILIKE :search', {
-        search: `%${search}%`,
-      });
+      // Use PostgreSQL Full-Text Search with simple configuration (supports all languages)
+      // Search across tobacco.name, brand.name, and line.name
+      const searchQuery = search.replace(/\s+/g, ' & '); // Convert spaces to AND operators
+      queryBuilder.andWhere(
+        `(to_tsvector('simple', tobacco.name) @@ to_tsquery('simple', :searchQuery) OR
+          to_tsvector('simple', brand.name) @@ to_tsquery('simple', :searchQuery) OR
+          to_tsvector('simple', line.name) @@ to_tsquery('simple', :searchQuery))`,
+        { searchQuery },
+      );
+
+      // Add relevance ranking when search is provided
+      queryBuilder.addSelect(
+        `(
+          ts_rank(to_tsvector('simple', tobacco.name), to_tsquery('simple', :searchQuery)) +
+          ts_rank(to_tsvector('simple', brand.name), to_tsquery('simple', :searchQuery)) +
+          ts_rank(to_tsvector('simple', line.name), to_tsquery('simple', :searchQuery))
+        )`,
+        'relevance',
+      );
+
+      // Sort by relevance when search is provided (override sortBy parameter)
+      queryBuilder.orderBy('relevance', 'DESC');
+    } else {
+      // Use normal sorting when no search is provided
+      queryBuilder.orderBy(
+        `tobacco.${sortBy}`,
+        order.toUpperCase() as 'ASC' | 'DESC',
+      );
     }
 
-    queryBuilder
-      .orderBy(`tobacco.${sortBy}`, order.toUpperCase() as 'ASC' | 'DESC')
-      .skip(skip)
-      .take(limit);
+    queryBuilder.skip(skip).take(limit);
 
     const [data, total] = await queryBuilder.getManyAndCount();
 

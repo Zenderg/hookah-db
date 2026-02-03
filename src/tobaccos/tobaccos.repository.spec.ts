@@ -38,6 +38,7 @@ describe('TobaccosRepository', () => {
       select: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
+      addSelect: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
       skip: jest.fn().mockReturnThis(),
       take: jest.fn().mockReturnThis(),
@@ -89,6 +90,10 @@ describe('TobaccosRepository', () => {
       expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith(
         'tobacco.brand',
         'brand',
+      );
+      expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith(
+        'tobacco.line',
+        'line',
       );
       expect(mockQueryBuilder.select).toHaveBeenCalledWith('tobacco');
       expect(mockQueryBuilder.skip).toHaveBeenCalledWith(0);
@@ -209,7 +214,7 @@ describe('TobaccosRepository', () => {
       );
     });
 
-    it('should apply search filter with ILIKE', async () => {
+    it('should apply search filter with full-text search', async () => {
       // Arrange
       const query: FindTobaccosDto = { search: 'test' };
       mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
@@ -219,8 +224,15 @@ describe('TobaccosRepository', () => {
 
       // Assert
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        'tobacco.name ILIKE :search',
-        { search: '%test%' },
+        `(to_tsvector('simple', tobacco.name) @@ to_tsquery('simple', :searchQuery) OR
+          to_tsvector('simple', brand.name) @@ to_tsquery('simple', :searchQuery) OR
+          to_tsvector('simple', line.name) @@ to_tsquery('simple', :searchQuery))`,
+        { searchQuery: 'test' },
+      );
+      expect(mockQueryBuilder.addSelect).toHaveBeenCalled();
+      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
+        'relevance',
+        'DESC',
       );
     });
 
@@ -292,6 +304,10 @@ describe('TobaccosRepository', () => {
         'tobacco.brand',
         'brand',
       );
+      expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith(
+        'tobacco.line',
+        'line',
+      );
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
         'tobacco.brandId = :brandId',
         { brandId: 'brand-123' },
@@ -317,11 +333,14 @@ describe('TobaccosRepository', () => {
         { status: 'Выпускается' },
       );
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        'tobacco.name ILIKE :search',
-        { search: '%test%' },
+        `(to_tsvector('simple', tobacco.name) @@ to_tsquery('simple', :searchQuery) OR
+          to_tsvector('simple', brand.name) @@ to_tsquery('simple', :searchQuery) OR
+          to_tsvector('simple', line.name) @@ to_tsquery('simple', :searchQuery))`,
+        { searchQuery: 'test' },
       );
+      expect(mockQueryBuilder.addSelect).toHaveBeenCalled();
       expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
-        'tobacco.rating',
+        'relevance',
         'DESC',
       );
     });

@@ -2,7 +2,7 @@
 
 ## Current State
 
-**Status:** PostgreSQL 18.1 migration completed. All parsers implemented and tested. Unit tests in progress.
+**Status:** PostgreSQL 18.1 migration completed. All parsers implemented and tested. Full-text search for tobaccos implemented.
 
 **Completed Features:**
 - ✅ NestJS application with modular architecture
@@ -10,7 +10,8 @@
 - ✅ API key authentication with request tracking
 - ✅ Brand, Line, and Tobacco parsers (Playwright-based)
 - ✅ RESTful API with filtering, sorting, and pagination
-- ✅ Case-insensitive search (ILIKE) for all entities
+- ✅ Case-insensitive search (ILIKE) for brands and lines
+- ✅ PostgreSQL Full-Text Search for tobaccos with relevance ranking (multi-field: tobacco.name, brand.name, line.name, simple configuration for multi-language support)
 - ✅ Daily automatic data refresh (cron job at 2:00 AM)
 - ✅ CLI commands for API key management and manual parsing
 - ✅ Health check endpoint
@@ -18,11 +19,11 @@
 - ✅ Docker deployment setup
 - ✅ Comprehensive README.md documentation (Russian)
 
-**Testing Status (2026-02-02):**
+**Testing Status (2026-02-03):**
 - ✅ BrandsService tests (14 tests)
 - ✅ BrandsRepository tests (11 tests)
 - ✅ TobaccosService tests (8 tests)
-- ✅ TobaccosRepository tests (21 tests)
+- ✅ TobaccosRepository tests (23 tests) - updated with full-text search tests
 - ✅ LinesService tests (12 tests)
 - ✅ LinesRepository tests (14 tests)
 - ✅ ApiKeysService tests (18 tests)
@@ -67,10 +68,14 @@ Complete NestJS-based project with feature-based modules:
 ## Recent Changes
 
 ### 2026-02-03
-- Search improvement planned for tobaccos: multi-field search across tobacco name, brand name, and line name (NOT description)
-- Current search limitation: only searches in `tobacco.name` field with ILIKE operator
-- Planned implementation: PostgreSQL Full-Text Search with GIN indexes for better performance and relevance ranking
-- Search fields: tobacco.name, brand.name, line.name (description excluded per requirement)
+  - ✅ Implemented improved tobacco search with PostgreSQL Full-Text Search
+  - Created migration [`1738572000000-AddFullTextSearch.ts`](src/migrations/1738572000000-AddFullTextSearch.ts) to add GIN indexes for full-text search
+  - Updated [`TobaccosRepository.findAll()`](src/tobaccos/tobaccos.repository.ts:14) to use full-text search with `to_tsvector()` and `to_tsquery()`
+  - Multi-field search across tobacco.name, brand.name, and line.name (description excluded per requirement)
+  - Implemented relevance ranking with `ts_rank()` - results sorted by relevance when search is provided
+  - Used 'simple' configuration for multi-language support (Russian + English names)
+  - Updated [`TobaccosRepository`](src/tobaccos/tobaccos.repository.spec.ts) tests to validate new full-text search functionality
+  - All 23 tests passing for TobaccosRepository
 
 ### 2026-02-02
 - Fixed `/tobaccos/by-url` endpoint to properly validate all three slugs (brand, line, tobacco)
@@ -107,11 +112,7 @@ Complete NestJS-based project with feature-based modules:
 
 ## Next Steps
 
-1. **Improve tobacco search** (2026-02-03):
-   - Implement multi-field search across tobacco.name, brand.name, line.name (NOT description)
-   - Add PostgreSQL Full-Text Search with GIN indexes for performance
-   - Implement relevance ranking with ts_rank()
-   - Support Russian language stemming for better search accuracy
-2. Configure CORS for production (if needed)
-3. Monitor automatic nightly parsing performance
-4. Consider adding caching layer if performance issues arise
+1. Configure CORS for production (if needed)
+2. Monitor automatic nightly parsing performance
+3. Consider adding caching layer if performance issues arise
+4. Add integration tests for API endpoints and parser workflows
