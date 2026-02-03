@@ -66,6 +66,12 @@ Complete NestJS-based project with feature-based modules:
 
 ## Recent Changes
 
+### 2026-02-03
+- Search improvement planned for tobaccos: multi-field search across tobacco name, brand name, and line name (NOT description)
+- Current search limitation: only searches in `tobacco.name` field with ILIKE operator
+- Planned implementation: PostgreSQL Full-Text Search with GIN indexes for better performance and relevance ranking
+- Search fields: tobacco.name, brand.name, line.name (description excluded per requirement)
+
 ### 2026-02-02
 - Fixed `/tobaccos/by-url` endpoint to properly validate all three slugs (brand, line, tobacco)
 - Updated [`TobaccosService.findByUrl()`](src/tobaccos/tobaccos.service.ts:41) to extract all three slugs from URL
@@ -101,6 +107,11 @@ Complete NestJS-based project with feature-based modules:
 
 ## Next Steps
 
-1. Configure CORS for production (if needed)
-2. Monitor automatic nightly parsing performance
-3. Consider adding caching layer if performance issues arise
+1. **Improve tobacco search** (2026-02-03):
+   - Implement multi-field search across tobacco.name, brand.name, line.name (NOT description)
+   - Add PostgreSQL Full-Text Search with GIN indexes for performance
+   - Implement relevance ranking with ts_rank()
+   - Support Russian language stemming for better search accuracy
+2. Configure CORS for production (if needed)
+3. Monitor automatic nightly parsing performance
+4. Consider adding caching layer if performance issues arise
