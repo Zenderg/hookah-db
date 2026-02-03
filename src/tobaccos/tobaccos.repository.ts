@@ -67,31 +67,42 @@ export class TobaccosRepository {
     if (search) {
       // Use PostgreSQL Full-Text Search with Russian and English configurations
       // Search across tobacco.name, brand.name, and line.name
-      // Combines both language configurations with OR for better multi-language support
-      const searchQuery = search.replace(/\s+/g, ' & '); // Convert spaces to AND operators
-      queryBuilder.andWhere(
-        `(
-          (to_tsvector('russian', tobacco.name) @@ to_tsquery('russian', :searchQuery) OR
-           to_tsvector('english', tobacco.name) @@ to_tsquery('english', :searchQuery)) OR
-          (to_tsvector('russian', brand.name) @@ to_tsquery('russian', :searchQuery) OR
-           to_tsvector('english', brand.name) @@ to_tsquery('english', :searchQuery)) OR
-          (to_tsvector('russian', line.name) @@ to_tsquery('russian', :searchQuery) OR
-           to_tsvector('english', line.name) @@ to_tsquery('english', :searchQuery))
-        )`,
-        { searchQuery },
-      );
+      // For multi-word searches, each word must match in at least one field (cross-field AND)
+      const searchWords = search.trim().split(/\s+/);
 
-      // Add relevance ranking when search is provided
-      // Combines rankings from both language configurations
+      // For each search word, create a condition that it must match in ANY field
+      searchWords.forEach((word, index) => {
+        const paramName = `searchWord${index}`;
+        queryBuilder.andWhere(
+          `(
+            to_tsvector('russian', tobacco.name) @@ to_tsquery('russian', :${paramName}) OR
+             to_tsvector('english', tobacco.name) @@ to_tsquery('english', :${paramName}) OR
+            to_tsvector('russian', brand.name) @@ to_tsquery('russian', :${paramName}) OR
+             to_tsvector('english', brand.name) @@ to_tsquery('english', :${paramName}) OR
+            to_tsvector('russian', line.name) @@ to_tsquery('russian', :${paramName}) OR
+             to_tsvector('english', line.name) @@ to_tsquery('english', :${paramName})
+          )`,
+          { [paramName]: word },
+        );
+      });
+
+      // Calculate relevance ranking
+      // Combines rankings from both language configurations across all fields
+      // Use COALESCE to handle NULL values from line.name (lineId can be null)
+      const relevanceExpressions = searchWords.map((word, index) => {
+        const paramName = `searchWord${index}`;
+        return `(
+          ts_rank(to_tsvector('russian', tobacco.name), to_tsquery('russian', :${paramName})) +
+          ts_rank(to_tsvector('english', tobacco.name), to_tsquery('english', :${paramName})) +
+          ts_rank(to_tsvector('russian', brand.name), to_tsquery('russian', :${paramName})) +
+          ts_rank(to_tsvector('english', brand.name), to_tsquery('english', :${paramName})) +
+          ts_rank(to_tsvector('russian', line.name), to_tsquery('russian', :${paramName})) +
+          ts_rank(to_tsvector('english', line.name), to_tsquery('english', :${paramName}))
+        )`;
+      });
+
       queryBuilder.addSelect(
-        `(
-          ts_rank(to_tsvector('russian', tobacco.name), to_tsquery('russian', :searchQuery)) +
-          ts_rank(to_tsvector('english', tobacco.name), to_tsquery('english', :searchQuery)) +
-          ts_rank(to_tsvector('russian', brand.name), to_tsquery('russian', :searchQuery)) +
-          ts_rank(to_tsvector('english', brand.name), to_tsquery('english', :searchQuery)) +
-          ts_rank(to_tsvector('russian', line.name), to_tsquery('russian', :searchQuery)) +
-          ts_rank(to_tsvector('english', line.name), to_tsquery('english', :searchQuery))
-        )`,
+        `COALESCE(${relevanceExpressions.join(' + ')}, 0)`,
         'relevance',
       );
 

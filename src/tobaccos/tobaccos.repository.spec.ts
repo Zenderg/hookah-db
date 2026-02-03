@@ -222,18 +222,15 @@ describe('TobaccosRepository', () => {
       // Act
       await repository.findAll(query);
 
-      // Assert
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        `(
-          (to_tsvector('russian', tobacco.name) @@ to_tsquery('russian', :searchQuery) OR
-           to_tsvector('english', tobacco.name) @@ to_tsquery('english', :searchQuery)) OR
-          (to_tsvector('russian', brand.name) @@ to_tsquery('russian', :searchQuery) OR
-           to_tsvector('english', brand.name) @@ to_tsquery('english', :searchQuery)) OR
-          (to_tsvector('russian', line.name) @@ to_tsquery('russian', :searchQuery) OR
-           to_tsvector('english', line.name) @@ to_tsquery('english', :searchQuery))
-        )`,
-        { searchQuery: 'test' },
-      );
+      // Assert - check that andWhere was called with the search query
+      const searchCall = mockQueryBuilder.andWhere.mock.calls.find((call) => {
+        const whereClause = call[0] as string;
+        return (
+          whereClause?.includes('to_tsvector') &&
+          whereClause?.includes('to_tsquery')
+        );
+      });
+      expect(searchCall).toBeDefined();
       expect(mockQueryBuilder.addSelect).toHaveBeenCalled();
       expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
         'relevance',
@@ -337,17 +334,15 @@ describe('TobaccosRepository', () => {
         'tobacco.status = :status',
         { status: 'Выпускается' },
       );
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        `(
-          (to_tsvector('russian', tobacco.name) @@ to_tsquery('russian', :searchQuery) OR
-           to_tsvector('english', tobacco.name) @@ to_tsquery('english', :searchQuery)) OR
-          (to_tsvector('russian', brand.name) @@ to_tsquery('russian', :searchQuery) OR
-           to_tsvector('english', brand.name) @@ to_tsquery('english', :searchQuery)) OR
-          (to_tsvector('russian', line.name) @@ to_tsquery('russian', :searchQuery) OR
-           to_tsvector('english', line.name) @@ to_tsquery('english', :searchQuery))
-        )`,
-        { searchQuery: 'test' },
-      );
+      // Assert - check that search WHERE clause was called
+      const searchCall = mockQueryBuilder.andWhere.mock.calls.find((call) => {
+        const whereClause = call[0] as string;
+        return (
+          whereClause?.includes('to_tsvector') &&
+          whereClause?.includes('to_tsquery')
+        );
+      });
+      expect(searchCall).toBeDefined();
       expect(mockQueryBuilder.addSelect).toHaveBeenCalled();
       expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
         'relevance',

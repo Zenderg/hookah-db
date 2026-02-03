@@ -70,11 +70,17 @@ Complete NestJS-based project with feature-based modules:
 ### 2026-02-03
   - ✅ Enhanced tobacco search with multi-language PostgreSQL Full-Text Search (Russian + English configurations)
   - Created migration [`1738606800000-AddMultiLanguageFullTextSearch.ts`](src/migrations/1738606800000-AddMultiLanguageFullTextSearch.ts) to add 6 GIN indexes (3 for Russian, 3 for English)
-  - Updated [`TobaccosRepository.findAll()`](src/tobaccos/tobaccos.repository.ts:67) to use combined Russian and English full-text search with OR logic
+  - Updated [`TobaccosRepository.findAll()`](src/tobaccos/tobaccos.repository.ts:67) to use combined Russian and English full-text search with cross-field AND logic
   - Multi-field search across tobacco.name, brand.name, and line.name with both language configurations
   - Implemented relevance ranking with combined `ts_rank()` from both Russian and English configurations
   - Results sorted by relevance when search is provided (override sortBy parameter)
   - Benefits: Stemming (words in different forms), stop-word removal, proper Russian and English language processing
+  - **Critical Bug Fix (2026-02-03):** Fixed multi-word search logic
+    - **Problem:** Multi-word searches like "vanilla sebero" returned no results even though data existed
+    - **Root Cause:** Original implementation used AND operator (`&`) which required ALL search terms to match in the SAME field
+    - **Solution:** Changed to cross-field AND logic where each search word must match in at least one field (tobacco.name OR brand.name OR line.name)
+    - **Implementation:** Split search query into individual words, create separate WHERE condition for each word with OR logic across all fields, then combine all word conditions with AND
+    - **Result:** "vanilla sebero" now correctly finds vanilla tobacco from Sebero brand
   - Updated [`TobaccosRepository`](src/tobaccos/tobaccos.repository.spec.ts) tests to validate new multi-language full-text search functionality
   - All 114 tests passing (including 23 TobaccosRepository tests)
   - Example: "кола darkside" finds "Cola" from "Darkside", "Кола" from "Darkside", etc.

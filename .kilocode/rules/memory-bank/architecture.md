@@ -251,7 +251,9 @@ All endpoints require API key authentication via:
   - Supports stemming (words in different forms): "кола" finds "колы", "колу", etc.
   - Supports stop-word removal for both Russian and English
   - Results sorted by relevance when search is provided
+  - **Cross-field AND logic (2026-02-03):** For multi-word searches, each search word must match in at least one field (tobacco.name OR brand.name OR line.name)
   - Example: "кола darkside" finds "Cola" from "Darkside", "Кола" from "Darkside", etc.
+  - Example: "vanilla sebero" finds vanilla tobacco from Sebero brand
 - Country filter: Uses JOIN with brands table to filter by brand's country (tobacco table doesn't have country column)
 
 **GET /tobaccos/statuses**
@@ -363,7 +365,9 @@ All repositories use TypeORM QueryBuilder for:
   - Supports stemming (words in different forms): "кола" finds "колы", "колу", etc.
   - Supports stop-word removal for both Russian and English
   - Results sorted by relevance when search is provided
+  - **Cross-field AND logic (2026-02-03):** For multi-word searches, each search word must match in at least one field (tobacco.name OR brand.name OR line.name)
   - Example: "кола darkside" finds "Cola" from "Darkside", "Кола" from "Darkside", etc.
+  - Example: "vanilla sebero" finds vanilla tobacco from Sebero brand
 
 **Note:** The following filters were removed as they don't exist in the Tobacco entity: `category`, `year`, `productionStatus` (replaced with `status`), **country** (removed 2026-01-31, now uses brand's country via JOIN)
 
