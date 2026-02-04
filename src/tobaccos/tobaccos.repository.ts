@@ -70,41 +70,81 @@ export class TobaccosRepository {
       // For multi-word searches, each word must match in at least one field (cross-field AND)
       const searchWords = search.trim().split(/\s+/);
 
-      // For each search word, create a condition that it must match in ANY field
+      // Build parameters object for all search words
+      const searchParams: Record<string, string> = {};
+
+      // For each search word, create conditions for:
+      // 1. Full-Text Search with prefix operator (:*) for stemming support
+      // 2. ILIKE for exact prefix matching (case-insensitive)
       searchWords.forEach((word, index) => {
-        const paramName = `searchWord${index}`;
+        const paramNamePrefix = `searchWordPrefix${index}`;
+        const paramNameILike = `searchWordILike${index}`;
+
+        searchParams[paramNamePrefix] = `${word}:*`;
+        searchParams[paramNameILike] = `${word}%`;
+
         queryBuilder.andWhere(
           `(
-            to_tsvector('russian', tobacco.name) @@ to_tsquery('russian', :${paramName}) OR
-             to_tsvector('english', tobacco.name) @@ to_tsquery('english', :${paramName}) OR
-            to_tsvector('russian', brand.name) @@ to_tsquery('russian', :${paramName}) OR
-             to_tsvector('english', brand.name) @@ to_tsquery('english', :${paramName}) OR
-            to_tsvector('russian', line.name) @@ to_tsquery('russian', :${paramName}) OR
-             to_tsvector('english', line.name) @@ to_tsquery('english', :${paramName})
+            to_tsvector('russian', tobacco.name) @@ to_tsquery('russian', :${paramNamePrefix}) OR
+             to_tsvector('english', tobacco.name) @@ to_tsquery('english', :${paramNamePrefix}) OR
+            to_tsvector('russian', brand.name) @@ to_tsquery('russian', :${paramNamePrefix}) OR
+             to_tsvector('english', brand.name) @@ to_tsquery('english', :${paramNamePrefix}) OR
+            to_tsvector('russian', line.name) @@ to_tsquery('russian', :${paramNamePrefix}) OR
+             to_tsvector('english', line.name) @@ to_tsquery('english', :${paramNamePrefix}) OR
+            LOWER(tobacco.name) LIKE LOWER(:${paramNameILike}) OR
+            LOWER(brand.name) LIKE LOWER(:${paramNameILike}) OR
+            LOWER(line.name) LIKE LOWER(:${paramNameILike})
           )`,
-          { [paramName]: word },
         );
       });
 
-      // Calculate relevance ranking
+      // Calculate base relevance ranking from Full-Text Search
       // Combines rankings from both language configurations across all fields
       // Use COALESCE to handle NULL values from line.name (lineId can be null)
-      const relevanceExpressions = searchWords.map((word, index) => {
-        const paramName = `searchWord${index}`;
+      const relevanceExpressions = searchWords.map((_, index) => {
+        const paramNamePrefix = `searchWordPrefix${index}`;
         return `(
-          ts_rank(to_tsvector('russian', tobacco.name), to_tsquery('russian', :${paramName})) +
-          ts_rank(to_tsvector('english', tobacco.name), to_tsquery('english', :${paramName})) +
-          ts_rank(to_tsvector('russian', brand.name), to_tsquery('russian', :${paramName})) +
-          ts_rank(to_tsvector('english', brand.name), to_tsquery('english', :${paramName})) +
-          ts_rank(to_tsvector('russian', line.name), to_tsquery('russian', :${paramName})) +
-          ts_rank(to_tsvector('english', line.name), to_tsquery('english', :${paramName}))
+          ts_rank(to_tsvector('russian', tobacco.name), to_tsquery('russian', :${paramNamePrefix})) +
+          ts_rank(to_tsvector('english', tobacco.name), to_tsquery('english', :${paramNamePrefix})) +
+          ts_rank(to_tsvector('russian', brand.name), to_tsquery('russian', :${paramNamePrefix})) +
+          ts_rank(to_tsvector('english', brand.name), to_tsquery('english', :${paramNamePrefix})) +
+          ts_rank(to_tsvector('russian', line.name), to_tsquery('russian', :${paramNamePrefix})) +
+          ts_rank(to_tsvector('english', line.name), to_tsquery('english', :${paramNamePrefix}))
         )`;
       });
 
+      // Calculate bonuses for exact matches and prefix matches
+      // Bonus weights:
+      // - Exact match of tobacco.name: +100
+      // - Prefix match at start of tobacco.name: +50
+      // - Prefix match at start of brand.name: +30
+      // - Prefix match at start of line.name: +30
+      const exactMatchBonus = searchWords.map((word, index) => {
+        const paramName = `searchWordExact${index}`;
+        searchParams[paramName] = word;
+        return `CASE WHEN LOWER(tobacco.name) = LOWER(:${paramName}) THEN 100 ELSE 0 END`;
+      });
+
+      const prefixMatchBonus = searchWords.map((_, index) => {
+        const paramName = `searchWordILike${index}`;
+        return `(
+          CASE WHEN LOWER(tobacco.name) LIKE LOWER(:${paramName}) THEN 50 ELSE 0 END +
+          CASE WHEN LOWER(brand.name) LIKE LOWER(:${paramName}) THEN 30 ELSE 0 END +
+          CASE WHEN LOWER(line.name) LIKE LOWER(:${paramName}) THEN 30 ELSE 0 END
+        )`;
+      });
+
+      // Combine all expressions into final ranking score
+      // Final score = base relevance + exact match bonuses + prefix match bonuses
       queryBuilder.addSelect(
-        `COALESCE(${relevanceExpressions.join(' + ')}, 0)`,
+        `COALESCE(${relevanceExpressions.join(' + ')}, 0) + ${exactMatchBonus.join(' + ')} + ${prefixMatchBonus.join(' + ')}`,
         'relevance',
       );
+
+      // Set all parameters
+      Object.entries(searchParams).forEach(([key, value]) => {
+        queryBuilder.setParameter(key, value);
+      });
 
       // Sort by relevance when search is provided (override sortBy parameter)
       queryBuilder.orderBy('relevance', 'DESC');

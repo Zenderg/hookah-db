@@ -19,15 +19,16 @@
 - ✅ Docker deployment setup
 - ✅ Comprehensive README.md documentation (Russian)
 
-**Testing Status (2026-02-03):**
+**Testing Status (2026-02-04):**
 - ✅ BrandsService tests (14 tests)
 - ✅ BrandsRepository tests (11 tests)
 - ✅ TobaccosService tests (8 tests)
-- ✅ TobaccosRepository tests (23 tests) - updated with multi-language full-text search tests
+- ✅ TobaccosRepository tests (33 tests) - updated with prefix search and ranking tests
 - ✅ LinesService tests (12 tests)
 - ✅ LinesRepository tests (14 tests)
 - ✅ ApiKeysService tests (18 tests)
 - ✅ ApiKeysRepository tests (11 tests)
+- ✅ All 124 tests passing
 
 ## Project Structure
 
@@ -66,6 +67,44 @@ Complete NestJS-based project with feature-based modules:
 - Simple authentication (API keys only)
 
 ## Recent Changes
+
+### 2026-02-04
+- ✅ Implemented improved tobacco search with prefix matching and enhanced ranking
+  - **Prefix Search:** Added ILIKE conditions for partial word matching (e.g., "col" finds "Cola", "Cola Lime", "California Cola")
+  - **FTS Prefix Operator:** Used `:*` operator in `to_tsquery` for stemming support with prefix matching
+  - **Enhanced Ranking:** Implemented bonus-based ranking system with the following weights:
+    - Exact match of tobacco.name: +100
+    - Prefix match at start of tobacco.name: +50
+    - Prefix match at start of brand.name: +30
+    - Prefix match at start of line.name: +30
+  - **Combined Score:** Final ranking score = base FTS relevance + exact match bonuses + prefix match bonuses
+  - **Multi-word Search:** Maintains cross-field AND logic where each search word must match in at least one field
+  - **Case-Insensitive Search:** All searches use LOWER() function for case-insensitive matching
+  - **Updated [`TobaccosRepository.findAll()`](src/tobaccos/tobaccos.repository.ts:14)** with:
+    - ILIKE conditions for prefix matching across tobacco.name, brand.name, and line.name
+    - FTS prefix operator (`:*`) for stemming support
+    - Bonus calculations for exact and prefix matches
+    - Combined ranking score calculation
+  - **Added 10 new tests** to [`TobaccosRepository`](src/tobaccos/tobaccos.repository.spec.ts) for prefix search and ranking validation:
+    - Prefix search with ILIKE for partial word matches
+    - FTS prefix operator (`:*`) for stemming support
+    - Exact match bonus for tobacco name
+    - Prefix match bonus for tobacco name
+    - Prefix match bonus for brand name
+    - Prefix match bonus for line name
+    - Multi-word search with cross-field AND logic
+    - Combined base relevance with bonuses for final ranking
+    - Parameter setting for prefix and exact match calculations
+    - Case-insensitive search validation
+  - **All 124 tests passing** (33 TobaccosRepository tests, including 10 new tests)
+  - **Benefits:**
+    - Users can now find tobaccos by entering only part of the name
+    - Most relevant results appear first due to bonus-based ranking
+    - Search is more predictable and intuitive
+    - Example: "cola" now returns results in order: "Cola" (exact match), "Cola Lime" (prefix match), "California Cola" (middle match)
+    - Example: "cola darks" now correctly finds "Cola" from "Darkside" brand
+  - **Performance:** Uses existing GIN indexes for FTS, ILIKE for prefix matching, all calculations done in database for optimal performance
+  - **Backward Compatible:** API parameters remain unchanged, client applications require no modifications
 
 ### 2026-02-03
   - ✅ Enhanced tobacco search with multi-language PostgreSQL Full-Text Search (Russian + English configurations)

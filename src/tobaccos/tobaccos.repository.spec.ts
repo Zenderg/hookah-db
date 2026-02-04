@@ -42,6 +42,7 @@ describe('TobaccosRepository', () => {
       orderBy: jest.fn().mockReturnThis(),
       skip: jest.fn().mockReturnThis(),
       take: jest.fn().mockReturnThis(),
+      setParameter: jest.fn().mockReturnThis(),
       getManyAndCount: jest.fn(),
       getRawMany: jest.fn(),
     } as unknown as jest.Mocked<SelectQueryBuilder<Tobacco>>;
@@ -379,6 +380,191 @@ describe('TobaccosRepository', () => {
         'tobacco.rating',
         'DESC',
       );
+    });
+
+    // Tests for improved search with prefix matching and ranking
+    it('should apply prefix search with ILIKE for partial word matches', async () => {
+      // Arrange
+      const query: FindTobaccosDto = { search: 'col' };
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
+
+      // Act
+      await repository.findAll(query);
+
+      // Assert - check that ILIKE conditions are present
+      const searchCall = mockQueryBuilder.andWhere.mock.calls.find((call) => {
+        const whereClause = call[0] as string;
+        return (
+          whereClause?.includes('LOWER(tobacco.name) LIKE LOWER') ||
+          whereClause?.includes('LOWER(brand.name) LIKE LOWER') ||
+          whereClause?.includes('LOWER(line.name) LIKE LOWER')
+        );
+      });
+      expect(searchCall).toBeDefined();
+    });
+
+    it('should use FTS prefix operator (:*) for stemming support', async () => {
+      // Arrange
+      const query: FindTobaccosDto = { search: 'cola' };
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
+
+      // Act
+      await repository.findAll(query);
+
+      // Assert - check that setParameter was called with values containing :*
+      const hasPrefixParam = mockQueryBuilder.setParameter.mock.calls.some(
+        (call) => {
+          const value = call[1] as string;
+          return value?.includes(':*');
+        },
+      );
+      expect(hasPrefixParam).toBe(true);
+    });
+
+    it('should calculate exact match bonus for tobacco name', async () => {
+      // Arrange
+      const query: FindTobaccosDto = { search: 'Test Tobacco' };
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
+
+      // Act
+      await repository.findAll(query);
+
+      // Assert - check that addSelect was called with relevance score
+      expect(mockQueryBuilder.addSelect).toHaveBeenCalled();
+      const addSelectCall = mockQueryBuilder.addSelect.mock.calls[0];
+      expect(addSelectCall).toBeDefined();
+      expect(addSelectCall[0]).toContain(
+        'CASE WHEN LOWER(tobacco.name) = LOWER',
+      );
+      expect(addSelectCall[0]).toContain('THEN 100 ELSE 0 END');
+    });
+
+    it('should calculate prefix match bonus for tobacco name', async () => {
+      // Arrange
+      const query: FindTobaccosDto = { search: 'Test' };
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
+
+      // Act
+      await repository.findAll(query);
+
+      // Assert - check that prefix match bonus is calculated
+      expect(mockQueryBuilder.addSelect).toHaveBeenCalled();
+      const addSelectCall = mockQueryBuilder.addSelect.mock.calls[0];
+      expect(addSelectCall[0]).toContain(
+        'CASE WHEN LOWER(tobacco.name) LIKE LOWER',
+      );
+      expect(addSelectCall[0]).toContain('THEN 50 ELSE 0 END');
+    });
+
+    it('should calculate prefix match bonus for brand name', async () => {
+      // Arrange
+      const query: FindTobaccosDto = { search: 'Test' };
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
+
+      // Act
+      await repository.findAll(query);
+
+      // Assert - check that brand prefix match bonus is calculated
+      expect(mockQueryBuilder.addSelect).toHaveBeenCalled();
+      const addSelectCall = mockQueryBuilder.addSelect.mock.calls[0];
+      expect(addSelectCall[0]).toContain(
+        'CASE WHEN LOWER(brand.name) LIKE LOWER',
+      );
+      expect(addSelectCall[0]).toContain('THEN 30 ELSE 0 END');
+    });
+
+    it('should calculate prefix match bonus for line name', async () => {
+      // Arrange
+      const query: FindTobaccosDto = { search: 'Test' };
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
+
+      // Act
+      await repository.findAll(query);
+
+      // Assert - check that line prefix match bonus is calculated
+      expect(mockQueryBuilder.addSelect).toHaveBeenCalled();
+      const addSelectCall = mockQueryBuilder.addSelect.mock.calls[0];
+      expect(addSelectCall[0]).toContain(
+        'CASE WHEN LOWER(line.name) LIKE LOWER',
+      );
+      expect(addSelectCall[0]).toContain('THEN 30 ELSE 0 END');
+    });
+
+    it('should handle multi-word search with cross-field AND logic', async () => {
+      // Arrange
+      const query: FindTobaccosDto = { search: 'cola darks' };
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
+
+      // Act
+      await repository.findAll(query);
+
+      // Assert - check that multiple andWhere calls are made (one per word)
+      const searchCalls = mockQueryBuilder.andWhere.mock.calls.filter(
+        (call) => {
+          const whereClause = call[0] as string;
+          return (
+            whereClause?.includes('to_tsvector') ||
+            whereClause?.includes('LOWER') ||
+            whereClause?.includes('LIKE')
+          );
+        },
+      );
+      // Should have at least 2 search calls (one for each word)
+      expect(searchCalls.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('should combine base relevance with bonuses for final ranking', async () => {
+      // Arrange
+      const query: FindTobaccosDto = { search: 'test' };
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
+
+      // Act
+      await repository.findAll(query);
+
+      // Assert - check that final score combines all components
+      expect(mockQueryBuilder.addSelect).toHaveBeenCalled();
+      const addSelectCall = mockQueryBuilder.addSelect.mock.calls[0];
+      // Should contain base relevance (ts_rank)
+      expect(addSelectCall[0]).toContain('ts_rank');
+      // Should contain exact match bonus (100)
+      expect(addSelectCall[0]).toContain('100');
+      // Should contain prefix match bonuses (50, 30)
+      expect(addSelectCall[0]).toContain('50');
+      expect(addSelectCall[0]).toContain('30');
+    });
+
+    it('should set parameters for prefix and exact match calculations', async () => {
+      // Arrange
+      const query: FindTobaccosDto = { search: 'test' };
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
+
+      // Act
+      await repository.findAll(query);
+
+      // Assert - check that setParameter is called with correct values
+      expect(mockQueryBuilder.setParameter).toHaveBeenCalled();
+      const setParamCalls = mockQueryBuilder.setParameter.mock.calls;
+      // Should have parameters for prefix search (test%)
+      const hasPrefixParam = setParamCalls.some((call) => {
+        return call[1] === 'test%';
+      });
+      expect(hasPrefixParam).toBe(true);
+    });
+
+    it('should handle case-insensitive search', async () => {
+      // Arrange
+      const query: FindTobaccosDto = { search: 'TEST' }; // uppercase
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
+
+      // Act
+      await repository.findAll(query);
+
+      // Assert - check that LOWER() is used for case-insensitive matching
+      const searchCall = mockQueryBuilder.andWhere.mock.calls.find((call) => {
+        const whereClause = call[0] as string;
+        return whereClause?.includes('LOWER');
+      });
+      expect(searchCall).toBeDefined();
     });
   });
 
