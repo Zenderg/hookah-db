@@ -416,32 +416,23 @@ export class TobaccoParserStrategy {
         }
       }
 
-      // Extract status: look for "Статус" label
+      // Extract status: look for object_info_item with "Статус" label
       let status = '';
-      const statusLabel = allElements.find((el) => {
-        const text = el.textContent?.trim() || '';
-        return text === 'Статус';
-      });
-      if (statusLabel) {
-        const labelContainer = statusLabel.parentElement;
-        if (labelContainer) {
-          const parentContainer = labelContainer.parentElement;
-          if (parentContainer) {
-            const valueDiv = Array.from(parentContainer.children).find(
-              (child) => {
-                const text = child.textContent?.trim() || '';
-                const statusValues = [
-                  'Выпускается',
-                  'Лимитированная',
-                  'Снята с производства',
-                ];
-                return statusValues.includes(text);
-              },
-            );
-            if (valueDiv) {
-              status = valueDiv.textContent?.trim() || '';
-            }
-          }
+      const infoItems = document.querySelectorAll('.object_info_item');
+      for (const item of infoItems) {
+        const spans = Array.from(item.querySelectorAll('span'));
+        const labelSpan = spans.find(
+          (span) => span.textContent?.trim() === 'Статус',
+        );
+        const valueSpan = spans[spans.length - 1];
+        if (
+          labelSpan &&
+          valueSpan &&
+          valueSpan !== labelSpan &&
+          valueSpan.textContent?.trim()
+        ) {
+          status = valueSpan.textContent.trim();
+          break;
         }
       }
 

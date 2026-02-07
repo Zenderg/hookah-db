@@ -108,6 +108,9 @@ export class LineParserStrategy {
               line.imageUrl = additionalData.imageUrl;
               line.strengthOfficial = additionalData.strengthOfficial;
               line.strengthByRatings = additionalData.strengthByRatings;
+              if (additionalData.status) {
+                line.status = additionalData.status;
+              }
               // Only update description if it was extracted from detail page
               if (additionalData.description) {
                 line.description = additionalData.description;
@@ -117,6 +120,7 @@ export class LineParserStrategy {
                   `ratingsCount=${line.ratingsCount}, ` +
                   `imageUrl=${line.imageUrl ? 'yes' : 'no'}, ` +
                   `strengthByRatings=${line.strengthByRatings || 'N/A'}, ` +
+                  `status=${line.status || 'N/A'}, ` +
                   `description=${line.description ? 'yes' : 'no'}`,
               );
             } catch (error) {
@@ -245,21 +249,6 @@ export class LineParserStrategy {
             }
           }
 
-          // Extract status - look for status values
-          let status = '';
-          const textContent = element.textContent || '';
-          const statusValues = [
-            'Выпускается',
-            'Лимитированная',
-            'Снята с производства',
-          ];
-          for (const statusValue of statusValues) {
-            if (textContent.includes(statusValue)) {
-              status = statusValue;
-              break;
-            }
-          }
-
           // Extract description - find longest text (>50 chars) from child elements
           let description = '';
           const allTextElements = Array.from(element.children).slice(1); // Skip first child (has link/heading)
@@ -282,7 +271,7 @@ export class LineParserStrategy {
             imageUrl: null, // Will be extracted from detail page if needed
             strengthOfficial: null, // Will be extracted from detail page
             strengthByRatings: null, // Not available on brand page
-            status: status || null,
+            status: null, // Will be extracted from detail page
             rating,
             ratingsCount: 0, // Will be extracted from detail page
           });
@@ -312,6 +301,7 @@ export class LineParserStrategy {
     ratingsCount: number;
     strengthOfficial: string | null;
     strengthByRatings: string | null;
+    status: string | null;
     description: string | null;
   }> {
     if (!this.page) {
@@ -524,11 +514,32 @@ export class LineParserStrategy {
           }
         }
 
+        // Extract status: look for object_info_item with "Статус" label
+        let status = '';
+        const infoItems = document.querySelectorAll('.object_info_item');
+        for (const item of infoItems) {
+          const spans = Array.from(item.querySelectorAll('span'));
+          const labelSpan = spans.find(
+            (span) => span.textContent?.trim() === 'Статус',
+          );
+          const valueSpan = spans[spans.length - 1];
+          if (
+            labelSpan &&
+            valueSpan &&
+            valueSpan !== labelSpan &&
+            valueSpan.textContent?.trim()
+          ) {
+            status = valueSpan.textContent.trim();
+            break;
+          }
+        }
+
         return {
           imageUrl,
           ratingsCount,
           strengthOfficial,
           strengthByRatings,
+          status,
           description,
         };
       });
@@ -539,6 +550,7 @@ export class LineParserStrategy {
           `ratingsCount=${data.ratingsCount}, ` +
           `strengthOfficial=${data.strengthOfficial || 'N/A'}, ` +
           `strengthByRatings=${data.strengthByRatings || 'N/A'}, ` +
+          `status=${data.status || 'N/A'}, ` +
           `description=${data.description ? 'yes' : 'no'}`,
       );
 
@@ -603,6 +615,7 @@ export class LineParserStrategy {
       ratingsCount: additionalData.ratingsCount,
       strengthOfficial: additionalData.strengthOfficial,
       strengthByRatings: additionalData.strengthByRatings,
+      status: additionalData.status || lineData.status,
       description: additionalData.description || lineData.description,
     };
   }
