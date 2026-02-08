@@ -263,9 +263,9 @@ All endpoints require API key authentication via:
 ### Tobaccos
 
 **GET /tobaccos**
-- Query params: `?page=1&limit=20&sortBy=rating&order=desc&brandId=xxx&lineId=xxx&minRating=4&maxRating=5&country=Russia&status=Выпускается&search=tobacco`
+- Query params: `?page=1&limit=20&sortBy=rating&order=desc&brandId=xxx&lineId=xxx&minRating=4&maxRating=5&country=Russia&status=Выпускается&flavors=cola,cherry&search=tobacco`
 - Returns: Paginated list of tobaccos
-- Filtering: by brandId, lineId, rating range, country, status, multi-language full-text search (PostgreSQL FTS with Russian + English configurations)
+- Filtering: by brandId, lineId, rating range, country, status, flavors (AND logic), multi-language full-text search (PostgreSQL FTS with Russian + English configurations)
 - Sorting: by rating, views, dateAdded, name, or relevance (when search is provided)
 - Search: `search` parameter performs PostgreSQL Full-Text Search across tobacco.name, brand.name, and line.name with combined Russian and English configurations
   - Supports stemming (words in different forms): "кола" finds "колы", "колу", etc.
@@ -274,6 +274,7 @@ All endpoints require API key authentication via:
   - **Cross-field AND logic (2026-02-03):** For multi-word searches, each search word must match in at least one field (tobacco.name OR brand.name OR line.name)
   - Example: "кола darkside" finds "Cola" from "Darkside", "Кола" from "Darkside", etc.
   - Example: "vanilla sebero" finds vanilla tobacco from Sebero brand
+- Flavors filter: `flavors` parameter (array of strings) filters tobaccos by flavors using AND logic - tobacco must have ALL specified flavors
 - Country filter: Uses JOIN with brands table to filter by brand's country (tobacco table doesn't have country column)
 
 **GET /tobaccos/statuses**
@@ -362,6 +363,7 @@ Located in [`src/common/dto/pagination.dto.ts`](src/common/dto/pagination.dto.ts
   - `minRating`/`maxRating`: Optional number range filter (0-5)
   - `country`: Optional string filter
   - `status`: Optional string filter (e.g., "Выпускается", "Лимитированная", "Снята с производства")
+  - `flavors`: Optional string array filter (AND logic - tobacco must have ALL specified flavors)
   - `search`: Optional string filter for case-insensitive partial match on tobacco name
 
 **Note:** The following filters were removed as they don't exist in the Tobacco entity: `category`, `year`, `productionStatus` (replaced with `status`)
