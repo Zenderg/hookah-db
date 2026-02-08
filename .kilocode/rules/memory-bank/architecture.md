@@ -72,6 +72,12 @@ src/
 │   ├── lines.module.ts
 │   └── dto/               # Request/response DTOs
 │       └── find-lines.dto.ts
+├── flavors/                # Flavor module
+│   ├── flavors.controller.ts
+│   ├── flavors.service.ts
+│   ├── flavors.repository.ts
+│   ├── flavors.entity.ts
+│   └── flavors.module.ts
 ├── auth/                   # Authentication module
 │   ├── auth.guard.ts
 │   ├── auth.middleware.ts
@@ -166,6 +172,20 @@ src/
 ```
 
 **Note**: Slug, brandId, imageUrl, rating, ratingsCount, strengthOfficial, strengthByRatings, and status are required fields per migration 1706328000000 (InitialSchema). Entity has been updated to match migration schema - all required fields are now non-nullable. Status: ✅ VERIFIED
+
+### Flavor Entity
+
+```typescript
+{
+  id: string (UUID)
+  name: string (unique)
+  tobaccos: Tobacco[] (many-to-many relationship)
+  createdAt: Date
+  updatedAt: Date
+}
+```
+
+**Note**: Flavor entity has a many-to-many relationship with Tobacco via the `tobacco_flavors` junction table. Migration: [`src/migrations/1738700000000-AddFlavors.ts`](src/migrations/1738700000000-AddFlavors.ts). Status: ✅ VERIFIED (2026-02-08)
 
 ### API Key Entity
 
@@ -294,6 +314,26 @@ All endpoints require API key authentication via:
 **GET /lines/:id/tobaccos**
 - Query params: `?page=1&limit=20&sortBy=rating&order=desc`
 - Returns: Paginated list of tobaccos for line
+
+### Flavors
+
+**GET /flavors**
+- Returns: List of all flavors sorted by name (ASC)
+- Authentication: Required (API key)
+- Response format:
+  ```json
+  [
+    {
+      "id": "uuid",
+      "name": "string",
+      "createdAt": "date",
+      "updatedAt": "date"
+    }
+  ]
+  ```
+- Used by client applications to populate flavor filter dropdowns
+- Many-to-many relationship with tobaccos via `tobacco_flavors` junction table
+- Migration: [`src/migrations/1738700000000-AddFlavors.ts`](src/migrations/1738700000000-AddFlavors.ts)
 
 ## DTOs and Validation
 

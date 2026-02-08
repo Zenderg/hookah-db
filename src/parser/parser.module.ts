@@ -7,9 +7,10 @@ import { TobaccoParserStrategy } from './strategies/tobacco-parser.strategy';
 import { Brand } from '../brands/brands.entity';
 import { Line } from '../lines/lines.entity';
 import { Tobacco } from '../tobaccos/tobaccos.entity';
+import { Flavor } from '../flavors/flavors.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Brand, Line, Tobacco])],
+  imports: [TypeOrmModule.forFeature([Brand, Line, Tobacco, Flavor])],
   providers: [
     ParserService,
     BrandParserStrategy,

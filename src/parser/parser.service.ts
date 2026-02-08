@@ -5,9 +5,11 @@ import { Repository } from 'typeorm';
 import { Brand } from '../brands/brands.entity';
 import { Line } from '../lines/lines.entity';
 import { Tobacco } from '../tobaccos/tobaccos.entity';
+import { Flavor } from '../flavors/flavors.entity';
 import { BrandParserStrategy } from './strategies/brand-parser.strategy';
 import { LineParserStrategy } from './strategies/line-parser.strategy';
 import { TobaccoParserStrategy } from './strategies/tobacco-parser.strategy';
+import { ParsedTobaccoData } from './strategies/tobacco-parser.strategy';
 
 @Injectable()
 export class ParserService {
@@ -20,6 +22,8 @@ export class ParserService {
     private readonly lineRepository: Repository<Line>,
     @InjectRepository(Tobacco)
     private readonly tobaccoRepository: Repository<Tobacco>,
+    @InjectRepository(Flavor)
+    private readonly flavorRepository: Repository<Flavor>,
     private readonly brandParserStrategy: BrandParserStrategy,
     private readonly lineParserStrategy: LineParserStrategy,
     private readonly tobaccoParserStrategy: TobaccoParserStrategy,
@@ -193,24 +197,14 @@ export class ParserService {
 
         for (const parsedTobacco of parsedTobaccos) {
           try {
-            const tobaccoData =
-              this.tobaccoParserStrategy.normalizeToEntity(parsedTobacco);
-            const existingTobacco = await this.tobaccoRepository.findOne({
-              where: { htreviewsId: tobaccoData.htreviewsId },
-            });
-
-            if (existingTobacco) {
-              await this.tobaccoRepository.update(
-                existingTobacco.id,
-                tobaccoData,
-              );
+            const { action } =
+              await this.saveTobaccoWithFlavors(parsedTobacco);
+            if (action === 'updated') {
               results.tobaccos.updated++;
-              this.logger.debug(`Updated tobacco: ${tobaccoData.name}`);
+              this.logger.debug(`Updated tobacco: ${parsedTobacco.name}`);
             } else {
-              const newTobacco = this.tobaccoRepository.create(tobaccoData);
-              await this.tobaccoRepository.save(newTobacco);
               results.tobaccos.created++;
-              this.logger.debug(`Created tobacco: ${tobaccoData.name}`);
+              this.logger.debug(`Created tobacco: ${parsedTobacco.name}`);
             }
           } catch (error) {
             results.tobaccos.errors++;
@@ -243,6 +237,49 @@ export class ParserService {
     );
 
     return results;
+  }
+
+  private async saveTobaccoWithFlavors(
+    parsedTobacco: ParsedTobaccoData,
+  ): Promise<{ action: 'created' | 'updated' }> {
+    const tobaccoData =
+      this.tobaccoParserStrategy.normalizeToEntity(parsedTobacco);
+
+    // Resolve flavors: find or create each flavor
+    const flavorEntities: Flavor[] = [];
+    for (const flavorName of parsedTobacco.flavors) {
+      let flavor = await this.flavorRepository.findOne({
+        where: { name: flavorName },
+      });
+      if (!flavor) {
+        flavor = this.flavorRepository.create({ name: flavorName });
+        flavor = await this.flavorRepository.save(flavor);
+      }
+      flavorEntities.push(flavor);
+    }
+
+    const existingTobacco = await this.tobaccoRepository.findOne({
+      where: { htreviewsId: tobaccoData.htreviewsId },
+    });
+
+    if (existingTobacco) {
+      await this.tobaccoRepository.update(existingTobacco.id, tobaccoData);
+      // Update flavors relation
+      const tobacco = await this.tobaccoRepository.findOne({
+        where: { id: existingTobacco.id },
+        relations: ['flavors'],
+      });
+      if (tobacco) {
+        tobacco.flavors = flavorEntities;
+        await this.tobaccoRepository.save(tobacco);
+      }
+      return { action: 'updated' };
+    } else {
+      const newTobacco = this.tobaccoRepository.create(tobaccoData);
+      newTobacco.flavors = flavorEntities;
+      await this.tobaccoRepository.save(newTobacco);
+      return { action: 'created' };
+    }
   }
 
   async parseBrandsManually(limit?: number): Promise<{
@@ -436,30 +473,14 @@ export class ParserService {
 
       for (const parsedTobacco of parsedTobaccos) {
         try {
-          const tobaccoData =
-            this.tobaccoParserStrategy.normalizeToEntity(parsedTobacco);
-
-          // Check if tobacco already exists by htreviewsId
-          const existingTobacco = await this.tobaccoRepository.findOne({
-            where: { htreviewsId: tobaccoData.htreviewsId },
-          });
-
-          if (existingTobacco) {
-            // Update existing tobacco
-            await this.tobaccoRepository.update(
-              existingTobacco.id,
-              tobaccoData,
-            );
+          const { action } =
+            await this.saveTobaccoWithFlavors(parsedTobacco);
+          if (action === 'updated') {
             updatedCount++;
-            this.logger.debug(
-              `Updated tobacco: ${tobaccoData.name} (ID: ${existingTobacco.id})`,
-            );
+            this.logger.debug(`Updated tobacco: ${parsedTobacco.name}`);
           } else {
-            // Create new tobacco
-            const newTobacco = this.tobaccoRepository.create(tobaccoData);
-            await this.tobaccoRepository.save(newTobacco);
             createdCount++;
-            this.logger.debug(`Created tobacco: ${tobaccoData.name}`);
+            this.logger.debug(`Created tobacco: ${parsedTobacco.name}`);
           }
         } catch (error) {
           errorCount++;
@@ -584,27 +605,10 @@ export class ParserService {
       );
       this.logger.log(`Parsed tobacco: ${parsedTobacco.name}`);
 
-      // Normalize to entity
-      const tobaccoData =
-        this.tobaccoParserStrategy.normalizeToEntity(parsedTobacco);
-
-      // Check if tobacco already exists by htreviewsId
-      const existingTobacco = await this.tobaccoRepository.findOne({
-        where: { htreviewsId: tobaccoData.htreviewsId },
-      });
-
-      if (existingTobacco) {
-        // Update existing tobacco
-        await this.tobaccoRepository.update(existingTobacco.id, tobaccoData);
-        this.logger.log(
-          `Updated tobacco: ${tobaccoData.name} (ID: ${existingTobacco.id})`,
-        );
-      } else {
-        // Create new tobacco
-        const newTobacco = this.tobaccoRepository.create(tobaccoData);
-        await this.tobaccoRepository.save(newTobacco);
-        this.logger.log(`Created tobacco: ${tobaccoData.name}`);
-      }
+      const { action } = await this.saveTobaccoWithFlavors(parsedTobacco);
+      this.logger.log(
+        `${action === 'created' ? 'Created' : 'Updated'} tobacco: ${parsedTobacco.name}`,
+      );
     } catch (error) {
       this.logger.error(
         `Failed to parse tobacco from URL ${url}: ${error instanceof Error ? error.message : String(error)}`,

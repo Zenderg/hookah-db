@@ -85,6 +85,12 @@
 - `eslint`: Linter
 - `prettier`: Code formatter
 
+### Database Migrations
+- `1706328000000-InitialSchema.ts`: Initial database schema (brands, lines, tobaccos, api_keys)
+- `1738572000000-AddFullTextSearch.ts`: Added full-text search indexes for tobaccos
+- `1738606800000-AddMultiLanguageFullTextSearch.ts`: Added multi-language full-text search (Russian + English)
+- `1738700000000-AddFlavors.ts`: Added flavors table and many-to-many relationship with tobaccos
+
 ## Development Setup
 
 ### Prerequisites

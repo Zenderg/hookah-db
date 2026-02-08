@@ -26,6 +26,7 @@ export class TobaccosRepository {
       country,
       status,
       search,
+      flavors,
     } = query;
     const skip = (page - 1) * limit;
 
@@ -37,8 +38,11 @@ export class TobaccosRepository {
     // Join with lines table for search
     queryBuilder.leftJoin('tobacco.line', 'line');
 
+    // Always join flavors so they are included in response
+    queryBuilder.leftJoinAndSelect('tobacco.flavors', 'tobaccoFlavor');
+
     // Select tobacco columns only (brand and line are joined only for filtering/search)
-    queryBuilder.select('tobacco');
+    queryBuilder.addSelect('tobacco');
 
     if (brandId) {
       queryBuilder.andWhere('tobacco.brandId = :brandId', { brandId });
@@ -62,6 +66,22 @@ export class TobaccosRepository {
 
     if (status) {
       queryBuilder.andWhere('tobacco.status = :status', { status });
+    }
+
+    // Filter by flavors (AND logic: tobacco must have ALL selected flavors)
+    if (flavors && flavors.length > 0) {
+      // Use a subquery to find tobaccos that have ALL requested flavors
+      queryBuilder.andWhere(
+        `tobacco.id IN (
+          SELECT tf."tobaccoId"
+          FROM tobacco_flavors tf
+          INNER JOIN flavors f ON f.id = tf."flavorId"
+          WHERE f.name IN (:...flavorNames)
+          GROUP BY tf."tobaccoId"
+          HAVING COUNT(DISTINCT f.id) = :flavorsCount
+        )`,
+        { flavorNames: flavors, flavorsCount: flavors.length },
+      );
     }
 
     if (search) {
@@ -164,11 +184,17 @@ export class TobaccosRepository {
   }
 
   async findOne(id: string): Promise<Tobacco | null> {
-    return this.tobaccoRepository.findOne({ where: { id } });
+    return this.tobaccoRepository.findOne({
+      where: { id },
+      relations: ['flavors'],
+    });
   }
 
   async findBySlug(slug: string): Promise<Tobacco | null> {
-    return this.tobaccoRepository.findOne({ where: { slug } });
+    return this.tobaccoRepository.findOne({
+      where: { slug },
+      relations: ['flavors'],
+    });
   }
 
   async findBySlugs(
@@ -181,6 +207,7 @@ export class TobaccosRepository {
     queryBuilder
       .leftJoin('tobacco.brand', 'brand')
       .leftJoin('tobacco.line', 'line')
+      .leftJoinAndSelect('tobacco.flavors', 'flavor')
       .where('brand.slug = :brandSlug', { brandSlug })
       .andWhere('line.slug = :lineSlug', { lineSlug })
       .andWhere('tobacco.slug = :tobaccoSlug', { tobaccoSlug });

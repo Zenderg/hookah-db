@@ -2,11 +2,11 @@
 
 ## Current State
 
-**Status:** PostgreSQL 18.1 migration completed. All parsers implemented and tested. Full-text search for tobaccos implemented with multi-language support (Russian + English).
+**Status:** PostgreSQL 18.1 migration completed. All parsers implemented and tested. Full-text search for tobaccos implemented with multi-language support (Russian + English). Flavors module implemented with many-to-many relationship to tobaccos.
 
 **Completed Features:**
 - ✅ NestJS application with modular architecture
-- ✅ PostgreSQL 18.1 database with all tables
+- ✅ PostgreSQL 18.1 database with all tables (brands, lines, tobaccos, flavors, api_keys)
 - ✅ API key authentication with request tracking
 - ✅ Brand, Line, and Tobacco parsers (Playwright-based)
 - ✅ RESTful API with filtering, sorting, and pagination
@@ -18,6 +18,7 @@
 - ✅ Global exception filter
 - ✅ Docker deployment setup
 - ✅ Comprehensive README.md documentation (Russian)
+- ✅ Flavors module with many-to-many relationship to tobaccos (2026-02-08)
 
 **Testing Status (2026-02-04):**
 - ✅ BrandsService tests (14 tests)
@@ -163,3 +164,28 @@ Complete NestJS-based project with feature-based modules:
 2. Monitor automatic nightly parsing performance
 3. Consider adding caching layer if performance issues arise
 4. Add integration tests for API endpoints and parser workflows
+
+### 2026-02-08
+- ✅ Implemented flavors module with many-to-many relationship to tobaccos
+  - Created [`FlavorsModule`](src/flavors/flavors.module.ts) with controller, service, and repository
+  - Created [`Flavor`](src/flavors/flavors.entity.ts) entity with id, name, createdAt, updatedAt fields
+  - Updated [`Tobacco`](src/tobaccos/tobaccos.entity.ts) entity to include many-to-many relationship with flavors
+  - Created migration [`1738700000000-AddFlavors.ts`](src/migrations/1738700000000-AddFlavors.ts) to add:
+    - `flavors` table with unique name constraint and index on name
+    - `tobacco_flavors` junction table for many-to-many relationship
+    - Foreign keys with CASCADE delete on both sides
+    - Indexes on junction table columns for performance
+  - Added [`GET /flavors`](src/flavors/flavors.controller.ts:17) endpoint to retrieve all flavors sorted by name (ASC)
+  - Registered [`FlavorsModule`](src/app.module.ts:16) in [`AppModule`](src/app.module.ts)
+  - Endpoint requires API key authentication (uses [`ApiKeyGuard`](src/common/guards/api-key.guard.ts))
+  - Response format: `[{ id, name, createdAt, updatedAt }]`
+  - **Benefits:**
+    - Allows clients to retrieve all available flavors for filtering
+    - Many-to-many relationship enables tobaccos to have multiple flavors
+    - Sorted response for consistent UI display
+    - Indexed queries for performance
+  - **Database Schema:**
+    - `flavors` table: id (UUID, PK), name (varchar, unique), createdAt, updatedAt
+    - `tobacco_flavors` junction table: tobaccoId (UUID, PK), flavorId (UUID, PK)
+    - Foreign keys: tobaccoId → tobaccos.id (CASCADE), flavorId → flavors.id (CASCADE)
+

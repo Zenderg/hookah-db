@@ -23,6 +23,7 @@ export type ParsedTobaccoData = {
   htreviewsId: string;
   imageUrl: string | null;
   description: string | null;
+  flavors: string[];
 };
 
 @Injectable()
@@ -456,6 +457,19 @@ export class TobaccoParserStrategy {
         }
       }
 
+      // Extract flavors: find all links with "r=flavor" in href
+      const flavors: string[] = [];
+      const allLinks = Array.from(document.querySelectorAll('a'));
+      for (const link of allLinks) {
+        const href = link.getAttribute('href') || '';
+        if (href.includes('r=flavor')) {
+          const flavorName = link.textContent?.trim();
+          if (flavorName && !flavors.includes(flavorName)) {
+            flavors.push(flavorName);
+          }
+        }
+      }
+
       // Extract rating and ratingsCount from rating box
       let rating = 0;
       let ratingsCount = 0;
@@ -494,6 +508,7 @@ export class TobaccoParserStrategy {
         htreviewsId,
         rating,
         ratingsCount,
+        flavors,
       };
     });
 
@@ -502,7 +517,8 @@ export class TobaccoParserStrategy {
         `name=${tobaccoData.name}, ` +
         `rating=${tobaccoData.rating}, ` +
         `ratingsCount=${tobaccoData.ratingsCount}, ` +
-        `htreviewsId=${tobaccoData.htreviewsId}`,
+        `htreviewsId=${tobaccoData.htreviewsId}, ` +
+        `flavors=[${tobaccoData.flavors.join(', ')}]`,
     );
 
     return {
@@ -518,6 +534,7 @@ export class TobaccoParserStrategy {
       htreviewsId: tobaccoData.htreviewsId,
       imageUrl: tobaccoData.imageUrl || '',
       description: tobaccoData.description || '',
+      flavors: tobaccoData.flavors || [],
     };
   }
 

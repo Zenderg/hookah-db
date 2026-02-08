@@ -24,7 +24,7 @@ This project exists to provide a centralized, structured API for hookah tobacco 
 ## How It Works
 
 1. **Data Collection:** Automated parser scrapes htreviews.org daily
-2. **Data Storage:** Structured data stored in SQLite database with TypeORM
+2. **Data Storage:** Structured data stored in PostgreSQL database with TypeORM
 3. **API Access:** RESTful endpoints provide filtered, sorted data to authorized clients
 4. **Authentication:** API key-based authentication ensures only authorized access
 5. **Maintenance:** Daily automatic updates keep data current
@@ -63,12 +63,13 @@ This project exists to provide a centralized, structured API for hookah tobacco 
 
 ### Included Features
 - Parsing tobacco data from htreviews.org
-- Storing data in SQLite database
-- RESTful API for brands, tobaccos, and lines
+- Storing data in PostgreSQL database
+- RESTful API for brands, tobaccos, lines, and flavors
 - Filtering and sorting capabilities
 - API key authentication
 - Daily automatic data refresh
 - Usage logging per client
+- Many-to-many relationship between tobaccos and flavors
 
 ### Explicitly Excluded Features
 - User accounts and authentication

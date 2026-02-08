@@ -5,10 +5,13 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
+  ManyToMany,
   JoinColumn,
+  JoinTable,
 } from 'typeorm';
 import { Brand } from '../brands/brands.entity';
 import { Line } from '../lines/lines.entity';
+import { Flavor } from '../flavors/flavors.entity';
 
 @Entity('tobaccos')
 export class Tobacco {
@@ -58,6 +61,14 @@ export class Tobacco {
 
   @Column({ type: 'text', nullable: true })
   description: string;
+
+  @ManyToMany(() => Flavor, (flavor) => flavor.tobaccos)
+  @JoinTable({
+    name: 'tobacco_flavors',
+    joinColumn: { name: 'tobaccoId', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'flavorId', referencedColumnName: 'id' },
+  })
+  flavors: Flavor[];
 
   @CreateDateColumn()
   createdAt: Date;

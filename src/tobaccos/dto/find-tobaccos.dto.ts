@@ -4,10 +4,11 @@ import {
   IsIn,
   IsUUID,
   IsNumber,
+  IsArray,
   Min,
   Max,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 
 export class FindTobaccosDto extends PaginationDto {
@@ -52,4 +53,10 @@ export class FindTobaccosDto extends PaginationDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @Transform(({ value }) => (Array.isArray(value) ? value : [value]))
+  flavors?: string[];
 }

@@ -13,6 +13,7 @@ import { ParserModule } from './parser/parser.module';
 import { BrandsModule } from './brands/brands.module';
 import { LinesModule } from './lines/lines.module';
 import { TobaccosModule } from './tobaccos/tobaccos.module';
+import { FlavorsModule } from './flavors/flavors.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { TobaccosModule } from './tobaccos/tobaccos.module';
     BrandsModule,
     LinesModule,
     TobaccosModule,
+    FlavorsModule,
   ],
   controllers: [AppController],
   providers: [
