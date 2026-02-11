@@ -17,6 +17,8 @@ export class LinesRepository {
 
     const queryBuilder = this.lineRepository.createQueryBuilder('line');
 
+    queryBuilder.leftJoinAndSelect('line.brand', 'brand');
+
     if (brandId) {
       queryBuilder.andWhere('line.brandId = :brandId', { brandId });
     }
@@ -35,7 +37,10 @@ export class LinesRepository {
   }
 
   async findOne(id: string): Promise<Line | null> {
-    return this.lineRepository.findOne({ where: { id } });
+    return this.lineRepository.findOne({
+      where: { id },
+      relations: ['brand'],
+    });
   }
 
   async getStatuses(): Promise<string[]> {

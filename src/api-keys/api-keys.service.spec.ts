@@ -85,7 +85,12 @@ describe('ApiKeysService', () => {
     it('should create a new API key with generated UUID', async () => {
       // Arrange
       const name = 'New API Key';
-      const createdApiKey = { ...mockApiKey, id: 'new-id', key: 'generated-uuid', name };
+      const createdApiKey = {
+        ...mockApiKey,
+        id: 'new-id',
+        key: 'generated-uuid',
+        name,
+      };
       mockApiKeysRepository.create.mockResolvedValue(createdApiKey);
 
       // Act
@@ -170,7 +175,9 @@ describe('ApiKeysService', () => {
       mockApiKeysRepository.findOneById.mockResolvedValue(null);
 
       // Act & Assert
-      await expect(service.deleteApiKey(apiKeyId)).rejects.toThrow(NotFoundException);
+      await expect(service.deleteApiKey(apiKeyId)).rejects.toThrow(
+        NotFoundException,
+      );
       await expect(service.deleteApiKey(apiKeyId)).rejects.toThrow(
         `API key with ID ${apiKeyId} not found`,
       );
@@ -299,7 +306,9 @@ describe('ApiKeysService', () => {
       // Assert
       expect(result).toBeNull();
       expect(mockApiKeysRepository.findOneByKey).toHaveBeenCalledWith(key);
-      expect(mockApiKeysRepository.incrementRequestCount).not.toHaveBeenCalled();
+      expect(
+        mockApiKeysRepository.incrementRequestCount,
+      ).not.toHaveBeenCalled();
       expect(mockApiKeysRepository.updateLastUsed).not.toHaveBeenCalled();
     });
 
@@ -315,7 +324,9 @@ describe('ApiKeysService', () => {
       // Assert
       expect(result).toBeNull();
       expect(mockApiKeysRepository.findOneByKey).toHaveBeenCalledWith(key);
-      expect(mockApiKeysRepository.incrementRequestCount).not.toHaveBeenCalled();
+      expect(
+        mockApiKeysRepository.incrementRequestCount,
+      ).not.toHaveBeenCalled();
       expect(mockApiKeysRepository.updateLastUsed).not.toHaveBeenCalled();
     });
 
@@ -330,7 +341,9 @@ describe('ApiKeysService', () => {
       await service.validateApiKey(key);
 
       // Assert
-      expect(mockApiKeysRepository.incrementRequestCount).toHaveBeenCalledTimes(1);
+      expect(mockApiKeysRepository.incrementRequestCount).toHaveBeenCalledTimes(
+        1,
+      );
       expect(mockApiKeysRepository.incrementRequestCount).toHaveBeenCalledWith(
         mockApiKey.id,
       );

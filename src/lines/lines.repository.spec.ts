@@ -31,6 +31,7 @@ describe('LinesRepository', () => {
   beforeEach(async () => {
     // Create mock query builder
     mockQueryBuilder = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
       select: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
@@ -79,7 +80,13 @@ describe('LinesRepository', () => {
         data: mockLines,
         total: 1,
       });
-      expect(mockLineRepository.createQueryBuilder).toHaveBeenCalledWith('line');
+      expect(mockLineRepository.createQueryBuilder).toHaveBeenCalledWith(
+        'line',
+      );
+      expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
+        'line.brand',
+        'brand',
+      );
       expect(mockQueryBuilder.skip).toHaveBeenCalledWith(0);
       expect(mockQueryBuilder.take).toHaveBeenCalledWith(20);
       expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith('line.name', 'ASC');
@@ -209,6 +216,7 @@ describe('LinesRepository', () => {
       expect(result).toEqual(mockLine);
       expect(mockLineRepository.findOne).toHaveBeenCalledWith({
         where: { id: lineId },
+        relations: ['brand'],
       });
     });
 
@@ -224,6 +232,7 @@ describe('LinesRepository', () => {
       expect(result).toBeNull();
       expect(mockLineRepository.findOne).toHaveBeenCalledWith({
         where: { id: lineId },
+        relations: ['brand'],
       });
     });
   });
@@ -247,10 +256,19 @@ describe('LinesRepository', () => {
         'Лимитированная',
         'Снята с производства',
       ]);
-      expect(mockLineRepository.createQueryBuilder).toHaveBeenCalledWith('line');
-      expect(mockQueryBuilder.select).toHaveBeenCalledWith('DISTINCT line.status');
-      expect(mockQueryBuilder.where).toHaveBeenCalledWith('line.status IS NOT NULL');
-      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith('line.status', 'ASC');
+      expect(mockLineRepository.createQueryBuilder).toHaveBeenCalledWith(
+        'line',
+      );
+      expect(mockQueryBuilder.select).toHaveBeenCalledWith(
+        'DISTINCT line.status',
+      );
+      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
+        'line.status IS NOT NULL',
+      );
+      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
+        'line.status',
+        'ASC',
+      );
       expect(mockQueryBuilder.getRawMany).toHaveBeenCalled();
     });
 
@@ -277,7 +295,9 @@ describe('LinesRepository', () => {
       const result = await repository.getStatuses();
 
       // Assert
-      expect(mockQueryBuilder.where).toHaveBeenCalledWith('line.status IS NOT NULL');
+      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
+        'line.status IS NOT NULL',
+      );
       expect(result).toEqual(['Выпускается', 'Лимитированная']);
     });
 
@@ -294,7 +314,10 @@ describe('LinesRepository', () => {
       await repository.getStatuses();
 
       // Assert
-      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith('line.status', 'ASC');
+      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
+        'line.status',
+        'ASC',
+      );
     });
   });
 });

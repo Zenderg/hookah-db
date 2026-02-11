@@ -7,7 +7,9 @@ import {
   ManyToOne,
   JoinColumn,
   Index,
+  AfterLoad,
 } from 'typeorm';
+import { buildLineHtreviewsUrl } from '../common/utils/htreviews-url';
 import { Brand } from '../brands/brands.entity';
 
 @Entity('lines')
@@ -50,9 +52,18 @@ export class Line {
   @Column()
   status: string;
 
+  htreviewsUrl: string;
+
   @CreateDateColumn()
   createdAt: Date;
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @AfterLoad()
+  computeHtreviewsUrl() {
+    if (this.brand?.slug) {
+      this.htreviewsUrl = buildLineHtreviewsUrl(this.brand.slug, this.slug);
+    }
+  }
 }

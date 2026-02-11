@@ -5,7 +5,9 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   Index,
+  AfterLoad,
 } from 'typeorm';
+import { buildBrandHtreviewsUrl } from '../common/utils/htreviews-url';
 
 @Entity('brands')
 export class Brand {
@@ -38,9 +40,16 @@ export class Brand {
   @Index('idx_brands_status')
   status: string;
 
+  htreviewsUrl: string;
+
   @CreateDateColumn()
   createdAt: Date;
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @AfterLoad()
+  computeHtreviewsUrl() {
+    this.htreviewsUrl = buildBrandHtreviewsUrl(this.slug);
+  }
 }

@@ -32,17 +32,9 @@ export class TobaccosRepository {
 
     const queryBuilder = this.tobaccoRepository.createQueryBuilder('tobacco');
 
-    // Join with brands table for country filtering and search
-    queryBuilder.leftJoin('tobacco.brand', 'brand');
-
-    // Join with lines table for search
-    queryBuilder.leftJoin('tobacco.line', 'line');
-
-    // Always join flavors so they are included in response
+    queryBuilder.leftJoinAndSelect('tobacco.brand', 'brand');
+    queryBuilder.leftJoinAndSelect('tobacco.line', 'line');
     queryBuilder.leftJoinAndSelect('tobacco.flavors', 'tobaccoFlavor');
-
-    // Select tobacco columns only (brand and line are joined only for filtering/search)
-    queryBuilder.addSelect('tobacco');
 
     if (brandId) {
       queryBuilder.andWhere('tobacco.brandId = :brandId', { brandId });
@@ -186,14 +178,14 @@ export class TobaccosRepository {
   async findOne(id: string): Promise<Tobacco | null> {
     return this.tobaccoRepository.findOne({
       where: { id },
-      relations: ['flavors'],
+      relations: ['brand', 'line', 'flavors'],
     });
   }
 
   async findBySlug(slug: string): Promise<Tobacco | null> {
     return this.tobaccoRepository.findOne({
       where: { slug },
-      relations: ['flavors'],
+      relations: ['brand', 'line', 'flavors'],
     });
   }
 
@@ -205,8 +197,8 @@ export class TobaccosRepository {
     const queryBuilder = this.tobaccoRepository.createQueryBuilder('tobacco');
 
     queryBuilder
-      .leftJoin('tobacco.brand', 'brand')
-      .leftJoin('tobacco.line', 'line')
+      .leftJoinAndSelect('tobacco.brand', 'brand')
+      .leftJoinAndSelect('tobacco.line', 'line')
       .leftJoinAndSelect('tobacco.flavors', 'flavor')
       .where('brand.slug = :brandSlug', { brandSlug })
       .andWhere('line.slug = :lineSlug', { lineSlug })

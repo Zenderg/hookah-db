@@ -222,8 +222,12 @@ describe('LinesService', () => {
       mockLinesRepository.findOne.mockResolvedValue(null);
 
       // Act & Assert
-      await expect(service.findTobaccosByLine(lineId, query)).rejects.toThrow(NotFoundException);
-      await expect(service.findTobaccosByLine(lineId, query)).rejects.toThrow('Line not found');
+      await expect(service.findTobaccosByLine(lineId, query)).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.findTobaccosByLine(lineId, query)).rejects.toThrow(
+        'Line not found',
+      );
       expect(mockLinesRepository.findOne).toHaveBeenCalledWith(lineId);
       expect(mockTobaccosRepository.findAll).not.toHaveBeenCalled();
     });

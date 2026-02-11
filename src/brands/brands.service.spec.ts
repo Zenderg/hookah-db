@@ -223,8 +223,12 @@ describe('BrandsService', () => {
       mockBrandsRepository.findOne.mockResolvedValue(null);
 
       // Act & Assert
-      await expect(service.findTobaccosByBrand(brandId, query)).rejects.toThrow(NotFoundException);
-      await expect(service.findTobaccosByBrand(brandId, query)).rejects.toThrow('Brand not found');
+      await expect(service.findTobaccosByBrand(brandId, query)).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.findTobaccosByBrand(brandId, query)).rejects.toThrow(
+        'Brand not found',
+      );
       expect(mockBrandsRepository.findOne).toHaveBeenCalledWith(brandId);
       expect(mockTobaccosRepository.findAll).not.toHaveBeenCalled();
     });

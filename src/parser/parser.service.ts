@@ -197,8 +197,7 @@ export class ParserService {
 
         for (const parsedTobacco of parsedTobaccos) {
           try {
-            const { action } =
-              await this.saveTobaccoWithFlavors(parsedTobacco);
+            const { action } = await this.saveTobaccoWithFlavors(parsedTobacco);
             if (action === 'updated') {
               results.tobaccos.updated++;
               this.logger.debug(`Updated tobacco: ${parsedTobacco.name}`);
@@ -473,8 +472,7 @@ export class ParserService {
 
       for (const parsedTobacco of parsedTobaccos) {
         try {
-          const { action } =
-            await this.saveTobaccoWithFlavors(parsedTobacco);
+          const { action } = await this.saveTobaccoWithFlavors(parsedTobacco);
           if (action === 'updated') {
             updatedCount++;
             this.logger.debug(`Updated tobacco: ${parsedTobacco.name}`);

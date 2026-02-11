@@ -1,9 +1,4 @@
-import {
-  Controller,
-  Get,
-  UseGuards,
-  UseInterceptors,
-} from '@nestjs/common';
+import { Controller, Get, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FlavorsService } from './flavors.service';
 import { ApiKeyGuard } from '../common/guards/api-key.guard';
 import { LoggingInterceptor } from '../common/interceptors/logging.interceptor';

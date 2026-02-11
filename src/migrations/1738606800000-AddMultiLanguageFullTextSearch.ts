@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddMultiLanguageFullTextSearch1738606800000
-  implements MigrationInterface
-{
+export class AddMultiLanguageFullTextSearch1738606800000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Drop existing simple configuration indexes
     await queryRunner.query(`DROP INDEX IF EXISTS idx_tobaccos_name_fulltext`);
@@ -56,12 +54,16 @@ export class AddMultiLanguageFullTextSearch1738606800000
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Drop Russian full-text search indexes
-    await queryRunner.query(`DROP INDEX IF EXISTS idx_tobaccos_name_fulltext_ru`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS idx_tobaccos_name_fulltext_ru`,
+    );
     await queryRunner.query(`DROP INDEX IF EXISTS idx_brands_name_fulltext_ru`);
     await queryRunner.query(`DROP INDEX IF EXISTS idx_lines_name_fulltext_ru`);
 
     // Drop English full-text search indexes
-    await queryRunner.query(`DROP INDEX IF EXISTS idx_tobaccos_name_fulltext_en`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS idx_tobaccos_name_fulltext_en`,
+    );
     await queryRunner.query(`DROP INDEX IF EXISTS idx_brands_name_fulltext_en`);
     await queryRunner.query(`DROP INDEX IF EXISTS idx_lines_name_fulltext_en`);
 

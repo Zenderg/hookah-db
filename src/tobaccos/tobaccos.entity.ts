@@ -8,7 +8,12 @@ import {
   ManyToMany,
   JoinColumn,
   JoinTable,
+  AfterLoad,
 } from 'typeorm';
+import {
+  buildLineHtreviewsUrl,
+  buildTobaccoHtreviewsUrl,
+} from '../common/utils/htreviews-url';
 import { Brand } from '../brands/brands.entity';
 import { Line } from '../lines/lines.entity';
 import { Flavor } from '../flavors/flavors.entity';
@@ -70,9 +75,30 @@ export class Tobacco {
   })
   flavors: Flavor[];
 
+  htreviewsUrl: string;
+
   @CreateDateColumn()
   createdAt: Date;
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @AfterLoad()
+  computeHtreviewsUrl() {
+    if (this.brand?.slug && this.line?.slug) {
+      this.htreviewsUrl = buildTobaccoHtreviewsUrl(
+        this.brand.slug,
+        this.line.slug,
+        this.slug,
+      );
+      // Line loaded as nested relation doesn't have its own brand loaded,
+      // so compute its htreviewsUrl here
+      if (!this.line.htreviewsUrl) {
+        this.line.htreviewsUrl = buildLineHtreviewsUrl(
+          this.brand.slug,
+          this.line.slug,
+        );
+      }
+    }
+  }
 }

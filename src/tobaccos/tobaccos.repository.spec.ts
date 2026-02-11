@@ -91,15 +91,14 @@ describe('TobaccosRepository', () => {
       expect(mockTobaccoRepository.createQueryBuilder).toHaveBeenCalledWith(
         'tobacco',
       );
-      expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith(
+      expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
         'tobacco.brand',
         'brand',
       );
-      expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith(
+      expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
         'tobacco.line',
         'line',
       );
-      expect(mockQueryBuilder.addSelect).toHaveBeenCalledWith('tobacco');
       expect(mockQueryBuilder.skip).toHaveBeenCalledWith(0);
       expect(mockQueryBuilder.take).toHaveBeenCalledWith(20);
       expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
@@ -306,11 +305,11 @@ describe('TobaccosRepository', () => {
       await repository.findAll(query);
 
       // Assert
-      expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith(
+      expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
         'tobacco.brand',
         'brand',
       );
-      expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith(
+      expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
         'tobacco.line',
         'line',
       );
@@ -434,8 +433,8 @@ describe('TobaccosRepository', () => {
 
       // Assert - check that addSelect was called with relevance score
       // calls[0] is addSelect('tobacco'), calls[1] is the relevance expression
-      const relevanceCall = mockQueryBuilder.addSelect.mock.calls.find(
-        (call) => (call[0] as string).includes('CASE WHEN'),
+      const relevanceCall = mockQueryBuilder.addSelect.mock.calls.find((call) =>
+        (call[0] as string).includes('CASE WHEN'),
       );
       expect(relevanceCall).toBeDefined();
       expect(relevanceCall![0]).toContain(
@@ -453,8 +452,8 @@ describe('TobaccosRepository', () => {
       await repository.findAll(query);
 
       // Assert - check that prefix match bonus is calculated
-      const relevanceCall = mockQueryBuilder.addSelect.mock.calls.find(
-        (call) => (call[0] as string).includes('CASE WHEN'),
+      const relevanceCall = mockQueryBuilder.addSelect.mock.calls.find((call) =>
+        (call[0] as string).includes('CASE WHEN'),
       );
       expect(relevanceCall).toBeDefined();
       expect(relevanceCall![0]).toContain(
@@ -472,8 +471,8 @@ describe('TobaccosRepository', () => {
       await repository.findAll(query);
 
       // Assert - check that brand prefix match bonus is calculated
-      const relevanceCall = mockQueryBuilder.addSelect.mock.calls.find(
-        (call) => (call[0] as string).includes('CASE WHEN'),
+      const relevanceCall = mockQueryBuilder.addSelect.mock.calls.find((call) =>
+        (call[0] as string).includes('CASE WHEN'),
       );
       expect(relevanceCall).toBeDefined();
       expect(relevanceCall![0]).toContain(
@@ -491,8 +490,8 @@ describe('TobaccosRepository', () => {
       await repository.findAll(query);
 
       // Assert - check that line prefix match bonus is calculated
-      const relevanceCall = mockQueryBuilder.addSelect.mock.calls.find(
-        (call) => (call[0] as string).includes('CASE WHEN'),
+      const relevanceCall = mockQueryBuilder.addSelect.mock.calls.find((call) =>
+        (call[0] as string).includes('CASE WHEN'),
       );
       expect(relevanceCall).toBeDefined();
       expect(relevanceCall![0]).toContain(
@@ -533,8 +532,8 @@ describe('TobaccosRepository', () => {
       await repository.findAll(query);
 
       // Assert - check that final score combines all components
-      const relevanceCall = mockQueryBuilder.addSelect.mock.calls.find(
-        (call) => (call[0] as string).includes('ts_rank'),
+      const relevanceCall = mockQueryBuilder.addSelect.mock.calls.find((call) =>
+        (call[0] as string).includes('ts_rank'),
       );
       expect(relevanceCall).toBeDefined();
       // Should contain base relevance (ts_rank)
@@ -594,7 +593,7 @@ describe('TobaccosRepository', () => {
       expect(result).toEqual(mockTobacco);
       expect(mockTobaccoRepository.findOne).toHaveBeenCalledWith({
         where: { id: tobaccoId },
-        relations: ['flavors'],
+        relations: ['brand', 'line', 'flavors'],
       });
     });
 
@@ -610,7 +609,7 @@ describe('TobaccosRepository', () => {
       expect(result).toBeNull();
       expect(mockTobaccoRepository.findOne).toHaveBeenCalledWith({
         where: { id: tobaccoId },
-        relations: ['flavors'],
+        relations: ['brand', 'line', 'flavors'],
       });
     });
   });
@@ -628,7 +627,7 @@ describe('TobaccosRepository', () => {
       expect(result).toEqual(mockTobacco);
       expect(mockTobaccoRepository.findOne).toHaveBeenCalledWith({
         where: { slug },
-        relations: ['flavors'],
+        relations: ['brand', 'line', 'flavors'],
       });
     });
 
@@ -644,7 +643,7 @@ describe('TobaccosRepository', () => {
       expect(result).toBeNull();
       expect(mockTobaccoRepository.findOne).toHaveBeenCalledWith({
         where: { slug },
-        relations: ['flavors'],
+        relations: ['brand', 'line', 'flavors'],
       });
     });
   });
