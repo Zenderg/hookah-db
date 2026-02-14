@@ -55,6 +55,7 @@ describe('BrandsService', () => {
       findOne: jest.fn(),
       getCountries: jest.fn(),
       getStatuses: jest.fn(),
+      getNames: jest.fn(),
     } as unknown as jest.Mocked<BrandsRepository>;
 
     mockTobaccosRepository = {
@@ -337,6 +338,37 @@ describe('BrandsService', () => {
 
       // Act
       const result = await service.getStatuses();
+
+      // Assert
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('getNames', () => {
+    it('should return list of all brand names', async () => {
+      // Arrange
+      const mockNames = [
+        'Adalya',
+        'Dark Side',
+        'Musthave',
+        'Tangiers',
+      ];
+      mockBrandsRepository.getNames.mockResolvedValue(mockNames);
+
+      // Act
+      const result = await service.getNames();
+
+      // Assert
+      expect(result).toEqual(mockNames);
+      expect(mockBrandsRepository.getNames).toHaveBeenCalled();
+    });
+
+    it('should return empty array when no brands exist', async () => {
+      // Arrange
+      mockBrandsRepository.getNames.mockResolvedValue([]);
+
+      // Act
+      const result = await service.getNames();
 
       // Assert
       expect(result).toEqual([]);

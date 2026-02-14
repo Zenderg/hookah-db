@@ -72,4 +72,8 @@ export class BrandsService {
   async getStatuses(): Promise<string[]> {
     return this.brandsRepository.getStatuses();
   }
+
+  async getNames(): Promise<string[]> {
+    return this.brandsRepository.getNames();
+  }
 }

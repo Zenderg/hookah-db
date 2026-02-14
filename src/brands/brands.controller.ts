@@ -36,6 +36,11 @@ export class BrandsController {
     return this.brandsService.getStatuses();
   }
 
+  @Get('names')
+  async getNames() {
+    return this.brandsService.getNames();
+  }
+
   @Get(':id')
   async findOne(@Param('id') id: string) {
     try {

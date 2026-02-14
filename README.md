@@ -52,6 +52,7 @@ curl -H "X-API-Key: <key>" http://localhost:3000/brands
 | `GET` | `/brands/:id/tobaccos` | Табаки бренда |
 | `GET` | `/brands/countries` | Список стран |
 | `GET` | `/brands/statuses` | Список статусов |
+| `GET` | `/brands/names` | Список имён брендов |
 | `GET` | `/tobaccos` | Список табаков (фильтры: brandId, lineId, rating, country, status, flavors, search) |
 | `GET` | `/tobaccos/:id` | Табак по ID |
 | `GET` | `/tobaccos/by-url` | Табак по URL с htreviews.org |

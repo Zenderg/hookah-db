@@ -76,4 +76,14 @@ export class BrandsRepository {
 
     return result.map((row: { status: string }) => row.status);
   }
+
+  async getNames(): Promise<string[]> {
+    const result = await this.brandRepository
+      .createQueryBuilder('brand')
+      .select('brand.name')
+      .orderBy('brand.name', 'ASC')
+      .getRawMany();
+
+    return result.map((row: { brand_name: string }) => row.brand_name);
+  }
 }
