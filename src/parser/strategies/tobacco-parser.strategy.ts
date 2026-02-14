@@ -217,8 +217,8 @@ export class TobaccoParserStrategy {
     const tobaccoUrls = new Set<string>();
     let previousCount = 0;
     let noNewContentCount = 0;
-    const maxNoNewContent = 5;
-    const maxScrollAttempts = 10;
+    const maxNoNewContent = 10;
+    const maxScrollAttempts = 50;
     let scrollAttempts = 0;
 
     while (
