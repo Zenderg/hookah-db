@@ -347,12 +347,7 @@ describe('BrandsService', () => {
   describe('getNames', () => {
     it('should return list of all brand names', async () => {
       // Arrange
-      const mockNames = [
-        'Adalya',
-        'Dark Side',
-        'Musthave',
-        'Tangiers',
-      ];
+      const mockNames = ['Adalya', 'Dark Side', 'Musthave', 'Tangiers'];
       mockBrandsRepository.getNames.mockResolvedValue(mockNames);
 
       // Act

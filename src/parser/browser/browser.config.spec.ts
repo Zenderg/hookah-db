@@ -80,7 +80,10 @@ describe('browser.config', () => {
         string,
         unknown
       >;
-      const viewport = contextOptions.viewport as { width: number; height: number };
+      const viewport = contextOptions.viewport as {
+        width: number;
+        height: number;
+      };
       expect(viewport).toEqual({ width: 1920, height: 1080 });
     });
 

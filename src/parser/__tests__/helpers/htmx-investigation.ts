@@ -279,8 +279,10 @@ async function main(): Promise<void> {
       // Match known HTMX patterns
       if (hasPaginationParams(c.request.url)) return true;
       if (c.request.url.includes('/tobaccos/')) return true;
-      if (c.request.url.includes('ajax') || c.request.url.includes('load')) return true;
-      if (c.request.url.includes('partial') || c.request.url.includes('htmx')) return true;
+      if (c.request.url.includes('ajax') || c.request.url.includes('load'))
+        return true;
+      if (c.request.url.includes('partial') || c.request.url.includes('htmx'))
+        return true;
       if (c.request.headers['hx-request'] === 'true') return true;
       // Catch POST requests to data endpoints (e.g. /postData)
       if (
@@ -356,9 +358,7 @@ async function main(): Promise<void> {
 
           console.log(`    Status: ${status}`);
           console.log(`    Body length: ${body.length}`);
-          console.log(
-            `    Snippet: ${truncate(body, 300)}`,
-          );
+          console.log(`    Snippet: ${truncate(body, 300)}`);
           console.log(`    Result: ${success ? '✅ SUCCESS' : '❌ FAILED'}`);
         } catch (err) {
           console.log(
@@ -438,14 +438,13 @@ async function main(): Promise<void> {
       console.log(`  child elements: ${finalAttrs.childCount}`);
     }
 
-    console.log(
-      `\n  Total captured relevant requests: ${captured.length}`,
-    );
-    console.log(
-      `  HTMX-like requests: ${htmxRequests.length}`,
-    );
+    console.log(`\n  Total captured relevant requests: ${captured.length}`);
+    console.log(`  HTMX-like requests: ${htmxRequests.length}`);
   } catch (err) {
-    console.error('\n[ERROR]', err instanceof Error ? err.message : String(err));
+    console.error(
+      '\n[ERROR]',
+      err instanceof Error ? err.message : String(err),
+    );
     if (err instanceof Error && err.stack) {
       console.error(err.stack);
     }
