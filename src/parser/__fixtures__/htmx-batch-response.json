@@ -1,0 +1,10 @@
+{
+  "_note": "Reference file — not used by test-server.ts (batches are generated programmatically). Documents the expected HTMX /postData response format.",
+  "items": [
+    { "id": "198641", "slug": "darkside/xperience/tobacco-21", "name": "Tobacco 21", "alt_name": "Вкус 21" },
+    { "id": "198642", "slug": "darkside/xperience/tobacco-22", "name": "Tobacco 22", "alt_name": "Вкус 22" },
+    { "id": "198643", "slug": "darkside/xperience/tobacco-23", "name": "Tobacco 23", "alt_name": "Вкус 23" },
+    { "id": "198644", "slug": "darkside/xperience/tobacco-24", "name": "Tobacco 24", "alt_name": "Вкус 24" },
+    { "id": "198645", "slug": "darkside/xperience/tobacco-25", "name": "Tobacco 25", "alt_name": "Вкус 25" }
+  ]
+}
