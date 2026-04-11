@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { chromium, Browser, Page, BrowserContext } from 'playwright';
+import type { Browser, Page, BrowserContext } from 'playwright';
 import { Brand } from '../../brands/brands.entity';
+import { createBrowser, createContext } from '../browser/browser.config';
+import { navigateWithCheck } from '../browser/http-checker';
 
 export type ParsedBrandData = {
   name: string;
@@ -23,10 +25,8 @@ export class BrandParserStrategy {
 
   async initialize(): Promise<void> {
     this.logger.log('Initializing Playwright browser...');
-    this.browser = await chromium.launch({
-      headless: true,
-    });
-    this.context = await this.browser.newContext();
+    this.browser = await createBrowser();
+    this.context = await createContext(this.browser);
     this.page = await this.context.newPage();
     this.logger.log('Playwright browser initialized');
   }
@@ -42,6 +42,44 @@ export class BrandParserStrategy {
       await this.browser.close();
     }
     this.logger.log('Playwright browser closed');
+  }
+
+  /**
+   * Navigate to URL with HTTP status verification.
+   * Uses navigateWithCheck for goto + status check + retry on 429.
+   * @param url - URL to navigate to (absolute)
+   */
+  private async safeNavigate(url: string): Promise<boolean> {
+    if (!this.page) {
+      throw new Error('Browser not initialized. Call initialize() first.');
+    }
+
+    this.logger.debug(`Navigating to ${url}`);
+
+    try {
+      const result = await navigateWithCheck(this.page, url);
+
+      if (!result.ok) {
+        this.logger.error(
+          `Navigation failed: HTTP ${result.status} for ${url}`,
+        );
+        return false;
+      }
+
+      // Wait for DOM content after successful navigation
+      await this.page.waitForLoadState('domcontentloaded', { timeout: 10000 });
+
+      // Wait for main content to appear
+      await this.page.waitForSelector('h1', { timeout: 10000 });
+
+      this.logger.debug(`Successfully navigated to ${url}`);
+      return true;
+    } catch (error) {
+      this.logger.error(
+        `Navigation error for ${url}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return false;
+    }
   }
 
   async parseBrands(limit?: number): Promise<ParsedBrandData[]> {
@@ -118,7 +156,10 @@ export class BrandParserStrategy {
       throw new Error('Browser not initialized');
     }
 
-    await this.page.goto(url, { waitUntil: 'networkidle' });
+    const navigated = await this.safeNavigate(url);
+    if (!navigated) {
+      return [];
+    }
 
     const brands: ParsedBrandData[] = [];
     const seenUrls = new Set<string>();
@@ -270,7 +311,10 @@ export class BrandParserStrategy {
       ? detailUrl
       : `https://htreviews.org${detailUrl}`;
 
-    await this.page.goto(fullUrl, { waitUntil: 'networkidle' });
+    const navigated = await this.safeNavigate(fullUrl);
+    if (!navigated) {
+      return { logoUrl: '', description: '', status: 'Не указано' };
+    }
 
     const data = await this.page.evaluate(() => {
       // Find logo image - look for img in object_image class
@@ -327,7 +371,20 @@ export class BrandParserStrategy {
 
     this.logger.log(`Parsing brand from URL: ${fullUrl}`);
 
-    await this.page.goto(fullUrl, { waitUntil: 'networkidle' });
+    const navigated = await this.safeNavigate(fullUrl);
+    if (!navigated) {
+      return {
+        name: '',
+        slug: '',
+        country: '',
+        rating: 0,
+        ratingsCount: 0,
+        description: '',
+        logoUrl: '',
+        detailUrl: url,
+        status: 'Не указано',
+      };
+    }
 
     // Extract basic brand data from detail page
     const data = await this.page.evaluate(() => {

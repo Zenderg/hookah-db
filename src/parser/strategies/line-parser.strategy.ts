@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { chromium, Browser, Page, BrowserContext } from 'playwright';
+import type { Browser, Page, BrowserContext } from 'playwright';
 import { Line } from '../../lines/lines.entity';
+import { createBrowser, createContext } from '../browser/browser.config';
+import { navigateWithCheck } from '../browser/http-checker';
 
 export type LineUrlInfo = {
   name: string;
@@ -36,10 +38,8 @@ export class LineParserStrategy {
 
   async initialize(): Promise<void> {
     this.logger.log('Initializing Playwright browser...');
-    this.browser = await chromium.launch({
-      headless: true,
-    });
-    this.context = await this.browser.newContext();
+    this.browser = await createBrowser();
+    this.context = await createContext(this.browser);
     this.page = await this.context.newPage();
     this.logger.log('Playwright browser initialized');
   }
@@ -55,6 +55,49 @@ export class LineParserStrategy {
       await this.browser.close();
     }
     this.logger.log('Playwright browser closed');
+  }
+
+  /**
+   * Navigate to URL with HTTP status verification.
+   * Uses navigateWithCheck for goto + status check + retry on 429.
+   * @param url - URL to navigate to (absolute or relative to htreviews.org)
+   * @returns true if navigation succeeded, false otherwise
+   */
+  private async safeNavigate(url: string): Promise<boolean> {
+    if (!this.page) {
+      throw new Error('Browser not initialized. Call initialize() first.');
+    }
+
+    const fullUrl = url.startsWith('http')
+      ? url
+      : `https://htreviews.org${url}`;
+
+    this.logger.debug(`Navigating to ${fullUrl}`);
+
+    try {
+      const result = await navigateWithCheck(this.page, fullUrl);
+
+      if (!result.ok) {
+        this.logger.error(
+          `Navigation failed: HTTP ${result.status} for ${fullUrl}`,
+        );
+        return false;
+      }
+
+      // Wait for DOM content after successful navigation
+      await this.page.waitForLoadState('domcontentloaded', { timeout: 10000 });
+
+      // Wait for main content to appear
+      await this.page.waitForSelector('h1', { timeout: 10000 });
+
+      this.logger.debug(`Successfully navigated to ${fullUrl}`);
+      return true;
+    } catch (error) {
+      this.logger.error(
+        `Navigation error for ${fullUrl}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return false;
+    }
   }
 
   async parseLines(
@@ -86,7 +129,7 @@ export class LineParserStrategy {
         this.logger.log(`Found ${lineData.length} lines on ${url}`);
 
         // Extract brand slug from URL for detail page navigation
-        const brandSlugMatch = url.match(/\/tobaccos\/([^\/]+)/);
+        const brandSlugMatch = url.match(/\/tobaccos\/([^/]+)/);
         const brandSlug = brandSlugMatch ? brandSlugMatch[1] : '';
 
         for (const line of lineData) {
@@ -162,10 +205,10 @@ export class LineParserStrategy {
       throw new Error('Browser not initialized');
     }
 
-    const fullUrl = url.startsWith('http')
-      ? url
-      : `https://htreviews.org${url}`;
-    await this.page.goto(fullUrl, { waitUntil: 'networkidle' });
+    const success = await this.safeNavigate(url);
+    if (!success) {
+      return [];
+    }
 
     const lines = await this.page.evaluate(() => {
       const lineItems: ParsedLineData[] = [];
@@ -313,7 +356,17 @@ export class LineParserStrategy {
     this.logger.debug(`Parsing line detail page: ${fullUrl}`);
 
     try {
-      await this.page.goto(fullUrl, { waitUntil: 'networkidle' });
+      const success = await this.safeNavigate(fullUrl);
+      if (!success) {
+        return {
+          imageUrl: null,
+          ratingsCount: 0,
+          strengthOfficial: null,
+          strengthByRatings: null,
+          status: null,
+          description: null,
+        };
+      }
 
       const data = await this.page.evaluate(() => {
         // Get all elements for searching
@@ -444,13 +497,19 @@ export class LineParserStrategy {
 
         for (const script of jsonLdScripts) {
           try {
-            const data = JSON.parse(script.textContent || '');
+            const data = JSON.parse(script.textContent || '') as Record<
+              string,
+              unknown
+            >;
             // Check if it's a Product with description
-            if (data['@type'] === 'Product' && data.description) {
+            if (
+              data['@type'] === 'Product' &&
+              typeof data.description === 'string'
+            ) {
               description = data.description;
               break;
             }
-          } catch (e) {
+          } catch {
             // Skip invalid JSON
           }
         }
