@@ -1,6 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { chromium, Browser, Page, BrowserContext } from 'playwright';
+import type { Browser, Page, BrowserContext } from 'playwright';
 import { Tobacco } from '../../tobaccos/tobaccos.entity';
+import { createBrowser, createContext } from '../browser/browser.config';
+import { navigateWithCheck } from '../browser/http-checker';
+import {
+  loadAllItems,
+  type ItemLoadResult,
+  type ItemLoaderOptions,
+} from '../browser/item-loader';
 
 export type TobaccoUrlInfo = {
   url: string;
@@ -35,10 +42,8 @@ export class TobaccoParserStrategy {
 
   async initialize(): Promise<void> {
     this.logger.log('Initializing Playwright browser...');
-    this.browser = await chromium.launch({
-      headless: true,
-    });
-    this.context = await this.browser.newContext();
+    this.browser = await createBrowser();
+    this.context = await createContext(this.browser);
     this.page = await this.context.newPage();
     this.logger.log('Playwright browser initialized');
   }
@@ -57,12 +62,11 @@ export class TobaccoParserStrategy {
   }
 
   /**
-   * Navigate to URL with retry mechanism to handle race conditions
-   * @param url - URL to navigate to
-   * @param retries - Number of retry attempts (default: 3)
-   * @returns Promise that resolves when navigation is successful
+   * Navigate to URL with HTTP status verification.
+   * Uses navigateWithCheck for goto + status check + retry on 429.
+   * @param url - URL to navigate to (absolute or relative to htreviews.org)
    */
-  private async safeNavigate(url: string, retries = 3): Promise<void> {
+  private async safeNavigate(url: string): Promise<void> {
     if (!this.page) {
       throw new Error('Browser not initialized. Call initialize() first.');
     }
@@ -71,56 +75,23 @@ export class TobaccoParserStrategy {
       ? url
       : `https://htreviews.org${url}`;
 
-    for (let attempt = 1; attempt <= retries; attempt++) {
-      try {
-        this.logger.debug(
-          `Navigating to ${fullUrl} (attempt ${attempt}/${retries})`,
-        );
+    this.logger.debug(`Navigating to ${fullUrl}`);
 
-        // Use 'commit' for faster initial response, then wait for domcontentloaded
-        await this.page.goto(fullUrl, {
-          waitUntil: 'commit',
-          timeout: 30000,
-        });
+    const result = await navigateWithCheck(this.page, fullUrl);
 
-        // Wait for DOM to be fully loaded
-        await this.page.waitForLoadState('domcontentloaded', {
-          timeout: 10000,
-        });
-
-        // Additional wait to ensure page is stable
-        await this.page.waitForTimeout(500);
-
-        // Verify page is stable (not loading)
-        const isStable = await this.page.evaluate(() => {
-          return document.readyState === 'complete';
-        });
-
-        if (!isStable) {
-          await this.page.waitForLoadState('load', { timeout: 10000 });
-        }
-
-        this.logger.debug(`Successfully navigated to ${fullUrl}`);
-        return;
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
-
-        if (attempt === retries) {
-          this.logger.error(
-            `Failed to navigate to ${fullUrl} after ${retries} attempts: ${errorMessage}`,
-          );
-          throw error;
-        }
-
-        this.logger.warn(
-          `Navigation attempt ${attempt}/${retries} failed for ${fullUrl}: ${errorMessage}. Retrying...`,
-        );
-
-        // Wait before retry
-        await this.page.waitForTimeout(1000 * attempt);
-      }
+    if (!result.ok) {
+      throw new Error(
+        `Navigation failed for ${fullUrl}: HTTP ${result.status}`,
+      );
     }
+
+    // Wait for DOM content after successful navigation
+    await this.page.waitForLoadState('domcontentloaded', { timeout: 10000 });
+
+    // Wait for main content to appear
+    await this.page.waitForSelector('h1', { timeout: 10000 });
+
+    this.logger.debug(`Successfully navigated to ${fullUrl}`);
   }
 
   async parseTobaccos(
@@ -197,7 +168,8 @@ export class TobaccoParserStrategy {
   }
 
   /**
-   * Extract tobacco URLs from line detail page
+   * Extract tobacco URLs from line detail page using HTMX direct loading
+   * with scroll fallback.
    */
   private async extractTobaccoUrlsFromLinePage(
     lineInfo: TobaccoUrlInfo,
@@ -213,94 +185,38 @@ export class TobaccoParserStrategy {
     this.logger.debug(`Navigating to: ${fullUrl}`);
     await this.safeNavigate(fullUrl);
 
-    // Handle infinite scroll
-    const tobaccoUrls = new Set<string>();
-    let previousCount = 0;
-    let noNewContentCount = 0;
-    const maxNoNewContent = 10;
-    const maxScrollAttempts = 50;
-    let scrollAttempts = 0;
+    const options: ItemLoaderOptions = {
+      containerSelector: '.tobacco_list_items',
+      itemSelector: '.tobacco_list_item',
+      baseUrl: 'https://htreviews.org',
+      maxScrollAttempts: 100,
+      maxNoNewContent: 15,
+      waitForNewItemMs: 2000,
+    };
 
-    while (
-      noNewContentCount < maxNoNewContent &&
-      scrollAttempts < maxScrollAttempts
-    ) {
-      scrollAttempts++;
+    const result: ItemLoadResult = await loadAllItems(this.page, options);
 
-      // Scroll gradually to trigger infinite scroll
-      await this.page.evaluate(() => {
-        window.scrollBy(0, window.innerHeight);
-      });
-      await this.page.waitForTimeout(1000);
+    this.logger.log(`Loaded tobaccos via ${result.method} for ${fullUrl}`);
 
-      // Extract tobacco URLs
-      const urls = await this.page.evaluate(() => {
-        const urls: string[] = [];
-
-        // Find all tobacco links in "Вкусы" section
-        // Look for links that match pattern: /tobaccos/{brand}/{line}/{tobacco}
-        const allLinks = Array.from(document.querySelectorAll('a'));
-
-        console.log('Total links on page:', allLinks.length);
-
-        for (const link of allLinks) {
-          const href = link.getAttribute('href');
-          if (!href) continue;
-
-          // Match pattern: /tobaccos/{brand}/{line}/{tobacco}
-          // Works for both absolute (https://...) and relative (/tobaccos/...) URLs
-          const match = href.match(/\/tobaccos\/([^/]+)\/([^/]+)\/([^/?#]+)/);
-          if (match) {
-            // Convert to absolute URL for consistency
-            const absoluteUrl = href.startsWith('http')
-              ? href
-              : `https://htreviews.org${href}`;
-            urls.push(absoluteUrl);
-          }
-        }
-
-        console.log('Found matching URLs:', urls.length);
-        console.log('Sample URLs:', urls.slice(0, 5));
-
-        return urls;
-      });
-
-      // Filter to only include tobaccos from this line
-      const filteredUrls = urls.filter((url) => {
-        const match = url.match(/\/tobaccos\/([^/]+)\/([^/]+)\/([^/?#]+)/);
-        if (!match) return false;
-        const [, brand, line] = match;
-        return line === lineInfo.lineSlug && brand === lineInfo.brandSlug;
-      });
-
-      // Add new URLs to set (deduplicates automatically)
-      let addedCount = 0;
-      for (const url of filteredUrls) {
-        if (!tobaccoUrls.has(url)) {
-          tobaccoUrls.add(url);
-          addedCount++;
-        }
-      }
-
-      this.logger.debug(
-        `Scroll iteration ${scrollAttempts}: added ${addedCount} new URLs, total ${tobaccoUrls.size}`,
+    if (!result.isComplete) {
+      this.logger.warn(
+        `Loaded ${result.loadedCount} of ${result.totalCount} tobaccos for ${fullUrl}`,
       );
-
-      // Check if new content was loaded
-      const currentCount = tobaccoUrls.size;
-      if (currentCount === previousCount) {
-        noNewContentCount++;
-      } else {
-        noNewContentCount = 0;
-        previousCount = currentCount;
-      }
     }
 
+    // Filter URLs by brand/line slug prefix
+    const filteredUrls = result.urls.filter((url) => {
+      const match = url.match(/\/tobaccos\/([^/]+)\/([^/]+)\/([^/?#]+)/);
+      if (!match) return false;
+      const [, brand, line] = match;
+      return line === lineInfo.lineSlug && brand === lineInfo.brandSlug;
+    });
+
     this.logger.debug(
-      `Final count for line ${lineInfo.lineSlug}: ${tobaccoUrls.size} tobacco URLs`,
+      `Filtered to ${filteredUrls.length} URLs for line ${lineInfo.lineSlug}`,
     );
 
-    return Array.from(tobaccoUrls);
+    return filteredUrls;
   }
 
   /**
