@@ -54,3 +54,7 @@ dist
 # Temporary files
 *.tmp
 *.temp
+
+.playwright-mcp
+.opencode
+.agents
