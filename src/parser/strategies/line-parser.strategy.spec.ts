@@ -139,6 +139,7 @@ describe('LineParserStrategy', () => {
     });
     expect(mockWaitForSelector).toHaveBeenCalledWith('h1', {
       timeout: 10000,
+      state: 'attached',
     });
   });
 

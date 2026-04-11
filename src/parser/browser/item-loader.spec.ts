@@ -26,11 +26,15 @@ function createMockPage() {
   const mockWaitForFunction = jest.fn();
   const mockWaitForTimeout = jest.fn();
   const mockPost = jest.fn();
+  // page.$(selector) → Promise<ElementHandle | null>
+  // Always return null so extractLineId falls through to page.evaluate()
+  const mock$ = jest.fn().mockResolvedValue(null);
 
   const mockPage = {
     evaluate: mockEvaluate,
     waitForFunction: mockWaitForFunction,
     waitForTimeout: mockWaitForTimeout,
+    $: mock$,
     request: { post: mockPost },
   } as unknown as Page;
 
@@ -40,6 +44,7 @@ function createMockPage() {
     mockWaitForFunction,
     mockWaitForTimeout,
     mockPost,
+    mock$,
   };
 }
 
@@ -246,7 +251,7 @@ describe('loadAllItems', () => {
 
     await loadAllItems(mockPage, defaultOptions);
 
-    expect(mockPost).toHaveBeenCalledWith('/postData', {
+    expect(mockPost).toHaveBeenCalledWith('https://htreviews.org/postData', {
       data: {
         action: 'objectByLine',
         data: {

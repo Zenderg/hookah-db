@@ -63,47 +63,58 @@ function delay(ms: number): Promise<void> {
  *
  * Multiple extraction strategies are tried in order of specificity:
  *
- * 1. `"action":"objectByLine"` … `"id":"391"` — the most reliable pattern,
+ * 1. `.object_wrapper[data-id]` — a simple DOM query for the element that
+ *    wraps the line object; no regex needed, most reliable.
+ * 2. `"action":"objectByLine"` … `"id":"391"` — the most reliable pattern,
  *    looks for the exact action name used in the request body near the line id.
- * 2. `objectByLine` (loose) … `"id":"391"` — same idea but tolerant of
+ * 3. `objectByLine` (loose) … `"id":"391"` — same idea but tolerant of
  *    whitespace / property ordering between the two tokens.
- * 3. `postData` … `"id":"391"` — the endpoint name appears near the payload.
- * 4. `data-count` / `data-offset` … `"id":"391"` — container attribute names
+ * 4. `postData` … `"id":"391"` — the endpoint name appears near the payload.
+ * 5. `data-count` / `data-offset` … `"id":"391"` — container attribute names
  *    may appear in the same script that reads them.
- * 5. `lineId` / `line_id` variable assignment.
- * 6. `data-line-id` attribute on the container element (HTML fallback).
+ * 6. `lineId` / `line_id` variable assignment.
+ * 7. `data-line-id` attribute on the container element (HTML fallback).
  */
-async function extractLineId(page: Page): Promise<string | null> {
+export async function extractLineId(page: Page): Promise<string | null> {
+  // Strategy 1: .object_wrapper[data-id] — the most reliable method
+  const objectWrapper = await page.$('.object_wrapper[data-id]');
+  if (objectWrapper) {
+    const attrId = await objectWrapper.getAttribute('data-id');
+    if (attrId && /^\d+$/.test(attrId)) {
+      return attrId;
+    }
+  }
+
   return page.evaluate(() => {
     const scripts = Array.from(document.querySelectorAll('script'));
 
     for (const script of scripts) {
       const text = script.textContent ?? '';
 
-      // Strategy 1: exact action + id in JSON-like structure
+      // Strategy 2: exact action + id in JSON-like structure
       const m1 = text.match(
         /"action"\s*:\s*"objectByLine"[\s\S]{0,300}?"id"\s*:\s*"(\d+)"/,
       );
       if (m1) return m1[1];
 
-      // Strategy 2: loose — "objectByLine" then "id" within 200 chars
+      // Strategy 3: loose — "objectByLine" then "id" within 200 chars
       const m2 = text.match(/objectByLine[\s\S]{0,200}?"id"\s*:\s*"(\d+)"/);
       if (m2) return m2[1];
 
-      // Strategy 3: endpoint name near id
+      // Strategy 4: endpoint name near id
       const m3 = text.match(/postData[\s\S]{0,300}?"id"\s*:\s*"(\d+)"/);
       if (m3) return m3[1];
 
-      // Strategy 4: container data attributes near id
+      // Strategy 5: container data attributes near id
       const m4 = text.match(/data-count[\s\S]{0,300}?"id"\s*:\s*"(\d+)"/);
       if (m4) return m4[1];
 
-      // Strategy 5: lineId / line_id variable
+      // Strategy 6: lineId / line_id variable
       const m5 = text.match(/(?:line_id|lineId)\s*[:=]\s*["']?(\d+)["']?/);
       if (m5) return m5[1];
     }
 
-    // Strategy 6: data attribute on container element
+    // Strategy 7: data attribute on container element
     const container = document.querySelector('.tobacco_list_items');
     if (container) {
       const attrId = container.getAttribute('data-line-id');
@@ -192,6 +203,7 @@ async function extractUrlsFromDom(
  */
 async function fetchHtmxBatch(
   page: Page,
+  baseUrl: string,
   lineId: string,
   offset: number,
   limit: number,
@@ -208,7 +220,7 @@ async function fetchHtmxBatch(
 
   for (let attempt = 0; attempt <= HTMX_RETRY_ATTEMPTS; attempt++) {
     try {
-      const response = await page.request.post(HTMX_PATH, {
+      const response = await page.request.post(`${baseUrl}${HTMX_PATH}`, {
         data: body,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -277,7 +289,13 @@ async function loadViaHtmx(
   let currentOffset = offset;
 
   while (currentOffset < count) {
-    const items = await fetchHtmxBatch(page, lineId, currentOffset, target);
+    const items = await fetchHtmxBatch(
+      page,
+      options.baseUrl,
+      lineId,
+      currentOffset,
+      target,
+    );
 
     if (items === null) {
       // Persistent failure — tell caller to fall back

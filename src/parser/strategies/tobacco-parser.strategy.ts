@@ -88,8 +88,14 @@ export class TobaccoParserStrategy {
     // Wait for DOM content after successful navigation
     await this.page.waitForLoadState('domcontentloaded', { timeout: 10000 });
 
-    // Wait for main content to appear
-    await this.page.waitForSelector('h1', { timeout: 10000 });
+    // Wait for main content to be present in DOM
+    // Note: state 'attached' instead of 'visible' — htreviews.org H1 elements
+    // may not satisfy Playwright's strict visibility check (e.g. zero-size,
+    // overflow:hidden parent) even though the page is fully loaded.
+    await this.page.waitForSelector('h1', {
+      timeout: 10000,
+      state: 'attached',
+    });
 
     this.logger.debug(`Successfully navigated to ${fullUrl}`);
   }
