@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import * as Sentry from '@sentry/nestjs';
 import type { Browser, Page, BrowserContext } from 'playwright';
 import { Line } from '../../lines/lines.entity';
 import { createBrowser, createContext } from '../browser/browser.config';
@@ -176,6 +177,17 @@ export class LineParserStrategy {
               this.logger.warn(
                 `Failed to extract additional data for ${line.name}: ${error instanceof Error ? error.message : String(error)}`,
               );
+              Sentry.captureException(error, (scope) => {
+                scope.setTag('parser_strategy', 'line');
+                scope.setTag('entity_slug', line.slug || 'unknown');
+                scope.setContext('parser', {
+                  strategy: 'line',
+                  entityName: line.name,
+                  entitySlug: line.slug,
+                  brandSlug,
+                });
+                return scope;
+              });
               // Continue with line even if detail page extraction fails
             }
           }
@@ -192,6 +204,16 @@ export class LineParserStrategy {
         this.logger.error(
           `Failed to parse lines from ${url}: ${error instanceof Error ? error.message : String(error)}`,
         );
+        Sentry.captureException(error, (scope) => {
+          scope.setTag('parser_strategy', 'line');
+          scope.setTag('entity_slug', brandId || 'unknown');
+          scope.setContext('parser', {
+            strategy: 'line',
+            entityUrl: url,
+            brandId,
+          });
+          return scope;
+        });
         // Continue with next brand on error
       }
     }
@@ -216,124 +238,157 @@ export class LineParserStrategy {
       return [];
     }
 
-    const lines = await this.page.evaluate(() => {
-      const lineItems: ParsedLineData[] = [];
+    const { items: lineItems, errors: lineErrors } = await this.page.evaluate(
+      () => {
+        const lineItems: ParsedLineData[] = [];
+        const lineErrors: { itemName: string; message: string }[] = [];
 
-      // Find "Линейки" section - look for h2 containing "Линейки"
-      const allHeadings = Array.from(document.querySelectorAll('h2'));
-      const linesHeading = allHeadings.find((h2) => {
-        const text = h2.textContent?.trim() || '';
-        return text.includes('Линейки');
-      });
+        // Find "Линейки" section - look for h2 containing "Линейки"
+        const allHeadings = Array.from(document.querySelectorAll('h2'));
+        const linesHeading = allHeadings.find((h2) => {
+          const text = h2.textContent?.trim() || '';
+          return text.includes('Линейки');
+        });
 
-      if (!linesHeading) {
-        console.log('No "Линейки" heading found');
-        return lineItems;
-      }
-
-      // Get container after heading - it's a sibling of heading's parent
-      const headingParent = linesHeading.parentElement;
-      const linesContainer = headingParent?.nextElementSibling;
-      if (!linesContainer) {
-        console.log('No container found after "Линейки" heading');
-        return lineItems;
-      }
-
-      // Find all line items - each line item is a child element (div/generic)
-      // The first child contains link and heading
-      const lineElements = Array.from(linesContainer.children).filter(
-        (child) => {
-          // Check if first child contains a link with h3
-          const firstChild = child.firstElementChild;
-          if (firstChild) {
-            const link = firstChild.querySelector('a');
-            const heading = firstChild.querySelector('h3');
-            return link && heading;
-          }
-          return false;
-        },
-      );
-
-      console.log(`Found ${lineElements.length} line elements`);
-
-      lineElements.forEach((element) => {
-        try {
-          // The link and heading are inside first child element
-          const firstChild = element.firstElementChild;
-          if (!firstChild) {
-            return;
-          }
-
-          // Extract line name from heading
-          const headingElement = firstChild.querySelector('h3');
-          const name = headingElement?.textContent?.trim() || '';
-
-          // Extract URL slug from link
-          const linkElement = firstChild.querySelector('a');
-          const detailUrl = linkElement?.getAttribute('href') || '';
-
-          // Extract slug from URL (format: dogma/100-sigarnyy-pank or /tobaccos/dogma/100-sigarnyy-pank)
-          let slug = '';
-          if (detailUrl) {
-            const urlMatch = detailUrl.match(/([^/]+)\/([^/]+)$/);
-            if (urlMatch) {
-              slug = urlMatch[2]; // Get last segment (line slug)
-            }
-          }
-
-          // Skip if no name or slug
-          if (!name || !slug) {
-            return;
-          }
-
-          // Extract rating - use specific selector for .lines_item_score div
-          let rating = 0;
-          const scoreElement = element.querySelector('.lines_item_score');
-          if (scoreElement) {
-            const ratingSpan = scoreElement.querySelector('span');
-            const ratingText = ratingSpan?.textContent?.trim() || '';
-            const parsedRating = parseFloat(ratingText);
-            if (!isNaN(parsedRating) && parsedRating > 0 && parsedRating <= 5) {
-              rating = parsedRating;
-            }
-          }
-
-          // Extract description - find longest text (>50 chars) from child elements
-          let description = '';
-          const allTextElements = Array.from(element.children).slice(1); // Skip first child (has link/heading)
-          for (const textElement of allTextElements) {
-            const text = textElement.textContent?.trim() || '';
-            if (
-              text.length > 50 &&
-              text.length > description.length &&
-              !text.includes('вкусов')
-            ) {
-              description = text;
-            }
-          }
-
-          lineItems.push({
-            name,
-            slug,
-            brandId: '', // Will be set by caller
-            description: description || null,
-            imageUrl: null, // Will be extracted from detail page if needed
-            strengthOfficial: null, // Will be extracted from detail page
-            strengthByRatings: null, // Not available on brand page
-            status: null, // Will be extracted from detail page
-            rating,
-            ratingsCount: 0, // Will be extracted from detail page
-          });
-        } catch (error) {
-          console.error('Error parsing line item:', error);
+        if (!linesHeading) {
+          console.log('No "Линейки" heading found');
+          return { items: lineItems, errors: lineErrors };
         }
-      });
 
-      return lineItems;
-    });
+        // Get container after heading - it's a sibling of heading's parent
+        const headingParent = linesHeading.parentElement;
+        const linesContainer = headingParent?.nextElementSibling;
+        if (!linesContainer) {
+          console.log('No container found after "Линейки" heading');
+          return { items: lineItems, errors: lineErrors };
+        }
+
+        // Find all line items - each line item is a child element (div/generic)
+        // The first child contains link and heading
+        const lineElements = Array.from(linesContainer.children).filter(
+          (child) => {
+            // Check if first child contains a link with h3
+            const firstChild = child.firstElementChild;
+            if (firstChild) {
+              const link = firstChild.querySelector('a');
+              const heading = firstChild.querySelector('h3');
+              return link && heading;
+            }
+            return false;
+          },
+        );
+
+        console.log(`Found ${lineElements.length} line elements`);
+
+        lineElements.forEach((element) => {
+          try {
+            // The link and heading are inside first child element
+            const firstChild = element.firstElementChild;
+            if (!firstChild) {
+              return;
+            }
+
+            // Extract line name from heading
+            const headingElement = firstChild.querySelector('h3');
+            const name = headingElement?.textContent?.trim() || '';
+
+            // Extract URL slug from link
+            const linkElement = firstChild.querySelector('a');
+            const detailUrl = linkElement?.getAttribute('href') || '';
+
+            // Extract slug from URL (format: dogma/100-sigarnyy-pank or /tobaccos/dogma/100-sigarnyy-pank)
+            let slug = '';
+            if (detailUrl) {
+              const urlMatch = detailUrl.match(/([^/]+)\/([^/]+)$/);
+              if (urlMatch) {
+                slug = urlMatch[2]; // Get last segment (line slug)
+              }
+            }
+
+            // Skip if no name or slug
+            if (!name || !slug) {
+              return;
+            }
+
+            // Extract rating - use specific selector for .lines_item_score div
+            let rating = 0;
+            const scoreElement = element.querySelector('.lines_item_score');
+            if (scoreElement) {
+              const ratingSpan = scoreElement.querySelector('span');
+              const ratingText = ratingSpan?.textContent?.trim() || '';
+              const parsedRating = parseFloat(ratingText);
+              if (
+                !isNaN(parsedRating) &&
+                parsedRating > 0 &&
+                parsedRating <= 5
+              ) {
+                rating = parsedRating;
+              }
+            }
+
+            // Extract description - find longest text (>50 chars) from child elements
+            let description = '';
+            const allTextElements = Array.from(element.children).slice(1); // Skip first child (has link/heading)
+            for (const textElement of allTextElements) {
+              const text = textElement.textContent?.trim() || '';
+              if (
+                text.length > 50 &&
+                text.length > description.length &&
+                !text.includes('вкусов')
+              ) {
+                description = text;
+              }
+            }
+
+            lineItems.push({
+              name,
+              slug,
+              brandId: '', // Will be set by caller
+              description: description || null,
+              imageUrl: null, // Will be extracted from detail page if needed
+              strengthOfficial: null, // Will be extracted from detail page
+              strengthByRatings: null, // Not available on brand page
+              status: null, // Will be extracted from detail page
+              rating,
+              ratingsCount: 0, // Will be extracted from detail page
+            });
+          } catch (error) {
+            const itemName =
+              element.firstElementChild
+                ?.querySelector('h3')
+                ?.textContent?.trim() || 'unknown';
+            lineErrors.push({
+              itemName,
+              message: error instanceof Error ? error.message : String(error),
+            });
+          }
+        });
+
+        return { items: lineItems, errors: lineErrors };
+      },
+    );
+
+    // Report individual line parsing errors to Sentry (from Node context)
+    for (const lineError of lineErrors) {
+      this.logger.warn(
+        `Error parsing line item "${lineError.itemName}": ${lineError.message}`,
+      );
+      const error = new Error(lineError.message);
+      Sentry.captureException(error, (scope) => {
+        scope.setTag('parser_strategy', 'line');
+        scope.setTag('entity_slug', lineError.itemName);
+        scope.setContext('parser', {
+          strategy: 'line',
+          entityName: lineError.itemName,
+          brandUrl: url,
+          errorSource: 'page.evaluate',
+        });
+        return scope;
+      });
+    }
 
     // Set brandId for all lines
-    return lines.map((line) => ({
+    return lineItems.map((line) => ({
       ...line,
       brandId,
     }));

@@ -14,6 +14,7 @@ import { BrandsModule } from './brands/brands.module';
 import { LinesModule } from './lines/lines.module';
 import { TobaccosModule } from './tobaccos/tobaccos.module';
 import { FlavorsModule } from './flavors/flavors.module';
+import { SentryModule } from '@sentry/nestjs/setup';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { FlavorsModule } from './flavors/flavors.module';
     LinesModule,
     TobaccosModule,
     FlavorsModule,
+    SentryModule.forRoot(),
   ],
   controllers: [AppController],
   providers: [

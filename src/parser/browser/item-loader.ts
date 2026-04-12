@@ -318,7 +318,7 @@ async function loadViaHtmx(
       `HTMX batch offset ${currentOffset}: +${items.length} items → ${existingUrls.size} total`,
     );
 
-    currentOffset += target;
+    currentOffset += items.length;
   }
 
   return { urls: existingUrls, success: true };

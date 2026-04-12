@@ -130,7 +130,7 @@ describe('LineParserStrategy', () => {
       url: `https://htreviews.org${brandUrl}`,
     });
 
-    mockEvaluate.mockResolvedValue([]);
+    mockEvaluate.mockResolvedValue({ items: [], errors: [] });
 
     await strategy.parseLines([{ url: brandUrl, brandId }]);
 
@@ -159,7 +159,10 @@ describe('LineParserStrategy', () => {
       });
 
     // Brand page returns one line
-    mockEvaluate.mockResolvedValueOnce([mockLineFromBrandPage]);
+    mockEvaluate.mockResolvedValueOnce({
+      items: [mockLineFromBrandPage],
+      errors: [],
+    });
 
     const result = await strategy.parseLines([{ url: brandUrl, brandId }]);
 

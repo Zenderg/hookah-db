@@ -222,7 +222,7 @@ describe('loadAllItems', () => {
     const { mockPage, mockEvaluate, mockPost } = createMockPage();
 
     mockEvaluate
-      .mockResolvedValueOnce({ count: 25, offset: 20, target: 5 })
+      .mockResolvedValueOnce({ count: 21, offset: 20, target: 5 })
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce('391');
 

@@ -9,7 +9,9 @@ import { Flavor } from '../flavors/flavors.entity';
 import { BrandParserStrategy } from './strategies/brand-parser.strategy';
 import { LineParserStrategy } from './strategies/line-parser.strategy';
 import { TobaccoParserStrategy } from './strategies/tobacco-parser.strategy';
-import { ParsedTobaccoData } from './strategies/tobacco-parser.strategy';
+import type { ParsedTobaccoData } from './strategies/tobacco-parser.strategy';
+import * as Sentry from '@sentry/nestjs';
+import { SentryTraced, SentryCron } from '@sentry/nestjs';
 
 @Injectable()
 export class ParserService {
@@ -29,6 +31,12 @@ export class ParserService {
     private readonly tobaccoParserStrategy: TobaccoParserStrategy,
   ) {}
 
+  @SentryTraced('parser.daily-refresh')
+  @SentryCron('hookah-db-daily-parse', {
+    schedule: { type: 'crontab', value: '0 2 * * *' },
+    checkinMargin: 2,
+    maxRuntime: 60,
+  })
   @Cron(CronExpression.EVERY_DAY_AT_2AM)
   async handleDailyRefresh(): Promise<{
     brands: { created: number; updated: number; errors: number };
@@ -71,11 +79,25 @@ export class ParserService {
             results.brands.created++;
             this.logger.debug(`Created brand: ${brandData.name}`);
           }
+          Sentry.addBreadcrumb({
+            category: 'parser',
+            message: `Successfully parsed brand: ${brandData.name}`,
+            level: 'info',
+          });
         } catch (error) {
           results.brands.errors++;
           this.logger.error(
             `Failed to save brand ${parsedBrand.name}: ${error instanceof Error ? error.message : String(error)}`,
           );
+          Sentry.captureException(error, (scope) => {
+            scope.setTag('parser_strategy', 'brand');
+            scope.setTag('entity_slug', parsedBrand.slug || 'unknown');
+            scope.setContext('parser', {
+              strategy: 'brand',
+              entityName: parsedBrand.name,
+            });
+            return scope;
+          });
         }
       }
 
@@ -86,6 +108,15 @@ export class ParserService {
       this.logger.error(
         `Brands refresh failed: ${error instanceof Error ? error.message : String(error)}`,
       );
+      Sentry.captureException(error, (scope) => {
+        scope.setTag('parser_strategy', 'brand');
+        scope.setTag('step', 'daily-refresh');
+        scope.setContext('parser', {
+          step: 'brands',
+          phase: 'daily-refresh',
+        });
+        return scope;
+      });
       results.brands.errors++;
     } finally {
       await this.brandParserStrategy.close();
@@ -142,11 +173,25 @@ export class ParserService {
               results.lines.created++;
               this.logger.debug(`Created line: ${lineData.name}`);
             }
+            Sentry.addBreadcrumb({
+              category: 'parser',
+              message: `Successfully parsed line: ${lineData.name}`,
+              level: 'info',
+            });
           } catch (error) {
             results.lines.errors++;
             this.logger.error(
               `Failed to save line ${parsedLine.name}: ${error instanceof Error ? error.message : String(error)}`,
             );
+            Sentry.captureException(error, (scope) => {
+              scope.setTag('parser_strategy', 'line');
+              scope.setTag('entity_slug', parsedLine.slug || 'unknown');
+              scope.setContext('parser', {
+                strategy: 'line',
+                entityName: parsedLine.name,
+              });
+              return scope;
+            });
           }
         }
 
@@ -157,6 +202,15 @@ export class ParserService {
         this.logger.error(
           `Lines refresh failed: ${error instanceof Error ? error.message : String(error)}`,
         );
+        Sentry.captureException(error, (scope) => {
+          scope.setTag('parser_strategy', 'line');
+          scope.setTag('step', 'daily-refresh');
+          scope.setContext('parser', {
+            step: 'lines',
+            phase: 'daily-refresh',
+          });
+          return scope;
+        });
         results.lines.errors++;
       } finally {
         await this.lineParserStrategy.close();
@@ -205,11 +259,25 @@ export class ParserService {
               results.tobaccos.created++;
               this.logger.debug(`Created tobacco: ${parsedTobacco.name}`);
             }
+            Sentry.addBreadcrumb({
+              category: 'parser',
+              message: `Successfully parsed tobacco: ${parsedTobacco.name}`,
+              level: 'info',
+            });
           } catch (error) {
             results.tobaccos.errors++;
             this.logger.error(
               `Failed to save tobacco ${parsedTobacco.name}: ${error instanceof Error ? error.message : String(error)}`,
             );
+            Sentry.captureException(error, (scope) => {
+              scope.setTag('parser_strategy', 'tobacco');
+              scope.setTag('entity_slug', parsedTobacco.slug || 'unknown');
+              scope.setContext('parser', {
+                strategy: 'tobacco',
+                entityName: parsedTobacco.name,
+              });
+              return scope;
+            });
           }
         }
 
@@ -220,6 +288,15 @@ export class ParserService {
         this.logger.error(
           `Tobaccos refresh failed: ${error instanceof Error ? error.message : String(error)}`,
         );
+        Sentry.captureException(error, (scope) => {
+          scope.setTag('parser_strategy', 'tobacco');
+          scope.setTag('step', 'daily-refresh');
+          scope.setContext('parser', {
+            step: 'tobaccos',
+            phase: 'daily-refresh',
+          });
+          return scope;
+        });
         results.tobaccos.errors++;
       } finally {
         await this.tobaccoParserStrategy.close();
@@ -238,6 +315,7 @@ export class ParserService {
     return results;
   }
 
+  @SentryTraced('parser.save-tobacco-with-flavors')
   private async saveTobaccoWithFlavors(
     parsedTobacco: ParsedTobaccoData,
   ): Promise<{ action: 'created' | 'updated' }> {
@@ -281,6 +359,7 @@ export class ParserService {
     }
   }
 
+  @SentryTraced('parser.parse-brands')
   async parseBrandsManually(limit?: number): Promise<{
     created: number;
     updated: number;
@@ -319,6 +398,15 @@ export class ParserService {
         this.logger.error(
           `Failed to save brand ${parsedBrand.name}: ${error instanceof Error ? error.message : String(error)}`,
         );
+        Sentry.captureException(error, (scope) => {
+          scope.setTag('parser_strategy', 'brand');
+          scope.setTag('entity_slug', parsedBrand.slug || 'unknown');
+          scope.setContext('parser', {
+            strategy: 'brand',
+            entityName: parsedBrand.name,
+          });
+          return scope;
+        });
       }
     }
 
@@ -335,6 +423,7 @@ export class ParserService {
     };
   }
 
+  @SentryTraced('parser.parse-lines')
   async parseLinesManually(limit?: number): Promise<void> {
     this.logger.log('Starting manual line parsing...');
 
@@ -410,6 +499,15 @@ export class ParserService {
           this.logger.error(
             `Failed to save line ${parsedLine.name}: ${error instanceof Error ? error.message : String(error)}`,
           );
+          Sentry.captureException(error, (scope) => {
+            scope.setTag('parser_strategy', 'line');
+            scope.setTag('entity_slug', parsedLine.slug || 'unknown');
+            scope.setContext('parser', {
+              strategy: 'line',
+              entityName: parsedLine.name,
+            });
+            return scope;
+          });
           // Continue with next line on error
         }
       }
@@ -427,6 +525,7 @@ export class ParserService {
     }
   }
 
+  @SentryTraced('parser.parse-tobaccos')
   async parseTobaccosManually(limit?: number): Promise<void> {
     this.logger.log('Starting manual tobacco parsing...');
 
@@ -485,6 +584,15 @@ export class ParserService {
           this.logger.error(
             `Failed to save tobacco ${parsedTobacco.name}: ${error instanceof Error ? error.message : String(error)}`,
           );
+          Sentry.captureException(error, (scope) => {
+            scope.setTag('parser_strategy', 'tobacco');
+            scope.setTag('entity_slug', parsedTobacco.slug || 'unknown');
+            scope.setContext('parser', {
+              strategy: 'tobacco',
+              entityName: parsedTobacco.name,
+            });
+            return scope;
+          });
           // Continue with next tobacco on error
         }
       }
@@ -502,6 +610,7 @@ export class ParserService {
     }
   }
 
+  @SentryTraced('parser.parse-brand-by-url')
   async parseBrandByUrl(url: string): Promise<void> {
     this.logger.log(`Parsing brand from URL: ${url}`);
 
@@ -536,12 +645,21 @@ export class ParserService {
       this.logger.error(
         `Failed to parse brand from URL ${url}: ${error instanceof Error ? error.message : String(error)}`,
       );
+      Sentry.captureException(error, (scope) => {
+        scope.setTag('parser_strategy', 'brand');
+        scope.setContext('parser', {
+          strategy: 'brand',
+          url,
+        });
+        return scope;
+      });
       throw error;
     } finally {
       await this.brandParserStrategy.close();
     }
   }
 
+  @SentryTraced('parser.parse-line-by-url')
   async parseLineByUrl(url: string, brandId: string): Promise<void> {
     this.logger.log(`Parsing line from URL: ${url}`);
 
@@ -579,12 +697,22 @@ export class ParserService {
       this.logger.error(
         `Failed to parse line from URL ${url}: ${error instanceof Error ? error.message : String(error)}`,
       );
+      Sentry.captureException(error, (scope) => {
+        scope.setTag('parser_strategy', 'line');
+        scope.setContext('parser', {
+          strategy: 'line',
+          url,
+          brandId,
+        });
+        return scope;
+      });
       throw error;
     } finally {
       await this.lineParserStrategy.close();
     }
   }
 
+  @SentryTraced('parser.parse-tobacco-by-url')
   async parseTobaccoByUrl(
     url: string,
     brandId: string,
@@ -611,6 +739,16 @@ export class ParserService {
       this.logger.error(
         `Failed to parse tobacco from URL ${url}: ${error instanceof Error ? error.message : String(error)}`,
       );
+      Sentry.captureException(error, (scope) => {
+        scope.setTag('parser_strategy', 'tobacco');
+        scope.setContext('parser', {
+          strategy: 'tobacco',
+          url,
+          brandId,
+          lineId,
+        });
+        return scope;
+      });
       throw error;
     } finally {
       await this.tobaccoParserStrategy.close();

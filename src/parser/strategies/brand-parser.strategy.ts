@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import * as Sentry from '@sentry/nestjs';
 import type { Browser, Page, BrowserContext } from 'playwright';
 import { Brand } from '../../brands/brands.entity';
 import { createBrowser, createContext } from '../browser/browser.config';
@@ -147,6 +148,16 @@ export class BrandParserStrategy {
         this.logger.error(
           `Failed to parse detail page for ${brand.name}: ${error instanceof Error ? error.message : String(error)}`,
         );
+        Sentry.captureException(error, (scope) => {
+          scope.setTag('parser_strategy', 'brand');
+          scope.setTag('entity_slug', brand.slug || 'unknown');
+          scope.setContext('parser', {
+            strategy: 'brand',
+            entityName: brand.name,
+            detailUrl: brand.detailUrl,
+          });
+          return scope;
+        });
         // Continue with next brand on error
       }
     }

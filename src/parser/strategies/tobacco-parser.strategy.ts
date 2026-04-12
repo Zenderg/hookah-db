@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import * as Sentry from '@sentry/nestjs';
 import type { Browser, Page, BrowserContext } from 'playwright';
 import { Tobacco } from '../../tobaccos/tobaccos.entity';
 import { createBrowser, createContext } from '../browser/browser.config';
@@ -148,6 +149,17 @@ export class TobaccoParserStrategy {
             this.logger.warn(
               `Failed to parse tobacco ${tobaccoUrl}: ${error instanceof Error ? error.message : String(error)}`,
             );
+            Sentry.captureException(error, (scope) => {
+              scope.setTag('parser_strategy', 'tobacco');
+              scope.setTag('entity_slug', tobaccoUrl || 'unknown');
+              scope.setContext('parser', {
+                strategy: 'tobacco',
+                entityUrl: tobaccoUrl,
+                lineSlug: lineInfo.lineSlug,
+                brandSlug: lineInfo.brandSlug,
+              });
+              return scope;
+            });
             // Continue with next tobacco
           }
 
@@ -163,6 +175,17 @@ export class TobaccoParserStrategy {
         this.logger.error(
           `Failed to parse tobaccos from line ${lineInfo.lineSlug}: ${error instanceof Error ? error.message : String(error)}`,
         );
+        Sentry.captureException(error, (scope) => {
+          scope.setTag('parser_strategy', 'tobacco');
+          scope.setTag('entity_slug', lineInfo.lineSlug || 'unknown');
+          scope.setContext('parser', {
+            strategy: 'tobacco',
+            entityName: lineInfo.lineSlug,
+            lineUrl: lineInfo.url,
+            brandSlug: lineInfo.brandSlug,
+          });
+          return scope;
+        });
         // Continue with next line on error
       }
 
