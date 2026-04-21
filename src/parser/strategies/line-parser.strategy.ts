@@ -748,7 +748,7 @@ export class LineParserStrategy {
       description: data.description || undefined,
       imageUrl: data.imageUrl || undefined,
       strengthOfficial: data.strengthOfficial || 'Не указано',
-      strengthByRatings: data.strengthByRatings || undefined,
+      strengthByRatings: data.strengthByRatings || 'Не указано',
       status: data.status || undefined,
       rating: data.rating || 0,
       ratingsCount: data.ratingsCount || 0,
