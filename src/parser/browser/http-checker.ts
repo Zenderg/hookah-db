@@ -12,12 +12,33 @@ export interface NavigateOptions {
   baseDelayMs?: number;
   maxDelayMs?: number;
   retryOnStatus?: number[];
+  maxNavigationsBeforeRotation?: number;
+  navigationCounter?: { value: number };
+  /**
+   * Factory callback to create a new Page after crash or periodic rotation.
+   * MUST update the caller's page reference as a side effect
+   * (e.g., `this.page = await this.context.newPage()`).
+   * The returned Page is used for the retry navigation.
+   */
+  recreatePage?: () => Promise<Page>;
 }
 
 const logger = new Logger('HttpChecker');
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isPageCrashed(error: unknown): boolean {
+  return error instanceof Error && error.message.includes('Page crashed');
+}
+
+function isNavigationTimeout(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    error.message.includes('Timeout') &&
+    error.message.includes('exceeded')
+  );
 }
 
 export function checkResponse(response: Response): NavigationResult {
@@ -45,24 +66,62 @@ export async function navigateWithCheck(
   const maxDelayMs = options?.maxDelayMs ?? 30000;
   const retryOnStatus = options?.retryOnStatus ?? [429];
 
+  let currentPage = page;
+  let recoveryAttempts = 0;
+  const maxRecoveryAttempts = 1;
+
   let result: NavigationResult = { ok: false, status: 0, url };
 
   for (let attempt = 0; attempt <= retries; attempt++) {
-    const response = await page.goto(url);
-
-    if (response) {
-      result = checkResponse(response);
-    } else {
-      result = { ok: false, status: 0, url };
-      logger.error(`No response from ${url}`);
+    // Periodic rotation (before navigation)
+    if (options?.maxNavigationsBeforeRotation && options?.navigationCounter) {
+      if (
+        options.navigationCounter.value >= options.maxNavigationsBeforeRotation
+      ) {
+        if (options.recreatePage) {
+          currentPage = await options.recreatePage();
+          options.navigationCounter.value = 0;
+        }
+      }
     }
 
-    if (result.ok) return result;
-    if (!retryOnStatus.includes(result.status)) return result;
+    try {
+      const response = await currentPage.goto(url, {});
 
-    if (attempt < retries) {
-      const ms = Math.min(baseDelayMs * 2 ** attempt, maxDelayMs);
-      await delay(ms);
+      if (response) {
+        result = checkResponse(response);
+      } else {
+        result = { ok: false, status: 0, url };
+        logger.error(`No response from ${url}`);
+      }
+
+      // Increment navigation counter on any goto completion
+      if (options?.navigationCounter) {
+        options.navigationCounter.value++;
+      }
+
+      if (result.ok) return result;
+      if (!retryOnStatus.includes(result.status)) return result;
+
+      if (attempt < retries) {
+        const ms = Math.min(baseDelayMs * 2 ** attempt, maxDelayMs);
+        await delay(ms);
+      }
+    } catch (error) {
+      const canRecover =
+        (isPageCrashed(error) || isNavigationTimeout(error)) &&
+        !!options?.recreatePage &&
+        recoveryAttempts < maxRecoveryAttempts;
+
+      if (canRecover && options?.recreatePage) {
+        recoveryAttempts++;
+        currentPage = await options.recreatePage();
+        if (options?.navigationCounter) {
+          options.navigationCounter.value = 0;
+        }
+        continue; // retry navigation on new page without consuming attempt
+      }
+      throw error;
     }
   }
 

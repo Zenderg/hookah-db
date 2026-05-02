@@ -40,12 +40,14 @@ export class TobaccoParserStrategy {
   private browser: Browser | null = null;
   private context: BrowserContext | null = null;
   private page: Page | null = null;
+  private navigationCounter = { value: 0 };
 
   async initialize(): Promise<void> {
     this.logger.log('Initializing Playwright browser...');
     this.browser = await createBrowser();
     this.context = await createContext(this.browser);
     this.page = await this.context.newPage();
+    this.setupPageListeners(this.page);
     this.logger.log('Playwright browser initialized');
   }
 
@@ -63,12 +65,24 @@ export class TobaccoParserStrategy {
   }
 
   /**
+   * Set up page event listeners for crash detection.
+   * Must be called whenever a new page is created.
+   */
+  private setupPageListeners(page: Page): void {
+    page.on('crash', () => {
+      this.logger.warn(
+        'Page crashed, recovery will be attempted on next navigation',
+      );
+    });
+  }
+
+  /**
    * Navigate to URL with HTTP status verification.
    * Uses navigateWithCheck for goto + status check + retry on 429.
    * @param url - URL to navigate to (absolute or relative to htreviews.org)
    */
   private async safeNavigate(url: string): Promise<void> {
-    if (!this.page) {
+    if (!this.page || !this.context) {
       throw new Error('Browser not initialized. Call initialize() first.');
     }
 
@@ -78,7 +92,16 @@ export class TobaccoParserStrategy {
 
     this.logger.debug(`Navigating to ${fullUrl}`);
 
-    const result = await navigateWithCheck(this.page, fullUrl);
+    const result = await navigateWithCheck(this.page, fullUrl, {
+      recreatePage: async () => {
+        await this.page?.close().catch(() => {}); // crashed page may not close
+        this.page = await this.context!.newPage(); // MUST update this.page
+        this.setupPageListeners(this.page);
+        return this.page;
+      },
+      navigationCounter: this.navigationCounter,
+      maxNavigationsBeforeRotation: 100,
+    });
 
     if (!result.ok) {
       throw new Error(

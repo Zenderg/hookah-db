@@ -51,9 +51,11 @@ const mockEvaluate = jest.fn();
 const mockWaitForLoadState = jest.fn();
 const mockWaitForSelector = jest.fn();
 const mockWaitForTimeout = jest.fn();
+const mockPageOn = jest.fn();
 
 const mockPage = {
   close: jest.fn(),
+  on: mockPageOn,
   waitForLoadState: mockWaitForLoadState,
   waitForSelector: mockWaitForSelector,
   evaluate: mockEvaluate,

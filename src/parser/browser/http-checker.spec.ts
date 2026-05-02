@@ -23,10 +23,22 @@ jest.mock('@nestjs/common', () => ({
 }));
 
 // Import after mock setup
-import { checkResponse, navigateWithCheck } from './http-checker';
+import {
+  checkResponse,
+  navigateWithCheck,
+  type NavigateOptions,
+} from './http-checker';
+
+/** Extended options for crash recovery & periodic rotation (TDD — fields don't exist yet). */
+type RecoveryNavigateOptions = NavigateOptions & {
+  recreatePage?: () => Promise<Page>;
+  maxNavigationsBeforeRotation?: number;
+  navigationCounter?: { value: number };
+};
 
 describe('http-checker', () => {
   beforeEach(() => {
+    jest.restoreAllMocks();
     jest.clearAllMocks();
     jest.useRealTimers();
   });
@@ -146,6 +158,196 @@ describe('http-checker', () => {
         .map((call) => call[1] as number)
         .filter((d) => d !== undefined);
       expect(delayCalls[0]).toBe(2000);
+    });
+
+    // ---- Crash recovery & periodic rotation tests ----
+
+    it('should recover from page crash by calling recreatePage factory', async () => {
+      const crashError = new Error('page.goto: Page crashed');
+      mockGoto.mockRejectedValueOnce(crashError);
+
+      const mockFactoryGoto = jest
+        .fn<Promise<Response | null>, [string, unknown]>()
+        .mockResolvedValueOnce(createMockResponse(200, url));
+      const mockNewPage = {
+        goto: mockFactoryGoto,
+      } as unknown as Page;
+      const recreatePage = jest
+        .fn<Promise<Page>, []>()
+        .mockResolvedValue(mockNewPage);
+
+      const result = await navigateWithCheck(mockPage, url, {
+        baseDelayMs: 1,
+        recreatePage,
+      } as RecoveryNavigateOptions);
+
+      expect(recreatePage).toHaveBeenCalledTimes(1);
+      expect(mockFactoryGoto).toHaveBeenCalledTimes(1);
+      expect(mockFactoryGoto).toHaveBeenCalledWith(url, expect.any(Object));
+      expect(result.ok).toBe(true);
+      expect(result.status).toBe(200);
+    });
+
+    it('should recover from timeout error by calling recreatePage factory', async () => {
+      const timeoutError = new Error('page.goto: Timeout 30000ms exceeded');
+      mockGoto.mockRejectedValueOnce(timeoutError);
+
+      const mockFactoryGoto = jest
+        .fn<Promise<Response | null>, [string, unknown]>()
+        .mockResolvedValueOnce(createMockResponse(200, url));
+      const mockNewPage = {
+        goto: mockFactoryGoto,
+      } as unknown as Page;
+      const recreatePage = jest
+        .fn<Promise<Page>, []>()
+        .mockResolvedValue(mockNewPage);
+
+      const result = await navigateWithCheck(mockPage, url, {
+        baseDelayMs: 1,
+        recreatePage,
+      } as RecoveryNavigateOptions);
+
+      expect(recreatePage).toHaveBeenCalledTimes(1);
+      expect(mockFactoryGoto).toHaveBeenCalledTimes(1);
+      expect(result.ok).toBe(true);
+      expect(result.status).toBe(200);
+    });
+
+    it('should propagate factory error immediately when recreation fails', async () => {
+      const crashError = new Error('page.goto: Page crashed');
+      const factoryError = new Error('Context creation failed');
+      mockGoto.mockRejectedValueOnce(crashError);
+
+      const recreatePage = jest
+        .fn<Promise<Page>, []>()
+        .mockRejectedValueOnce(factoryError);
+
+      await expect(
+        navigateWithCheck(mockPage, url, {
+          baseDelayMs: 1,
+          recreatePage,
+        } as RecoveryNavigateOptions),
+      ).rejects.toThrow('Context creation failed');
+
+      expect(recreatePage).toHaveBeenCalledTimes(1);
+      // No additional goto calls after factory failure
+      expect(mockGoto).toHaveBeenCalledTimes(1);
+    });
+
+    it('should limit recovery to 1 attempt — second crash throws immediately', async () => {
+      const firstCrash = new Error('page.goto: Page crashed');
+      const secondCrash = new Error('page.goto: Page crashed');
+      mockGoto.mockRejectedValueOnce(firstCrash);
+
+      const mockFactoryGoto = jest
+        .fn<Promise<Response | null>, [string, unknown]>()
+        .mockRejectedValueOnce(secondCrash);
+      const mockNewPage = {
+        goto: mockFactoryGoto,
+      } as unknown as Page;
+      const recreatePage = jest
+        .fn<Promise<Page>, []>()
+        .mockResolvedValue(mockNewPage);
+
+      await expect(
+        navigateWithCheck(mockPage, url, {
+          baseDelayMs: 1,
+          recreatePage,
+        } as RecoveryNavigateOptions),
+      ).rejects.toThrow('Page crashed');
+
+      // Factory called only once — recovery is limited to 1 attempt
+      expect(recreatePage).toHaveBeenCalledTimes(1);
+      expect(mockFactoryGoto).toHaveBeenCalledTimes(1);
+      // Original page goto called once, factory page goto called once
+      expect(mockGoto).toHaveBeenCalledTimes(1);
+    });
+
+    it('should rotate page after maxNavigationsBeforeRotation threshold', async () => {
+      const counter = { value: 5 };
+      const maxNavigations = 5;
+
+      const mockFactoryGoto = jest
+        .fn<Promise<Response | null>, [string, unknown]>()
+        .mockResolvedValueOnce(createMockResponse(200, url));
+      const mockNewPage = {
+        goto: mockFactoryGoto,
+      } as unknown as Page;
+      const recreatePage = jest
+        .fn<Promise<Page>, []>()
+        .mockResolvedValue(mockNewPage);
+
+      const result = await navigateWithCheck(mockPage, url, {
+        baseDelayMs: 1,
+        maxNavigationsBeforeRotation: maxNavigations,
+        navigationCounter: counter,
+        recreatePage,
+      } as RecoveryNavigateOptions);
+
+      // Factory called because counter hit the threshold
+      expect(recreatePage).toHaveBeenCalledTimes(1);
+      // Counter was reset to 0 before navigation, then incremented to 1 after success
+      expect(counter.value).toBe(1);
+      // New page's goto was used for the actual navigation
+      expect(mockFactoryGoto).toHaveBeenCalledTimes(1);
+      // Original page goto was NOT called (rotation happened before navigation)
+      expect(mockGoto).not.toHaveBeenCalled();
+      expect(result.ok).toBe(true);
+      expect(result.status).toBe(200);
+    });
+
+    it('should not rotate page when navigation count is below threshold', async () => {
+      const counter = { value: 1 };
+
+      mockGoto.mockResolvedValueOnce(createMockResponse(200, url));
+
+      const recreatePage = jest.fn<Promise<Page>, []>();
+
+      const result = await navigateWithCheck(mockPage, url, {
+        baseDelayMs: 1,
+        maxNavigationsBeforeRotation: 100,
+        navigationCounter: counter,
+        recreatePage,
+      } as RecoveryNavigateOptions);
+
+      // Factory NOT called — counter is well below threshold
+      expect(recreatePage).not.toHaveBeenCalled();
+      // Counter incremented after successful navigation
+      expect(counter.value).toBe(2);
+      // Original page goto was used
+      expect(mockGoto).toHaveBeenCalledTimes(1);
+      expect(result.ok).toBe(true);
+      expect(result.status).toBe(200);
+    });
+
+    it('should not consume retry capacity when recovering from crash', async () => {
+      const crashError = new Error('page.goto: Page crashed');
+      mockGoto.mockRejectedValueOnce(crashError);
+
+      const mockFactoryGoto = jest
+        .fn<Promise<Response | null>, [string, unknown]>()
+        .mockResolvedValueOnce(createMockResponse(429, url))
+        .mockResolvedValueOnce(createMockResponse(200, url));
+      const mockNewPage = {
+        goto: mockFactoryGoto,
+      } as unknown as Page;
+      const recreatePage = jest
+        .fn<Promise<Page>, []>()
+        .mockResolvedValue(mockNewPage);
+
+      const result = await navigateWithCheck(mockPage, url, {
+        retries: 2,
+        baseDelayMs: 1,
+        recreatePage,
+      } as RecoveryNavigateOptions);
+
+      // Factory called once for crash recovery
+      expect(recreatePage).toHaveBeenCalledTimes(1);
+      // 3 total goto calls: 1 crash (original) + 1 429 (recovery page) + 1 200 (recovery page)
+      expect(mockGoto).toHaveBeenCalledTimes(1);
+      expect(mockFactoryGoto).toHaveBeenCalledTimes(2);
+      expect(result.ok).toBe(true);
+      expect(result.status).toBe(200);
     });
   });
 });
