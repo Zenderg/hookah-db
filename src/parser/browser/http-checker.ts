@@ -15,12 +15,12 @@ export interface NavigateOptions {
   maxNavigationsBeforeRotation?: number;
   navigationCounter?: { value: number };
   /**
-   * Factory callback to create a new Page after crash or periodic rotation.
-   * MUST update the caller's page reference as a side effect
-   * (e.g., `this.page = await this.context.newPage()`).
-   * The returned Page is used for the retry navigation.
+   * Factory callback to rotate the entire BrowserContext after crash or periodic rotation.
+   * MUST close the old context, create a new one via the browser, update the caller's
+   * context + page references as a side effect, and return the new Page.
+   * Errors during context close MUST be logged, not silently swallowed.
    */
-  recreatePage?: () => Promise<Page>;
+  recreateContext?: () => Promise<Page>;
 }
 
 const logger = new Logger('HttpChecker');
@@ -78,8 +78,11 @@ export async function navigateWithCheck(
       if (
         options.navigationCounter.value >= options.maxNavigationsBeforeRotation
       ) {
-        if (options.recreatePage) {
-          currentPage = await options.recreatePage();
+        if (options.recreateContext) {
+          logger.log(
+            `Rotating browser context after ${options.navigationCounter.value} navigations`,
+          );
+          currentPage = await options.recreateContext();
           options.navigationCounter.value = 0;
         }
       }
@@ -110,12 +113,15 @@ export async function navigateWithCheck(
     } catch (error) {
       const canRecover =
         (isPageCrashed(error) || isNavigationTimeout(error)) &&
-        !!options?.recreatePage &&
+        !!options?.recreateContext &&
         recoveryAttempts < maxRecoveryAttempts;
 
-      if (canRecover && options?.recreatePage) {
+      if (canRecover && options?.recreateContext) {
         recoveryAttempts++;
-        currentPage = await options.recreatePage();
+        logger.warn(
+          `Recovering from ${isPageCrashed(error) ? 'page crash' : 'navigation timeout'} — rotating browser context`,
+        );
+        currentPage = await options.recreateContext();
         if (options?.navigationCounter) {
           options.navigationCounter.value = 0;
         }

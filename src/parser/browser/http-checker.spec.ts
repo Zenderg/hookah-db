@@ -19,6 +19,7 @@ jest.mock('@nestjs/common', () => ({
   Logger: jest.fn().mockImplementation(() => ({
     warn: jest.fn(),
     error: jest.fn(),
+    log: jest.fn(),
   })),
 }));
 
@@ -31,7 +32,7 @@ import {
 
 /** Extended options for crash recovery & periodic rotation (TDD — fields don't exist yet). */
 type RecoveryNavigateOptions = NavigateOptions & {
-  recreatePage?: () => Promise<Page>;
+  recreateContext?: () => Promise<Page>;
   maxNavigationsBeforeRotation?: number;
   navigationCounter?: { value: number };
 };
@@ -162,7 +163,7 @@ describe('http-checker', () => {
 
     // ---- Crash recovery & periodic rotation tests ----
 
-    it('should recover from page crash by calling recreatePage factory', async () => {
+    it('should recover from page crash by calling recreateContext factory', async () => {
       const crashError = new Error('page.goto: Page crashed');
       mockGoto.mockRejectedValueOnce(crashError);
 
@@ -172,23 +173,23 @@ describe('http-checker', () => {
       const mockNewPage = {
         goto: mockFactoryGoto,
       } as unknown as Page;
-      const recreatePage = jest
+      const recreateContext = jest
         .fn<Promise<Page>, []>()
         .mockResolvedValue(mockNewPage);
 
       const result = await navigateWithCheck(mockPage, url, {
         baseDelayMs: 1,
-        recreatePage,
+        recreateContext,
       } as RecoveryNavigateOptions);
 
-      expect(recreatePage).toHaveBeenCalledTimes(1);
+      expect(recreateContext).toHaveBeenCalledTimes(1);
       expect(mockFactoryGoto).toHaveBeenCalledTimes(1);
       expect(mockFactoryGoto).toHaveBeenCalledWith(url, expect.any(Object));
       expect(result.ok).toBe(true);
       expect(result.status).toBe(200);
     });
 
-    it('should recover from timeout error by calling recreatePage factory', async () => {
+    it('should recover from timeout error by calling recreateContext factory', async () => {
       const timeoutError = new Error('page.goto: Timeout 30000ms exceeded');
       mockGoto.mockRejectedValueOnce(timeoutError);
 
@@ -198,16 +199,16 @@ describe('http-checker', () => {
       const mockNewPage = {
         goto: mockFactoryGoto,
       } as unknown as Page;
-      const recreatePage = jest
+      const recreateContext = jest
         .fn<Promise<Page>, []>()
         .mockResolvedValue(mockNewPage);
 
       const result = await navigateWithCheck(mockPage, url, {
         baseDelayMs: 1,
-        recreatePage,
+        recreateContext,
       } as RecoveryNavigateOptions);
 
-      expect(recreatePage).toHaveBeenCalledTimes(1);
+      expect(recreateContext).toHaveBeenCalledTimes(1);
       expect(mockFactoryGoto).toHaveBeenCalledTimes(1);
       expect(result.ok).toBe(true);
       expect(result.status).toBe(200);
@@ -218,18 +219,18 @@ describe('http-checker', () => {
       const factoryError = new Error('Context creation failed');
       mockGoto.mockRejectedValueOnce(crashError);
 
-      const recreatePage = jest
+      const recreateContext = jest
         .fn<Promise<Page>, []>()
         .mockRejectedValueOnce(factoryError);
 
       await expect(
         navigateWithCheck(mockPage, url, {
           baseDelayMs: 1,
-          recreatePage,
+          recreateContext,
         } as RecoveryNavigateOptions),
       ).rejects.toThrow('Context creation failed');
 
-      expect(recreatePage).toHaveBeenCalledTimes(1);
+      expect(recreateContext).toHaveBeenCalledTimes(1);
       // No additional goto calls after factory failure
       expect(mockGoto).toHaveBeenCalledTimes(1);
     });
@@ -245,25 +246,25 @@ describe('http-checker', () => {
       const mockNewPage = {
         goto: mockFactoryGoto,
       } as unknown as Page;
-      const recreatePage = jest
+      const recreateContext = jest
         .fn<Promise<Page>, []>()
         .mockResolvedValue(mockNewPage);
 
       await expect(
         navigateWithCheck(mockPage, url, {
           baseDelayMs: 1,
-          recreatePage,
+          recreateContext,
         } as RecoveryNavigateOptions),
       ).rejects.toThrow('Page crashed');
 
       // Factory called only once — recovery is limited to 1 attempt
-      expect(recreatePage).toHaveBeenCalledTimes(1);
+      expect(recreateContext).toHaveBeenCalledTimes(1);
       expect(mockFactoryGoto).toHaveBeenCalledTimes(1);
       // Original page goto called once, factory page goto called once
       expect(mockGoto).toHaveBeenCalledTimes(1);
     });
 
-    it('should rotate page after maxNavigationsBeforeRotation threshold', async () => {
+    it('should rotate context after maxNavigationsBeforeRotation threshold', async () => {
       const counter = { value: 5 };
       const maxNavigations = 5;
 
@@ -273,7 +274,7 @@ describe('http-checker', () => {
       const mockNewPage = {
         goto: mockFactoryGoto,
       } as unknown as Page;
-      const recreatePage = jest
+      const recreateContext = jest
         .fn<Promise<Page>, []>()
         .mockResolvedValue(mockNewPage);
 
@@ -281,11 +282,11 @@ describe('http-checker', () => {
         baseDelayMs: 1,
         maxNavigationsBeforeRotation: maxNavigations,
         navigationCounter: counter,
-        recreatePage,
+        recreateContext,
       } as RecoveryNavigateOptions);
 
       // Factory called because counter hit the threshold
-      expect(recreatePage).toHaveBeenCalledTimes(1);
+      expect(recreateContext).toHaveBeenCalledTimes(1);
       // Counter was reset to 0 before navigation, then incremented to 1 after success
       expect(counter.value).toBe(1);
       // New page's goto was used for the actual navigation
@@ -301,17 +302,17 @@ describe('http-checker', () => {
 
       mockGoto.mockResolvedValueOnce(createMockResponse(200, url));
 
-      const recreatePage = jest.fn<Promise<Page>, []>();
+      const recreateContext = jest.fn<Promise<Page>, []>();
 
       const result = await navigateWithCheck(mockPage, url, {
         baseDelayMs: 1,
         maxNavigationsBeforeRotation: 100,
         navigationCounter: counter,
-        recreatePage,
+        recreateContext,
       } as RecoveryNavigateOptions);
 
       // Factory NOT called — counter is well below threshold
-      expect(recreatePage).not.toHaveBeenCalled();
+      expect(recreateContext).not.toHaveBeenCalled();
       // Counter incremented after successful navigation
       expect(counter.value).toBe(2);
       // Original page goto was used
@@ -331,18 +332,18 @@ describe('http-checker', () => {
       const mockNewPage = {
         goto: mockFactoryGoto,
       } as unknown as Page;
-      const recreatePage = jest
+      const recreateContext = jest
         .fn<Promise<Page>, []>()
         .mockResolvedValue(mockNewPage);
 
       const result = await navigateWithCheck(mockPage, url, {
         retries: 2,
         baseDelayMs: 1,
-        recreatePage,
+        recreateContext,
       } as RecoveryNavigateOptions);
 
       // Factory called once for crash recovery
-      expect(recreatePage).toHaveBeenCalledTimes(1);
+      expect(recreateContext).toHaveBeenCalledTimes(1);
       // 3 total goto calls: 1 crash (original) + 1 429 (recovery page) + 1 200 (recovery page)
       expect(mockGoto).toHaveBeenCalledTimes(1);
       expect(mockFactoryGoto).toHaveBeenCalledTimes(2);

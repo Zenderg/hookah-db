@@ -79,6 +79,7 @@ export class TobaccoParserStrategy {
   /**
    * Navigate to URL with HTTP status verification.
    * Uses navigateWithCheck for goto + status check + retry on 429.
+   * Rotates the entire BrowserContext every 100 navigations to prevent resource leaks.
    * @param url - URL to navigate to (absolute or relative to htreviews.org)
    */
   private async safeNavigate(url: string): Promise<void> {
@@ -93,9 +94,19 @@ export class TobaccoParserStrategy {
     this.logger.debug(`Navigating to ${fullUrl}`);
 
     const result = await navigateWithCheck(this.page, fullUrl, {
-      recreatePage: async () => {
-        await this.page?.close().catch(() => {}); // crashed page may not close
-        this.page = await this.context!.newPage(); // MUST update this.page
+      recreateContext: async () => {
+        const oldContext = this.context;
+        try {
+          if (oldContext) {
+            await oldContext.close();
+          }
+        } catch (error) {
+          this.logger.warn(
+            `Failed to close old browser context during rotation: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+        this.context = await createContext(this.browser!);
+        this.page = await this.context.newPage();
         this.setupPageListeners(this.page);
         return this.page;
       },
