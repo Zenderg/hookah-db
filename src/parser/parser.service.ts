@@ -13,6 +13,12 @@ import type { ParsedTobaccoData } from './strategies/tobacco-parser.strategy';
 import * as Sentry from '@sentry/nestjs';
 import { SentryTraced, SentryCron } from '@sentry/nestjs';
 
+export const PARSER_DAILY_REFRESH_MONITOR_CONFIG = {
+  schedule: { type: 'crontab' as const, value: '0 2 * * *' },
+  checkinMargin: 2,
+  maxRuntime: 12 * 60,
+};
+
 @Injectable()
 export class ParserService {
   private readonly logger = new Logger(ParserService.name);
@@ -32,11 +38,7 @@ export class ParserService {
   ) {}
 
   @SentryTraced('parser.daily-refresh')
-  @SentryCron('hookah-db-daily-parse', {
-    schedule: { type: 'crontab', value: '0 2 * * *' },
-    checkinMargin: 2,
-    maxRuntime: 60,
-  })
+  @SentryCron('hookah-db-daily-parse', PARSER_DAILY_REFRESH_MONITOR_CONFIG)
   @Cron(CronExpression.EVERY_DAY_AT_2AM)
   async handleDailyRefresh(): Promise<{
     brands: { created: number; updated: number; errors: number };
