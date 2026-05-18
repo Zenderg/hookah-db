@@ -2,19 +2,47 @@ import { ArgumentsHost } from '@nestjs/common';
 import { HttpExceptionFilter } from './http-exception-filter';
 import { HttpException, HttpStatus } from '@nestjs/common';
 
+interface MockResponse {
+  status: jest.Mock<MockResponse, [number]>;
+  json: jest.Mock<MockResponse, [unknown]>;
+}
+
+interface MockRequest {
+  url: string;
+  method: string;
+}
+
+interface ErrorResponseBody {
+  statusCode: number;
+  timestamp: string;
+  path: string;
+  message: string | string[];
+}
+
+interface ValidationException {
+  response: {
+    message: string[];
+  };
+  status: number;
+}
+
+function getLastJsonResponse(mockResponse: MockResponse): ErrorResponseBody {
+  const responseBody = mockResponse.json.mock.calls.at(-1)?.[0];
+  return responseBody as ErrorResponseBody;
+}
+
 describe('HttpExceptionFilter', () => {
   let filter: HttpExceptionFilter;
   let mockHost: ArgumentsHost;
-  let mockResponse: any;
-  let mockRequest: any;
+  let mockResponse: MockResponse;
+  let mockRequest: MockRequest;
 
   beforeEach(() => {
     filter = new HttpExceptionFilter();
 
-    mockResponse = {
-      status: jest.fn().mockReturnThis(),
-      json: jest.fn().mockReturnThis(),
-    };
+    mockResponse = {} as MockResponse;
+    mockResponse.status = jest.fn(() => mockResponse);
+    mockResponse.json = jest.fn(() => mockResponse);
 
     mockRequest = {
       url: '/test',
@@ -26,7 +54,7 @@ describe('HttpExceptionFilter', () => {
         getResponse: () => mockResponse,
         getRequest: () => mockRequest,
       }),
-    } as any;
+    } as ArgumentsHost;
   });
 
   describe('HttpException handling', () => {
@@ -36,12 +64,14 @@ describe('HttpExceptionFilter', () => {
       filter.catch(exception, mockHost);
 
       expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.NOT_FOUND);
-      expect(mockResponse.json).toHaveBeenCalledWith({
+      const responseBody = getLastJsonResponse(mockResponse);
+      expect(responseBody).toEqual({
         statusCode: HttpStatus.NOT_FOUND,
-        timestamp: expect.any(String),
+        timestamp: responseBody.timestamp,
         path: '/test',
         message: 'Not found',
       });
+      expect(typeof responseBody.timestamp).toBe('string');
     });
 
     it('should handle HttpException with custom response object', () => {
@@ -56,12 +86,14 @@ describe('HttpExceptionFilter', () => {
       filter.catch(exception, mockHost);
 
       expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.BAD_REQUEST);
-      expect(mockResponse.json).toHaveBeenCalledWith({
+      const responseBody = getLastJsonResponse(mockResponse);
+      expect(responseBody).toEqual({
         statusCode: HttpStatus.BAD_REQUEST,
-        timestamp: expect.any(String),
+        timestamp: responseBody.timestamp,
         path: '/test',
         message: 'Bad Request',
       });
+      expect(typeof responseBody.timestamp).toBe('string');
     });
   });
 
@@ -74,31 +106,35 @@ describe('HttpExceptionFilter', () => {
       expect(mockResponse.status).toHaveBeenCalledWith(
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
-      expect(mockResponse.json).toHaveBeenCalledWith({
+      const responseBody = getLastJsonResponse(mockResponse);
+      expect(responseBody).toEqual({
         statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-        timestamp: expect.any(String),
+        timestamp: responseBody.timestamp,
         path: '/test',
         message: 'Internal server error',
       });
+      expect(typeof responseBody.timestamp).toBe('string');
     });
 
     it('should handle validation errors', () => {
-      const exception = {
+      const exception: ValidationException = {
         response: {
           message: ['name should not be empty', 'email must be an email'],
         },
         status: HttpStatus.BAD_REQUEST,
-      } as any;
+      };
 
       filter.catch(exception, mockHost);
 
       expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.BAD_REQUEST);
-      expect(mockResponse.json).toHaveBeenCalledWith({
+      const responseBody = getLastJsonResponse(mockResponse);
+      expect(responseBody).toEqual({
         statusCode: HttpStatus.BAD_REQUEST,
-        timestamp: expect.any(String),
+        timestamp: responseBody.timestamp,
         path: '/test',
         message: ['name should not be empty', 'email must be an email'],
       });
+      expect(typeof responseBody.timestamp).toBe('string');
     });
   });
 
@@ -108,7 +144,7 @@ describe('HttpExceptionFilter', () => {
 
       filter.catch(exception, mockHost);
 
-      const responseCall = mockResponse.json.mock.calls[0][0];
+      const responseCall = getLastJsonResponse(mockResponse);
       const timestamp = responseCall.timestamp;
 
       expect(timestamp).toMatch(
@@ -124,7 +160,7 @@ describe('HttpExceptionFilter', () => {
 
       filter.catch(exception, mockHost);
 
-      const responseCall = mockResponse.json.mock.calls[0][0];
+      const responseCall = getLastJsonResponse(mockResponse);
       expect(responseCall.path).toBe('/api/brands/123');
     });
   });

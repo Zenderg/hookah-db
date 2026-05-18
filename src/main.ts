@@ -3,7 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 
-async function bootstrap() {
+async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
 
   // Enable validation
@@ -25,4 +25,4 @@ async function bootstrap() {
   console.log(`Application is running on: http://localhost:${port}`);
 }
 
-bootstrap();
+void bootstrap();

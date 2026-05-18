@@ -57,6 +57,11 @@ export class FindTobaccosDto extends PaginationDto {
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  @Transform(({ value }) => (Array.isArray(value) ? value : [value]))
+  @Transform(({ value }: { value: unknown }) => {
+    if (!Array.isArray(value)) {
+      return [value];
+    }
+    return value.map((item: unknown) => item);
+  })
   flavors?: string[];
 }

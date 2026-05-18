@@ -4,7 +4,10 @@ import { Transform } from 'class-transformer';
 export class FindTobaccoByUrlDto {
   @IsUrl()
   @IsString()
-  @Transform(({ value }) => {
+  @Transform(({ value }: { value: unknown }) => {
+    if (typeof value !== 'string') {
+      return value;
+    }
     // Strip query parameters and hash from URL
     const url = new URL(value);
     return `${url.origin}${url.pathname}`;

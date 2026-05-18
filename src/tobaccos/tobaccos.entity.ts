@@ -34,14 +34,14 @@ export class Tobacco {
 
   @ManyToOne(() => Brand)
   @JoinColumn({ name: 'brandId' })
-  brand: Brand;
+  brand: Brand | null;
 
   @Column({ nullable: true })
-  lineId: string;
+  lineId: string | null;
 
   @ManyToOne(() => Line, { nullable: true })
   @JoinColumn({ name: 'lineId' })
-  line: Line;
+  line: Line | null;
 
   @Column('decimal', { precision: 3, scale: 2, default: 0 })
   rating: number;
@@ -65,7 +65,7 @@ export class Tobacco {
   imageUrl: string;
 
   @Column({ type: 'text', nullable: true })
-  description: string;
+  description: string | null;
 
   @ManyToMany(() => Flavor, (flavor) => flavor.tobaccos)
   @JoinTable({

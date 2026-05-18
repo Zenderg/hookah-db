@@ -2,13 +2,35 @@
 
 import '../instrument';
 import { Command } from 'commander';
+import type { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import type { Repository } from 'typeorm';
 import { AppModule } from '../app.module';
 import { ApiKeysService } from '../api-keys/api-keys.service';
 import { ParserService } from '../parser/parser.service';
 import * as Sentry from '@sentry/nestjs';
+import { Brand } from '../brands/brands.entity';
+import { Line } from '../lines/lines.entity';
 
 const program = new Command();
+
+interface ApiKeysContext {
+  service: ApiKeysService;
+  app: INestApplicationContext;
+}
+
+interface ParserContext {
+  service: ParserService;
+  app: INestApplicationContext;
+  brandRepository: Repository<Brand>;
+  lineRepository: Repository<Line>;
+}
+
+interface ParseOptions {
+  limit?: string;
+  url?: string;
+}
 
 program
   .name('hookah-db-cli')
@@ -16,34 +38,30 @@ program
   .version('0.0.1');
 
 // Helper function to initialize NestJS app and get service
-async function getApiKeysService(): Promise<{
-  service: ApiKeysService;
-  app: any;
-}> {
+async function getApiKeysService(): Promise<ApiKeysContext> {
   const app = await NestFactory.createApplicationContext(AppModule);
   const service = app.get(ApiKeysService);
   return { service, app };
 }
 
 // Helper function to initialize NestJS app and get parser service
-async function getParserService(): Promise<{
-  service: ParserService;
-  app: any;
-}> {
+async function getParserService(): Promise<ParserContext> {
   const app = await NestFactory.createApplicationContext(AppModule);
   const service = app.get(ParserService);
-  return { service, app };
+  const brandRepository = app.get<Repository<Brand>>(getRepositoryToken(Brand));
+  const lineRepository = app.get<Repository<Line>>(getRepositoryToken(Line));
+  return { service, app, brandRepository, lineRepository };
 }
 
 // Create API key command
 program
   .command('create <name>')
   .description('Create a new API key')
-  .action(async (name) => {
+  .action(async (name: string) => {
     await Sentry.startSpan(
       { op: 'cli.create-api-key', name: 'Create API key' },
       async () => {
-        let app: any = null;
+        let app: INestApplicationContext | null = null;
         try {
           const { service, app: appContext } = await getApiKeysService();
           app = appContext;
@@ -82,11 +100,11 @@ program
 program
   .command('delete <id>')
   .description('Delete an API key by ID')
-  .action(async (id) => {
+  .action(async (id: string) => {
     await Sentry.startSpan(
       { op: 'cli.delete-api-key', name: 'Delete API key' },
       async () => {
-        let app: any = null;
+        let app: INestApplicationContext | null = null;
         try {
           const { service, app: appContext } = await getApiKeysService();
           app = appContext;
@@ -119,7 +137,7 @@ program
     await Sentry.startSpan(
       { op: 'cli.list-api-keys', name: 'List API keys' },
       async () => {
-        let app: any = null;
+        let app: INestApplicationContext | null = null;
         try {
           const { service, app: appContext } = await getApiKeysService();
           app = appContext;
@@ -174,7 +192,7 @@ program
     await Sentry.startSpan(
       { op: 'cli.api-key-stats', name: 'API key statistics' },
       async () => {
-        let app: any = null;
+        let app: INestApplicationContext | null = null;
         try {
           const { service, app: appContext } = await getApiKeysService();
           app = appContext;
@@ -211,13 +229,18 @@ program
   .argument('<type>', 'Type of data to parse: brand, line, or tobacco')
   .option('--limit <number>', 'Limit number of items to parse')
   .option('--url <url>', 'Parse specific item by URL')
-  .action(async (type, options) => {
+  .action(async (type: string, options: ParseOptions) => {
     await Sentry.startSpan(
       { op: 'cli.parse', name: `Parse ${type}` },
       async () => {
-        let app: any = null;
+        let app: INestApplicationContext | null = null;
         try {
-          const { service, app: appContext } = await getParserService();
+          const {
+            service,
+            app: appContext,
+            brandRepository,
+            lineRepository,
+          } = await getParserService();
           app = appContext;
           const limit = options.limit ? parseInt(options.limit, 10) : undefined;
           const url = options.url;
@@ -258,7 +281,7 @@ program
 
                 // Find brand by slug to get brandId
                 const brandSlug = urlMatch[1];
-                const brands = await service['brandRepository'].find({
+                const brands = await brandRepository.find({
                   where: { slug: brandSlug },
                 });
                 if (!brands || brands.length === 0) {
@@ -284,7 +307,7 @@ program
 
                 // Find brand by slug to get brandId
                 const brandSlug = urlMatch[1];
-                const brands = await service['brandRepository'].find({
+                const brands = await brandRepository.find({
                   where: { slug: brandSlug },
                 });
                 if (!brands || brands.length === 0) {
@@ -296,7 +319,7 @@ program
 
                 // Find line by slug and brandId to get lineId
                 const lineSlug = urlMatch[2];
-                const lines = await service['lineRepository'].find({
+                const lines = await lineRepository.find({
                   where: { slug: lineSlug, brandId },
                 });
                 if (!lines || lines.length === 0) {

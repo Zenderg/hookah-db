@@ -29,10 +29,10 @@ export class Line {
 
   @ManyToOne(() => Brand)
   @JoinColumn({ name: 'brandId' })
-  brand: Brand;
+  brand: Brand | null;
 
   @Column({ type: 'text', nullable: true })
-  description: string;
+  description: string | null;
 
   @Column()
   imageUrl: string;

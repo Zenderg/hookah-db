@@ -9,7 +9,7 @@
  * reproduction via Playwright `page.request` API is viable.
  */
 
-import { chromium, type Request, type Response, type Page } from 'playwright';
+import { chromium, type Request, type Response } from 'playwright';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -384,27 +384,28 @@ async function main(): Promise<void> {
       );
       console.log('Fallback: scroll + parse DOM after each scroll.');
     } else {
-      const reproducible = Array.from(uniqueEndpoints.entries()).filter(
-        async ([key]) => {
-          try {
-            const original = uniqueEndpoints.get(key)!;
-            let response;
-            if (original.request.method === 'POST') {
-              response = await page.request.post(original.request.url, {
-                headers: original.request.headers,
-                data: original.request.body,
-              });
-            } else {
-              response = await page.request.get(original.request.url, {
-                headers: original.request.headers,
-              });
-            }
-            return response.ok();
-          } catch {
-            return false;
+      const reproducible: [string, CapturedCall][] = [];
+      for (const [key] of uniqueEndpoints.entries()) {
+        try {
+          const original = uniqueEndpoints.get(key)!;
+          let response;
+          if (original.request.method === 'POST') {
+            response = await page.request.post(original.request.url, {
+              headers: original.request.headers,
+              data: original.request.body,
+            });
+          } else {
+            response = await page.request.get(original.request.url, {
+              headers: original.request.headers,
+            });
           }
-        },
-      );
+          if (response.ok()) {
+            reproducible.push([key, original]);
+          }
+        } catch {
+          // Treat failed reproduction as non-reproducible.
+        }
+      }
 
       if (reproducible.length > 0) {
         console.log(

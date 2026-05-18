@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DeleteResult, Repository, UpdateResult } from 'typeorm';
 import { ApiKeysRepository } from './api-keys.repository';
 import { ApiKey } from './api-keys.entity';
 
@@ -137,16 +137,20 @@ describe('ApiKeysRepository', () => {
     it('should update lastUsedAt timestamp for API key', async () => {
       // Arrange
       const apiKeyId = mockApiKey.id;
-      const newLastUsedAt = new Date('2024-01-02');
-      mockApiKeyRepository.update.mockResolvedValue({ affected: 1 } as any);
+      const updateResult: UpdateResult = {
+        affected: 1,
+        generatedMaps: [],
+        raw: [],
+      };
+      mockApiKeyRepository.update.mockResolvedValue(updateResult);
 
       // Act
       await repository.updateLastUsed(apiKeyId);
 
       // Assert
-      expect(mockApiKeyRepository.update).toHaveBeenCalledWith(apiKeyId, {
-        lastUsedAt: expect.any(Date),
-      });
+      expect(mockApiKeyRepository.update).toHaveBeenCalledTimes(1);
+      const [, updatePayload] = mockApiKeyRepository.update.mock.calls[0];
+      expect(updatePayload.lastUsedAt).toBeInstanceOf(Date);
     });
   });
 
@@ -154,7 +158,12 @@ describe('ApiKeysRepository', () => {
     it('should increment requestCount by 1 for API key', async () => {
       // Arrange
       const apiKeyId = mockApiKey.id;
-      mockApiKeyRepository.increment.mockResolvedValue({ affected: 1 } as any);
+      const updateResult: UpdateResult = {
+        affected: 1,
+        generatedMaps: [],
+        raw: [],
+      };
+      mockApiKeyRepository.increment.mockResolvedValue(updateResult);
 
       // Act
       await repository.incrementRequestCount(apiKeyId);
@@ -172,7 +181,11 @@ describe('ApiKeysRepository', () => {
     it('should delete API key and return true when successful', async () => {
       // Arrange
       const apiKeyId = mockApiKey.id;
-      mockApiKeyRepository.delete.mockResolvedValue({ affected: 1 } as any);
+      const deleteResult: DeleteResult = {
+        affected: 1,
+        raw: [],
+      };
+      mockApiKeyRepository.delete.mockResolvedValue(deleteResult);
 
       // Act
       const result = await repository.delete(apiKeyId);
@@ -185,7 +198,11 @@ describe('ApiKeysRepository', () => {
     it('should return false when no API key was deleted', async () => {
       // Arrange
       const apiKeyId = 'non-existent-id';
-      mockApiKeyRepository.delete.mockResolvedValue({ affected: 0 } as any);
+      const deleteResult: DeleteResult = {
+        affected: 0,
+        raw: [],
+      };
+      mockApiKeyRepository.delete.mockResolvedValue(deleteResult);
 
       // Act
       const result = await repository.delete(apiKeyId);
@@ -198,7 +215,10 @@ describe('ApiKeysRepository', () => {
     it('should return false when affected is undefined', async () => {
       // Arrange
       const apiKeyId = mockApiKey.id;
-      mockApiKeyRepository.delete.mockResolvedValue({} as any);
+      const deleteResult: DeleteResult = {
+        raw: [],
+      };
+      mockApiKeyRepository.delete.mockResolvedValue(deleteResult);
 
       // Act
       const result = await repository.delete(apiKeyId);

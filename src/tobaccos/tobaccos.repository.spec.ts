@@ -17,8 +17,8 @@ describe('TobaccosRepository', () => {
     slug: 'test-tobacco',
     brandId: 'brand-123',
     brand: null as any, // eslint-disable-line @typescript-eslint/no-unsafe-assignment
-    lineId: null as any, // eslint-disable-line @typescript-eslint/no-unsafe-assignment
-    line: null as any, // eslint-disable-line @typescript-eslint/no-unsafe-assignment
+    lineId: null,
+    line: null,
     rating: 4.5,
     ratingsCount: 50,
     strengthOfficial: 'Средняя',
@@ -656,7 +656,7 @@ describe('TobaccosRepository', () => {
         { status: 'Лимитированная' },
         { status: 'Снята с производства' },
       ];
-      mockQueryBuilder.getRawMany.mockResolvedValue(mockRawResult as any);
+      mockQueryBuilder.getRawMany.mockResolvedValue(mockRawResult);
 
       // Act
       const result = await repository.getStatuses();
@@ -700,7 +700,7 @@ describe('TobaccosRepository', () => {
         { status: 'Выпускается' },
         { status: 'Лимитированная' },
       ];
-      mockQueryBuilder.getRawMany.mockResolvedValue(mockRawResult as any);
+      mockQueryBuilder.getRawMany.mockResolvedValue(mockRawResult);
 
       // Act
       const result = await repository.getStatuses();
@@ -719,7 +719,7 @@ describe('TobaccosRepository', () => {
         { status: 'Выпускается' },
         { status: 'Лимитированная' },
       ];
-      mockQueryBuilder.getRawMany.mockResolvedValue(mockRawResult as any);
+      mockQueryBuilder.getRawMany.mockResolvedValue(mockRawResult);
 
       // Act
       await repository.getStatuses();

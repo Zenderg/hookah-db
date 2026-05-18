@@ -12,7 +12,11 @@ import {
 const DEFAULT_USER_AGENT =
   'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
-const USER_AGENT = process.env.PARSER_USER_AGENT ?? DEFAULT_USER_AGENT;
+function getUserAgent(): string {
+  return process.env.PARSER_USER_AGENT ?? DEFAULT_USER_AGENT;
+}
+
+const USER_AGENT = getUserAgent();
 
 const VIEWPORT = { width: 1920, height: 1080 } as const;
 
@@ -34,7 +38,7 @@ const BROWSER_CONFIG: BrowserLaunchConfig = {
 
   createContext(browser: Browser): Promise<BrowserContext> {
     return browser.newContext({
-      userAgent: USER_AGENT,
+      userAgent: getUserAgent(),
       viewport: VIEWPORT,
       locale: LOCALE,
       extraHTTPHeaders: EXTRA_HTTP_HEADERS,
@@ -59,5 +63,6 @@ export {
   VIEWPORT,
   LOCALE,
   EXTRA_HTTP_HEADERS,
+  getUserAgent,
 };
 export type { BrowserLaunchConfig };

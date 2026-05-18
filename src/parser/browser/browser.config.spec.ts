@@ -1,24 +1,49 @@
-import { Browser, BrowserContext } from 'playwright';
+import type {
+  Browser,
+  BrowserContext,
+  BrowserContextOptions,
+  LaunchOptions,
+} from 'playwright';
 
 // Mock playwright — only chromium.launch is used by createBrowser
-const mockNewContext = jest.fn();
-const mockBrowserClose = jest.fn();
+const mockNewContext = jest.fn<
+  Promise<BrowserContext>,
+  [BrowserContextOptions?]
+>();
+const mockBrowserClose = jest.fn<Promise<void>, []>();
 
 const mockBrowser = {
   newContext: mockNewContext,
   close: mockBrowserClose,
 } as unknown as Browser;
 
-const mockChromiumLaunch = jest.fn();
+const mockChromiumLaunch = jest.fn<Promise<Browser>, [LaunchOptions?]>();
 
 jest.mock('playwright', () => ({
   chromium: {
-    launch: (options?: unknown) => mockChromiumLaunch(options),
+    launch: (options?: LaunchOptions): Promise<Browser> =>
+      mockChromiumLaunch(options),
   },
 }));
 
 // Import after mock setup
 import { createBrowser, createContext } from './browser.config';
+
+function getLaunchOptions(): LaunchOptions {
+  const options = mockChromiumLaunch.mock.calls[0]?.[0];
+  if (!options) {
+    throw new Error('Expected chromium.launch to be called with options');
+  }
+  return options;
+}
+
+function getContextOptions(): BrowserContextOptions {
+  const options = mockNewContext.mock.calls[0]?.[0];
+  if (!options) {
+    throw new Error('Expected browser.newContext to be called with options');
+  }
+  return options;
+}
 
 describe('browser.config', () => {
   const originalEnv = process.env;
@@ -43,10 +68,7 @@ describe('browser.config', () => {
 
       // Assert
       expect(mockChromiumLaunch).toHaveBeenCalledTimes(1);
-      const launchOptions = mockChromiumLaunch.mock.calls[0][0] as Record<
-        string,
-        unknown
-      >;
+      const launchOptions = getLaunchOptions();
       // Browser launch itself does not pass userAgent directly —
       // that's handled in createContext. Verify headless is set.
       expect(launchOptions.headless).toBe(true);
@@ -63,10 +85,7 @@ describe('browser.config', () => {
 
       // Assert
       expect(mockNewContext).toHaveBeenCalledTimes(1);
-      const contextOptions = mockNewContext.mock.calls[0][0] as Record<
-        string,
-        unknown
-      >;
+      const contextOptions = getContextOptions();
       expect(contextOptions.locale).toBe('ru-RU');
     });
 
@@ -76,15 +95,8 @@ describe('browser.config', () => {
 
       // Assert
       expect(mockNewContext).toHaveBeenCalledTimes(1);
-      const contextOptions = mockNewContext.mock.calls[0][0] as Record<
-        string,
-        unknown
-      >;
-      const viewport = contextOptions.viewport as {
-        width: number;
-        height: number;
-      };
-      expect(viewport).toEqual({ width: 1920, height: 1080 });
+      const contextOptions = getContextOptions();
+      expect(contextOptions.viewport).toEqual({ width: 1920, height: 1080 });
     });
 
     it('should set Accept-Language header', async () => {
@@ -93,13 +105,10 @@ describe('browser.config', () => {
 
       // Assert
       expect(mockNewContext).toHaveBeenCalledTimes(1);
-      const contextOptions = mockNewContext.mock.calls[0][0] as Record<
-        string,
-        unknown
-      >;
-      const headers = contextOptions.extraHTTPHeaders as Record<string, string>;
+      const contextOptions = getContextOptions();
+      const headers = contextOptions.extraHTTPHeaders;
       expect(headers).toBeDefined();
-      expect(headers['Accept-Language']).toBe(
+      expect(headers?.['Accept-Language']).toBe(
         'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
       );
     });
@@ -110,11 +119,8 @@ describe('browser.config', () => {
 
       // Assert
       expect(mockNewContext).toHaveBeenCalledTimes(1);
-      const contextOptions = mockNewContext.mock.calls[0][0] as Record<
-        string,
-        unknown
-      >;
-      const userAgent = contextOptions.userAgent as string;
+      const contextOptions = getContextOptions();
+      const userAgent = contextOptions.userAgent;
       expect(userAgent).toBeDefined();
       expect(userAgent).not.toContain('HeadlessChrome');
     });
@@ -125,25 +131,12 @@ describe('browser.config', () => {
         'Mozilla/5.0 (X11; Linux x86_64) CustomBot/1.0 Safari/537.36';
       process.env.PARSER_USER_AGENT = customUA;
 
-      // Reset modules to pick up fresh env, then re-require
-      jest.resetModules();
-      jest.doMock('playwright', () => ({
-        chromium: {
-          launch: (options?: unknown) => mockChromiumLaunch(options),
-        },
-      }));
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const freshModule = require('./browser.config');
-
       // Act
-      await freshModule.createContext(mockBrowser);
+      await createContext(mockBrowser);
 
       // Assert
       expect(mockNewContext).toHaveBeenCalledTimes(1);
-      const contextOptions = mockNewContext.mock.calls[0][0] as Record<
-        string,
-        unknown
-      >;
+      const contextOptions = getContextOptions();
       expect(contextOptions.userAgent).toBe(customUA);
     });
   });

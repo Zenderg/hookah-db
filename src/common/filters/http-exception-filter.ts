@@ -7,6 +7,45 @@ import {
 } from '@nestjs/common';
 import type { ArgumentsHost } from '@nestjs/common';
 import { SentryExceptionCaptured } from '@sentry/nestjs';
+import type { Request, Response } from 'express';
+
+interface ExceptionResponseObject {
+  message?: string | string[];
+  error?: string;
+}
+
+interface StatusExceptionObject {
+  status?: unknown;
+  response?: unknown;
+  message?: unknown;
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function getExceptionResponseMessage(
+  exceptionResponse: object,
+  fallback: string,
+): string | string[] {
+  const responseObj = exceptionResponse as ExceptionResponseObject;
+  return responseObj.message ?? responseObj.error ?? fallback;
+}
+
+function getStatusExceptionMessage(
+  exceptionObj: StatusExceptionObject,
+): string | string[] {
+  if (isObject(exceptionObj.response)) {
+    const responseMessage = exceptionObj.response.message;
+    if (typeof responseMessage === 'string' || Array.isArray(responseMessage)) {
+      return responseMessage;
+    }
+  }
+
+  return typeof exceptionObj.message === 'string'
+    ? exceptionObj.message
+    : 'Internal server error';
+}
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -15,8 +54,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
   @SentryExceptionCaptured()
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
-    const response = ctx.getResponse();
-    const request = ctx.getRequest();
+    const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
 
     let httpStatus: number;
     let message: string | string[];
@@ -30,8 +69,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
         typeof exceptionResponse === 'object' &&
         exceptionResponse !== null
       ) {
-        const responseObj = exceptionResponse as Record<string, any>;
-        message = responseObj.message || responseObj.error || exception.message;
+        message = getExceptionResponseMessage(
+          exceptionResponse,
+          exception.message,
+        );
       } else {
         message = exception.message;
       }
@@ -40,12 +81,12 @@ export class HttpExceptionFilter implements ExceptionFilter {
       exception !== null &&
       'status' in exception
     ) {
-      const exceptionObj = exception as Record<string, any>;
-      httpStatus = exceptionObj.status || HttpStatus.INTERNAL_SERVER_ERROR;
-      message =
-        exceptionObj.response?.message ||
-        exceptionObj.message ||
-        'Internal server error';
+      const exceptionObj = exception as StatusExceptionObject;
+      httpStatus =
+        typeof exceptionObj.status === 'number'
+          ? exceptionObj.status
+          : HttpStatus.INTERNAL_SERVER_ERROR;
+      message = getStatusExceptionMessage(exceptionObj);
     } else if (exception instanceof Error) {
       httpStatus = HttpStatus.INTERNAL_SERVER_ERROR;
       message = 'Internal server error';

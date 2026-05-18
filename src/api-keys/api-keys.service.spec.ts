@@ -98,14 +98,14 @@ describe('ApiKeysService', () => {
 
       // Assert
       expect(result).toEqual(createdApiKey);
-      expect(mockApiKeysRepository.create).toHaveBeenCalledWith({
-        name,
-        key: expect.any(String),
-        isActive: true,
-        requestCount: 0,
-        createdAt: expect.any(Date),
-        updatedAt: expect.any(Date),
-      });
+      expect(mockApiKeysRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name,
+          key: 'mock-uuid-v4',
+          isActive: true,
+          requestCount: 0,
+        }),
+      );
     });
 
     it('should set isActive to true by default', async () => {

@@ -71,6 +71,10 @@ interface HtmxRequestBody {
   };
 }
 
+function isHtmxRequestBody(value: unknown): value is HtmxRequestBody {
+  return typeof value === 'object' && value !== null;
+}
+
 function generateHtmxBatch(offset: number): object[] {
   const items: object[] = [];
   const batchSize = 5;
@@ -98,98 +102,111 @@ export async function startTestServer(
 ): Promise<TestServer> {
   let postDataRequestCount = 0;
 
-  const server: Server = createServer(
-    async (req: IncomingMessage, res: ServerResponse) => {
-      const url = new URL(req.url || '/', `http://localhost`);
-      const pathname = url.pathname;
+  async function handleRequest(
+    req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> {
+    const url = new URL(req.url || '/', `http://localhost`);
+    const pathname = url.pathname;
 
-      // If forceStatus is set, serve the error page for every request
-      if (config?.forceStatus) {
-        try {
-          htmlResponse(
-            res,
-            readFixture('error-page-403.html'),
-            config.forceStatus,
-          );
-        } catch {
-          res.writeHead(config.forceStatus);
-          res.end('Error');
-        }
-        return;
+    // If forceStatus is set, serve the error page for every request
+    if (config?.forceStatus) {
+      try {
+        htmlResponse(
+          res,
+          readFixture('error-page-403.html'),
+          config.forceStatus,
+        );
+      } catch {
+        res.writeHead(config.forceStatus);
+        res.end('Error');
       }
+      return;
+    }
 
-      // -------------------------------------------------------------------
-      // POST /postData — HTMX pagination endpoint
-      // -------------------------------------------------------------------
-      if (req.method === 'POST' && pathname === '/postData') {
-        postDataRequestCount++;
+    // -------------------------------------------------------------------
+    // POST /postData — HTMX pagination endpoint
+    // -------------------------------------------------------------------
+    if (req.method === 'POST' && pathname === '/postData') {
+      postDataRequestCount++;
 
-        let body: HtmxRequestBody;
-        try {
-          body = JSON.parse(await readBody(req));
-        } catch {
+      let body: HtmxRequestBody;
+      try {
+        const parsedBody: unknown = JSON.parse(await readBody(req));
+        if (!isHtmxRequestBody(parsedBody)) {
           jsonResponse(res, { error: 'Invalid JSON' }, 400);
           return;
         }
-
-        const offset = body.data?.offset ?? 0;
-
-        // When skipLastBatch is enabled, the second+ request returns empty
-        if (config?.skipLastBatch && postDataRequestCount > 1) {
-          jsonResponse(res, []);
-          return;
-        }
-
-        const items = generateHtmxBatch(offset);
-        jsonResponse(res, items);
+        body = parsedBody;
+      } catch {
+        jsonResponse(res, { error: 'Invalid JSON' }, 400);
         return;
       }
 
-      // Only handle GET from here on
-      if (req.method !== 'GET') {
-        res.writeHead(404);
-        res.end('Not Found');
+      const offset = body.data?.offset ?? 0;
+
+      // When skipLastBatch is enabled, the second+ request returns empty
+      if (config?.skipLastBatch && postDataRequestCount > 1) {
+        jsonResponse(res, []);
         return;
       }
 
-      // -------------------------------------------------------------------
-      // GET /tobaccos/darkside/xperience — Line page
-      // -------------------------------------------------------------------
-      if (pathname === '/tobaccos/darkside/xperience') {
-        const fixture =
-          config?.linePageFixture === 'complete'
-            ? 'line-page-complete.html'
-            : 'line-page-htmx.html';
-        htmlResponse(res, readFixture(fixture));
-        return;
-      }
+      const items = generateHtmxBatch(offset);
+      jsonResponse(res, items);
+      return;
+    }
 
-      // -------------------------------------------------------------------
-      // GET /tobaccos/darkside/xperience/:tobacco — Tobacco detail page
-      // -------------------------------------------------------------------
-      const tobaccoDetailMatch = pathname.match(
-        /^\/tobaccos\/darkside\/xperience\/.+$/,
-      );
-      if (tobaccoDetailMatch) {
-        htmlResponse(res, readFixture('tobacco-detail-page.html'));
-        return;
-      }
-
-      // -------------------------------------------------------------------
-      // GET /tobaccos/ or GET /tobaccos — Brand listing page
-      // -------------------------------------------------------------------
-      if (pathname === '/tobaccos/' || pathname === '/tobaccos') {
-        htmlResponse(res, readFixture('brand-page-with-lines.html'));
-        return;
-      }
-
-      // -------------------------------------------------------------------
-      // 404 — everything else
-      // -------------------------------------------------------------------
+    // Only handle GET from here on
+    if (req.method !== 'GET') {
       res.writeHead(404);
       res.end('Not Found');
-    },
-  );
+      return;
+    }
+
+    // -------------------------------------------------------------------
+    // GET /tobaccos/darkside/xperience — Line page
+    // -------------------------------------------------------------------
+    if (pathname === '/tobaccos/darkside/xperience') {
+      const fixture =
+        config?.linePageFixture === 'complete'
+          ? 'line-page-complete.html'
+          : 'line-page-htmx.html';
+      htmlResponse(res, readFixture(fixture));
+      return;
+    }
+
+    // -------------------------------------------------------------------
+    // GET /tobaccos/darkside/xperience/:tobacco — Tobacco detail page
+    // -------------------------------------------------------------------
+    const tobaccoDetailMatch = pathname.match(
+      /^\/tobaccos\/darkside\/xperience\/.+$/,
+    );
+    if (tobaccoDetailMatch) {
+      htmlResponse(res, readFixture('tobacco-detail-page.html'));
+      return;
+    }
+
+    // -------------------------------------------------------------------
+    // GET /tobaccos/ or GET /tobaccos — Brand listing page
+    // -------------------------------------------------------------------
+    if (pathname === '/tobaccos/' || pathname === '/tobaccos') {
+      htmlResponse(res, readFixture('brand-page-with-lines.html'));
+      return;
+    }
+
+    // -------------------------------------------------------------------
+    // 404 — everything else
+    // -------------------------------------------------------------------
+    res.writeHead(404);
+    res.end('Not Found');
+  }
+
+  const server: Server = createServer((req, res) => {
+    void handleRequest(req, res).catch(() => {
+      res.writeHead(500);
+      res.end('Internal Server Error');
+    });
+  });
 
   await new Promise<void>((r) => server.listen(0, r));
   const address = server.address();

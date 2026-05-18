@@ -16,8 +16,8 @@ describe('TobaccosService', () => {
     slug: 'test-tobacco',
     brandId: 'brand-123',
     brand: null as any, // eslint-disable-line @typescript-eslint/no-unsafe-assignment
-    lineId: null as any, // eslint-disable-line @typescript-eslint/no-unsafe-assignment
-    line: null as any, // eslint-disable-line @typescript-eslint/no-unsafe-assignment
+    lineId: null,
+    line: null,
     rating: 4.5,
     ratingsCount: 50,
     strengthOfficial: 'Средняя',

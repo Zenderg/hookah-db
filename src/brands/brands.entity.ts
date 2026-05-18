@@ -31,7 +31,7 @@ export class Brand {
   ratingsCount: number;
 
   @Column({ type: 'text', nullable: true })
-  description: string;
+  description: string | null;
 
   @Column({ type: 'varchar' })
   logoUrl: string;

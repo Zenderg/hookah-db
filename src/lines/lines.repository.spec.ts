@@ -245,7 +245,7 @@ describe('LinesRepository', () => {
         { status: 'Лимитированная' },
         { status: 'Снята с производства' },
       ];
-      mockQueryBuilder.getRawMany.mockResolvedValue(mockRawResult as any);
+      mockQueryBuilder.getRawMany.mockResolvedValue(mockRawResult);
 
       // Act
       const result = await repository.getStatuses();
@@ -289,7 +289,7 @@ describe('LinesRepository', () => {
         { status: 'Выпускается' },
         { status: 'Лимитированная' },
       ];
-      mockQueryBuilder.getRawMany.mockResolvedValue(mockRawResult as any);
+      mockQueryBuilder.getRawMany.mockResolvedValue(mockRawResult);
 
       // Act
       const result = await repository.getStatuses();
@@ -308,7 +308,7 @@ describe('LinesRepository', () => {
         { status: 'Выпускается' },
         { status: 'Лимитированная' },
       ];
-      mockQueryBuilder.getRawMany.mockResolvedValue(mockRawResult as any);
+      mockQueryBuilder.getRawMany.mockResolvedValue(mockRawResult);
 
       // Act
       await repository.getStatuses();
