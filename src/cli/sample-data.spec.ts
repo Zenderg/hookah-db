@@ -78,6 +78,11 @@ describe('seedSampleData', () => {
       tobaccos: { created: 3, updated: 0 },
     });
     expect(apiKeys.rows[0].key).toBe(LOCAL_DEV_API_KEY);
+    expect(apiKeys.rows[0].createdAt).toBeInstanceOf(Date);
+    expect(apiKeys.rows[0].updatedAt).toBeInstanceOf(Date);
+    expect(brands.rows[0].createdAt).toBeInstanceOf(Date);
+    expect(lines.rows[0].createdAt).toBeInstanceOf(Date);
+    expect(tobaccos.rows[0].createdAt).toBeInstanceOf(Date);
     expect(tobaccos.rows[0].brand).toBeDefined();
     expect(tobaccos.rows[0].line).toBeDefined();
     expect(tobaccos.rows[0].flavors.length).toBeGreaterThan(0);

@@ -146,13 +146,21 @@ async function upsertBy<T extends { id: string }>(
   data: Partial<T>,
 ): Promise<UpsertResult<T>> {
   const existing = await repository.findOne({ where });
+  const now = new Date();
 
   if (existing) {
-    repository.merge(existing, data);
+    repository.merge(existing, {
+      ...data,
+      updatedAt: now,
+    } as Partial<T>);
     return { entity: await repository.save(existing), action: 'updated' };
   }
 
-  const entity = repository.create(data);
+  const entity = repository.create({
+    ...data,
+    createdAt: now,
+    updatedAt: now,
+  } as Partial<T>);
   return { entity: await repository.save(entity), action: 'created' };
 }
 
