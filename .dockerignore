@@ -2,8 +2,26 @@ node_modules
 npm-debug.log
 dist
 .git
+.github
 .env
 .env.local
+.env.*.local
 .DS_Store
 coverage
-test
+.nyc_output
+
+# Local agent/tool state
+.agents
+.claude
+.kilocode
+.opencode
+.playwright-mcp
+mcp.json
+
+# Editor files
+.idea
+.vscode
+
+# Runtime data and docs not needed in the image
+data
+plans

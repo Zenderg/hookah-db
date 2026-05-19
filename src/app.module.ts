@@ -15,12 +15,14 @@ import { LinesModule } from './lines/lines.module';
 import { TobaccosModule } from './tobaccos/tobaccos.module';
 import { FlavorsModule } from './flavors/flavors.module';
 import { SentryModule } from '@sentry/nestjs/setup';
+import { validateEnvironment } from './config/env.validation';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+      validate: validateEnvironment,
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],

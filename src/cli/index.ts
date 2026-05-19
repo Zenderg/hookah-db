@@ -10,8 +10,16 @@ import { AppModule } from '../app.module';
 import { ApiKeysService } from '../api-keys/api-keys.service';
 import { ParserService } from '../parser/parser.service';
 import * as Sentry from '@sentry/nestjs';
+import { ApiKey } from '../api-keys/api-keys.entity';
 import { Brand } from '../brands/brands.entity';
+import { Flavor } from '../flavors/flavors.entity';
 import { Line } from '../lines/lines.entity';
+import { Tobacco } from '../tobaccos/tobaccos.entity';
+import {
+  LOCAL_DEV_API_KEY,
+  seedSampleData,
+  type SampleDataRepositories,
+} from './sample-data';
 
 const program = new Command();
 
@@ -30,6 +38,11 @@ interface ParserContext {
 interface ParseOptions {
   limit?: string;
   url?: string;
+}
+
+interface SampleDataContext {
+  app: INestApplicationContext;
+  repositories: SampleDataRepositories;
 }
 
 program
@@ -51,6 +64,23 @@ async function getParserService(): Promise<ParserContext> {
   const brandRepository = app.get<Repository<Brand>>(getRepositoryToken(Brand));
   const lineRepository = app.get<Repository<Line>>(getRepositoryToken(Line));
   return { service, app, brandRepository, lineRepository };
+}
+
+async function getSampleDataContext(): Promise<SampleDataContext> {
+  const app = await NestFactory.createApplicationContext(AppModule);
+
+  return {
+    app,
+    repositories: {
+      apiKeyRepository: app.get<Repository<ApiKey>>(getRepositoryToken(ApiKey)),
+      brandRepository: app.get<Repository<Brand>>(getRepositoryToken(Brand)),
+      lineRepository: app.get<Repository<Line>>(getRepositoryToken(Line)),
+      flavorRepository: app.get<Repository<Flavor>>(getRepositoryToken(Flavor)),
+      tobaccoRepository: app.get<Repository<Tobacco>>(
+        getRepositoryToken(Tobacco),
+      ),
+    },
+  };
 }
 
 // Create API key command
@@ -208,6 +238,64 @@ program
           Sentry.captureException(error);
           console.error(
             '❌ Error fetching statistics:',
+            error instanceof Error ? error.message : error,
+          );
+          await Sentry.flush(2000);
+          process.exit(1);
+        } finally {
+          if (app) {
+            await app.close();
+          }
+          await Sentry.close(2000);
+        }
+      },
+    );
+  });
+
+program
+  .command('seed <dataset>')
+  .description('Seed local development data without calling external websites')
+  .action(async (dataset: string) => {
+    await Sentry.startSpan(
+      { op: 'cli.seed', name: `Seed ${dataset}` },
+      async () => {
+        let app: INestApplicationContext | null = null;
+        try {
+          if (dataset !== 'sample') {
+            console.error(
+              `❌ Invalid dataset: ${dataset}. Only 'sample' is supported.`,
+            );
+            process.exit(1);
+          }
+
+          const context = await getSampleDataContext();
+          app = context.app;
+          const result = await seedSampleData(context.repositories);
+
+          console.log('✅ Sample data seeded successfully!');
+          console.log('');
+          console.log('Rows:');
+          console.log(
+            `  API keys: ${result.apiKeys.created} created, ${result.apiKeys.updated} updated`,
+          );
+          console.log(
+            `  Brands: ${result.brands.created} created, ${result.brands.updated} updated`,
+          );
+          console.log(
+            `  Lines: ${result.lines.created} created, ${result.lines.updated} updated`,
+          );
+          console.log(
+            `  Flavors: ${result.flavors.created} created, ${result.flavors.updated} updated`,
+          );
+          console.log(
+            `  Tobaccos: ${result.tobaccos.created} created, ${result.tobaccos.updated} updated`,
+          );
+          console.log('');
+          console.log(`Local API key: ${LOCAL_DEV_API_KEY}`);
+        } catch (error) {
+          Sentry.captureException(error);
+          console.error(
+            '❌ Seeding failed:',
             error instanceof Error ? error.message : error,
           );
           await Sentry.flush(2000);

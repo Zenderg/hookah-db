@@ -12,6 +12,8 @@ import { TobaccoParserStrategy } from './strategies/tobacco-parser.strategy';
 import type { ParsedTobaccoData } from './strategies/tobacco-parser.strategy';
 import * as Sentry from '@sentry/nestjs';
 import { SentryTraced, SentryCron } from '@sentry/nestjs';
+import { ConfigService } from '@nestjs/config';
+import { isParserCronEnabled } from '../config/env.validation';
 
 export const PARSER_DAILY_REFRESH_MONITOR_CONFIG = {
   schedule: { type: 'crontab' as const, value: '0 2 * * *' },
@@ -35,6 +37,7 @@ export class ParserService {
     private readonly brandParserStrategy: BrandParserStrategy,
     private readonly lineParserStrategy: LineParserStrategy,
     private readonly tobaccoParserStrategy: TobaccoParserStrategy,
+    private readonly configService: ConfigService,
   ) {}
 
   @SentryTraced('parser.daily-refresh')
@@ -45,6 +48,21 @@ export class ParserService {
     lines: { created: number; updated: number; errors: number };
     tobaccos: { created: number; updated: number; errors: number };
   }> {
+    if (
+      !isParserCronEnabled(
+        this.configService.get<string>('PARSER_CRON_ENABLED'),
+      )
+    ) {
+      this.logger.log(
+        'Daily parser cron is disabled by PARSER_CRON_ENABLED=false.',
+      );
+      return {
+        brands: { created: 0, updated: 0, errors: 0 },
+        lines: { created: 0, updated: 0, errors: 0 },
+        tobaccos: { created: 0, updated: 0, errors: 0 },
+      };
+    }
+
     this.logger.log('Starting daily data refresh...');
 
     const results = {
