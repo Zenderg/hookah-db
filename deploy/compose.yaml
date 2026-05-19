@@ -21,7 +21,7 @@ services:
     restart: unless-stopped
 
   api:
-    image: ${HOOKAH_DB_API_IMAGE:-ghcr.io/koshmarus/hookah-db:latest}
+    image: ${HOOKAH_DB_API_IMAGE:-ghcr.io/Zenderg/hookah-db:latest}
     ports:
       - "${API_PORT:-3000}:3000"
     depends_on:
