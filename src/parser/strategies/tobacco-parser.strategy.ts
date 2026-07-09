@@ -76,6 +76,59 @@ export class TobaccoParserStrategy {
     });
   }
 
+  private async recreateContext(): Promise<Page> {
+    const oldContext = this.context;
+    try {
+      if (oldContext) {
+        await oldContext.close();
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Failed to close old browser context during rotation: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    this.context = await createContext(this.browser!);
+    this.page = await this.context.newPage();
+    this.setupPageListeners(this.page);
+    this.navigationCounter.value = 0;
+
+    return this.page;
+  }
+
+  private isRecoverableNavigationError(error: unknown): boolean {
+    if (!(error instanceof Error)) {
+      return false;
+    }
+
+    return (
+      error.message.includes('Timeout') ||
+      error.message.includes('Page crashed') ||
+      error.message.includes('Target page, context or browser has been closed')
+    );
+  }
+
+  private async waitForPageReady(): Promise<void> {
+    if (!this.page) {
+      throw new Error('Browser not initialized. Call initialize() first.');
+    }
+
+    // Wait for DOM content after successful navigation
+    await this.page.waitForLoadState('domcontentloaded', { timeout: 10000 });
+
+    // htreviews.org can render duplicate H1 nodes where the first has no
+    // layout box. A page-side predicate avoids Playwright adopting the first
+    // matching element handle and only checks that meaningful content exists.
+    await this.page.waitForFunction(
+      () =>
+        Array.from(document.querySelectorAll('h1')).some((heading) =>
+          heading.textContent?.trim(),
+        ),
+      undefined,
+      { timeout: 10000 },
+    );
+  }
+
   /**
    * Navigate to URL with HTTP status verification.
    * Uses navigateWithCheck for goto + status check + retry on 429.
@@ -93,46 +146,38 @@ export class TobaccoParserStrategy {
 
     this.logger.debug(`Navigating to ${fullUrl}`);
 
-    const result = await navigateWithCheck(this.page, fullUrl, {
-      recreateContext: async () => {
-        const oldContext = this.context;
-        try {
-          if (oldContext) {
-            await oldContext.close();
-          }
-        } catch (error) {
-          this.logger.warn(
-            `Failed to close old browser context during rotation: ${error instanceof Error ? error.message : String(error)}`,
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const result = await navigateWithCheck(this.page, fullUrl, {
+          recreateContext: () => this.recreateContext(),
+          navigationCounter: this.navigationCounter,
+          maxNavigationsBeforeRotation: 100,
+        });
+
+        if (!result.ok) {
+          throw new Error(
+            `Navigation failed for ${fullUrl}: HTTP ${result.status}`,
           );
         }
-        this.context = await createContext(this.browser!);
-        this.page = await this.context.newPage();
-        this.setupPageListeners(this.page);
-        return this.page;
-      },
-      navigationCounter: this.navigationCounter,
-      maxNavigationsBeforeRotation: 100,
-    });
 
-    if (!result.ok) {
-      throw new Error(
-        `Navigation failed for ${fullUrl}: HTTP ${result.status}`,
-      );
+        await this.waitForPageReady();
+
+        this.logger.debug(`Successfully navigated to ${fullUrl}`);
+        return;
+      } catch (error) {
+        const canRetry =
+          attempt === 0 && this.isRecoverableNavigationError(error);
+
+        if (!canRetry) {
+          throw error;
+        }
+
+        this.logger.warn(
+          `Recovering from navigation readiness failure for ${fullUrl}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        await this.recreateContext();
+      }
     }
-
-    // Wait for DOM content after successful navigation
-    await this.page.waitForLoadState('domcontentloaded', { timeout: 10000 });
-
-    // Wait for main content to be present in DOM
-    // Note: state 'attached' instead of 'visible' — htreviews.org H1 elements
-    // may not satisfy Playwright's strict visibility check (e.g. zero-size,
-    // overflow:hidden parent) even though the page is fully loaded.
-    await this.page.waitForSelector('h1', {
-      timeout: 10000,
-      state: 'attached',
-    });
-
-    this.logger.debug(`Successfully navigated to ${fullUrl}`);
   }
 
   async parseTobaccos(

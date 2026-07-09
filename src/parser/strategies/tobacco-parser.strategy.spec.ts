@@ -41,15 +41,17 @@ const mockBrowser = {
 } as unknown as Browser;
 
 const mockNewPage = jest.fn();
+const mockContextClose = jest.fn();
 
 const mockContext = {
-  close: jest.fn(),
+  close: mockContextClose,
   newPage: mockNewPage,
 } as unknown as BrowserContext;
 
 const mockEvaluate = jest.fn();
 const mockWaitForLoadState = jest.fn();
 const mockWaitForSelector = jest.fn();
+const mockWaitForFunction = jest.fn();
 const mockWaitForTimeout = jest.fn();
 const mockPageOn = jest.fn();
 
@@ -58,6 +60,7 @@ const mockPage = {
   on: mockPageOn,
   waitForLoadState: mockWaitForLoadState,
   waitForSelector: mockWaitForSelector,
+  waitForFunction: mockWaitForFunction,
   evaluate: mockEvaluate,
   waitForTimeout: mockWaitForTimeout,
 } as unknown as Page;
@@ -221,7 +224,7 @@ describe('TobaccoParserStrategy', () => {
     });
   });
 
-  it('should use domcontentloaded instead of commit', async () => {
+  it('should use domcontentloaded and a stable readiness predicate', async () => {
     mockedNavigateWithCheck.mockResolvedValue({
       ok: true,
       status: 200,
@@ -241,9 +244,69 @@ describe('TobaccoParserStrategy', () => {
     expect(mockWaitForLoadState).toHaveBeenCalledWith('domcontentloaded', {
       timeout: 10000,
     });
-    expect(mockWaitForSelector).toHaveBeenCalledWith('h1', {
-      timeout: 10000,
-      state: 'attached',
+    expect(mockWaitForFunction).toHaveBeenCalledWith(
+      expect.any(Function),
+      undefined,
+      { timeout: 10000 },
+    );
+    expect(mockWaitForSelector).not.toHaveBeenCalled();
+  });
+
+  it('should recreate context and retry when readiness wait times out after HTTP 200', async () => {
+    const recoveryWaitForLoadState = jest.fn();
+    const recoveryWaitForFunction = jest.fn();
+    const recoveryWaitForTimeout = jest.fn();
+    const recoveryPage = {
+      close: jest.fn(),
+      on: jest.fn(),
+      waitForLoadState: recoveryWaitForLoadState,
+      waitForSelector: jest.fn(),
+      waitForFunction: recoveryWaitForFunction,
+      evaluate: jest.fn(),
+      waitForTimeout: recoveryWaitForTimeout,
+    } as unknown as Page;
+    const recoveryContext = {
+      close: jest.fn(),
+      newPage: jest.fn().mockResolvedValue(recoveryPage),
+    } as unknown as BrowserContext;
+
+    mockedCreateContext.mockResolvedValueOnce(recoveryContext);
+    mockedNavigateWithCheck.mockResolvedValue({
+      ok: true,
+      status: 200,
+      url: 'https://htreviews.org/tobaccos/darkside/xperience',
     });
+    mockWaitForFunction.mockRejectedValueOnce(
+      new Error('page.waitForFunction: Timeout 10000ms exceeded'),
+    );
+    recoveryWaitForLoadState.mockResolvedValue(undefined);
+    recoveryWaitForFunction.mockResolvedValue(undefined);
+    mockedLoadAllItems.mockResolvedValue({
+      urls: [],
+      totalCount: 0,
+      loadedCount: 0,
+      isComplete: true,
+      method: 'htmx-direct',
+    });
+
+    await strategy.parseTobaccos([lineInfo]);
+
+    expect(mockContextClose).toHaveBeenCalledTimes(1);
+    expect(mockedCreateContext).toHaveBeenCalledTimes(2);
+    expect(mockedNavigateWithCheck).toHaveBeenCalledTimes(2);
+    expect(recoveryWaitForLoadState).toHaveBeenCalledWith('domcontentloaded', {
+      timeout: 10000,
+    });
+    expect(recoveryWaitForFunction).toHaveBeenCalledWith(
+      expect.any(Function),
+      undefined,
+      { timeout: 10000 },
+    );
+    expect(mockedLoadAllItems).toHaveBeenCalledWith(
+      recoveryPage,
+      expect.objectContaining({
+        containerSelector: '.tobacco_list_items',
+      }),
+    );
   });
 });
