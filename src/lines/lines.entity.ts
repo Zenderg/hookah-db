@@ -34,8 +34,8 @@ export class Line {
   @Column({ type: 'text', nullable: true })
   description: string | null;
 
-  @Column()
-  imageUrl: string;
+  @Column({ type: 'varchar', nullable: true })
+  imageUrl: string | null;
 
   @Column({ type: 'decimal', precision: 3, scale: 2, default: 0 })
   rating: number;

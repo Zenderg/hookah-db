@@ -177,7 +177,7 @@ export class ParserService {
                 slug: lineData.slug,
                 brandId: lineData.brandId,
                 description: lineData.description,
-                imageUrl: lineData.imageUrl,
+                imageUrl: lineData.imageUrl ?? existingLine.imageUrl,
                 strengthOfficial: lineData.strengthOfficial,
                 strengthByRatings: lineData.strengthByRatings,
                 status: lineData.status,
@@ -209,6 +209,7 @@ export class ParserService {
               scope.setContext('parser', {
                 strategy: 'line',
                 entityName: parsedLine.name,
+                brandId: parsedLine.brandId,
               });
               return scope;
             });
@@ -495,7 +496,7 @@ export class ParserService {
               slug: lineData.slug,
               brandId: lineData.brandId,
               description: lineData.description,
-              imageUrl: lineData.imageUrl,
+              imageUrl: lineData.imageUrl ?? existingLine.imageUrl,
               strengthOfficial: lineData.strengthOfficial,
               strengthByRatings: lineData.strengthByRatings,
               status: lineData.status,
@@ -525,6 +526,7 @@ export class ParserService {
             scope.setContext('parser', {
               strategy: 'line',
               entityName: parsedLine.name,
+              brandId: parsedLine.brandId,
             });
             return scope;
           });
@@ -703,7 +705,10 @@ export class ParserService {
 
       if (existingLine) {
         // Update existing line
-        await this.lineRepository.update(existingLine.id, lineData);
+        await this.lineRepository.update(existingLine.id, {
+          ...lineData,
+          imageUrl: lineData.imageUrl ?? existingLine.imageUrl,
+        });
         this.logger.log(
           `Updated line: ${lineData.name} (ID: ${existingLine.id})`,
         );

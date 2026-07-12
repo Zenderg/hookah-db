@@ -175,4 +175,13 @@ describe('LineParserStrategy', () => {
     // Error should be logged for the detail page failure
     expect(mockError).toHaveBeenCalledWith(expect.stringContaining('HTTP 403'));
   });
+
+  it('should preserve a missing image as null when normalizing a line', () => {
+    const result = strategy.normalizeToEntity({
+      ...mockLineFromBrandPage,
+      brandId,
+    });
+
+    expect(result.imageUrl).toBeNull();
+  });
 });

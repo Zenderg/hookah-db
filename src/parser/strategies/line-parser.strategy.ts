@@ -746,7 +746,7 @@ export class LineParserStrategy {
       slug: data.slug,
       brandId: data.brandId,
       description: data.description || undefined,
-      imageUrl: data.imageUrl || undefined,
+      imageUrl: data.imageUrl || null,
       strengthOfficial: data.strengthOfficial || 'Не указано',
       strengthByRatings: data.strengthByRatings || 'Не указано',
       status: data.status || 'Не указано',
