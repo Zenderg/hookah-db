@@ -42,6 +42,9 @@ npm run migration:show
 ```
 
 - Migration files live in `src/migrations/` and use timestamp-prefixed names.
+- Migration commands load `.env` from the current working directory. Exported
+  shell variables take precedence, and the same environment validation used by
+  the app rejects invalid database ports before a migration starts.
 - Never set `synchronize: true`.
 - The app config has `migrationsRun: true`; account for that when changing startup or deployment behavior.
 
