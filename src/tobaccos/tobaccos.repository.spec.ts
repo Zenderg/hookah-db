@@ -241,23 +241,44 @@ describe('TobaccosRepository', () => {
       );
     });
 
-    it('should treat punctuation as separators while keeping safe search terms', async () => {
+    it('should keep decimal compounds and split tsquery operators safely', async () => {
       mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
 
-      await repository.findAll({ search: '  apple & cafe\u0301 ! мят  ' });
+      await repository.findAll({ search: 'apple & Tea1.5 2.0 ! мят' });
 
       const parameters = mockQueryBuilder.setParameter.mock.calls.map(
         (call) => call[1] as string,
       );
-      expect(parameters).toContain('apple:*');
-      expect(parameters).toContain('cafe\u0301:*');
-      expect(parameters).toContain('мят:*');
-      expect(parameters).toContain('apple%');
-      expect(parameters).toContain('cafe\u0301%');
-      expect(parameters).toContain('мят%');
-      expect(parameters).not.toContain('&:*');
-      expect(parameters).not.toContain('!:*');
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledTimes(3);
+      expect(parameters).toContain("'apple':*");
+      expect(parameters).toContain("'Tea1.5':*");
+      expect(parameters).toContain("'2.0':*");
+      expect(parameters).toContain("'мят':*");
+      expect(parameters).toContain('Tea1.5%');
+      expect(parameters).toContain('2.0%');
+      expect(parameters).not.toContain("'&':*");
+      expect(parameters).not.toContain("'!':*");
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledTimes(4);
+    });
+
+    it('should quote tsquery terms and escape LIKE wildcards', async () => {
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
+
+      await repository.findAll({ search: "o'reilly\\_100%" });
+
+      const parameters = mockQueryBuilder.setParameter.mock.calls.map(
+        (call) => call[1] as string,
+      );
+      expect(parameters).toContain("'o''reilly\\\\_100%':*");
+      expect(parameters).toContain("o'reilly\\\\\\_100\\%%");
+
+      const searchClause = mockQueryBuilder.andWhere.mock.calls.find((call) =>
+        (call[0] as string).includes('to_tsquery'),
+      )?.[0] as string;
+      expect(searchClause).toContain("ESCAPE E'\\\\'");
+      const relevanceClause = mockQueryBuilder.addSelect.mock.calls.find(
+        (call) => (call[0] as string).includes('ts_rank'),
+      )?.[0] as string;
+      expect(relevanceClause).toContain("ESCAPE E'\\\\'");
     });
 
     it.each(['  \t\n ', '& | : !'])(

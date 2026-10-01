@@ -34,6 +34,7 @@ jobs:
       DATABASE_USERNAME: postgres
       DATABASE_PASSWORD: postgres
       DATABASE_NAME: hookah_db
+      POSTGRES_SEARCH_TESTS: "true"
       CORS_ORIGIN: "*"
       PARSER_CRON_ENABLED: "false"
 

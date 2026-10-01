@@ -70,10 +70,11 @@ DTOs, and utilities.
 
 - All endpoints except `/health` require an API key.
 - Accepted auth headers: `X-API-Key` or `Authorization: Bearer <key>`.
+- A valid key used on a protected request increments its request count and updates `lastUsedAt` once; public `/health` requests do neither.
 - Pagination defaults to 20 and maxes at 100.
 - Tobacco search uses PostgreSQL FTS with Russian and English configurations across `tobacco.name`, `brand.name`, and `line.name`.
-- Search splits input into Unicode letter and number terms; combining marks stay with the preceding term, and punctuation (including apostrophes and tsquery operators) separates terms. Every term must match at least one searched field, so multi-word searches use cross-field AND logic.
-- Each search term retains PostgreSQL prefix matching and Russian/English stemming, plus case-insensitive field-prefix matching. Whitespace-only and punctuation-only input uses the normal requested sort without a search filter.
+- Search splits on whitespace and PostgreSQL tsquery operators. Other punctuation stays within a term and is quoted for PostgreSQL normalization, preserving decimals and compounds such as `1.5` and `apple-mint`. Every term must match at least one searched field, so multi-term searches use cross-field AND logic.
+- Each term retains PostgreSQL prefix matching and Russian/English stemming, plus case-insensitive field-prefix matching with LIKE wildcards escaped. Whitespace-only or operator-only input uses the normal requested sort without a search filter.
 - Search ranking includes exact match bonus +100, tobacco prefix bonus +50, and brand/line prefix bonus +30.
 - Flavor filtering uses AND logic: a tobacco must have every requested flavor.
 - Global exception responses use `{ statusCode, timestamp, path, message }`.

@@ -57,7 +57,13 @@ npm run migration:show
 ```
 
 - Migration files live in `src/migrations/` and use timestamp-prefixed names.
-- The migration CLI runs on the host and connects to `localhost:5432` by default. Start PostgreSQL with `docker-compose.local.yaml` first when running migrations locally; when changing the published host port, pass the same value as `DATABASE_PORT` to the CLI command.
+- Migration commands load `.env` from the current working directory. Exported
+  shell variables take precedence, and the same environment validation used by
+  the app rejects invalid database ports before a migration starts.
+- The migration CLI runs on the host and connects to `localhost:5432` by
+  default. Start PostgreSQL with `docker-compose.local.yaml` first when running
+  migrations locally; when changing the published host port, pass the same
+  value as `DATABASE_PORT` to the CLI command.
 - Never set `synchronize: true`.
 - The app config has `migrationsRun: true`; account for that when changing startup or deployment behavior.
 
@@ -68,6 +74,16 @@ npm run migration:show
 - Mocks and stubs for external dependencies are acceptable.
 - Repository tests use mock QueryBuilder objects. Include all chain methods when creating these mocks: `leftJoin`, `leftJoinAndSelect`, `select`, `addSelect`, `where`, `andWhere`, `orderBy`, `skip`, `take`, `setParameter`, `getManyAndCount`, `getRawMany`, `getOne`.
 - When changing select or ranking strategy, update assertions that distinguish `select` from `addSelect`.
+- `src/tobaccos/tobaccos.repository.postgres.spec.ts` checks search behavior against a real PostgreSQL server. It is skipped unless `POSTGRES_SEARCH_TESTS=true`; when enabled, it creates a uniquely named schema, loads its fixtures there, and drops that schema afterward. The database user needs permission to create and drop schemas.
+
+Run the PostgreSQL repository regression against a local Compose database with:
+
+```bash
+POSTGRES_PORT=35445 docker compose -f docker-compose.yaml -f docker-compose.local.yaml up -d postgres
+POSTGRES_SEARCH_TESTS=true DATABASE_HOST=127.0.0.1 DATABASE_PORT=35445 npm test -- --runInBand tobaccos.repository.postgres.spec.ts
+```
+
+CI enables this spec against its PostgreSQL service. The isolated test schema means the database can also contain application or sample data without the spec changing it.
 
 ## Dependencies
 
