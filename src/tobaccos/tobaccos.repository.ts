@@ -4,6 +4,21 @@ import { Repository } from 'typeorm';
 import { Tobacco } from './tobaccos.entity';
 import { FindTobaccosDto } from './dto/find-tobaccos.dto';
 
+function splitSearchTerms(search: string): string[] {
+  return search
+    .split(/[\s&|!():<>*]+/u)
+    .filter((term) => /[\p{L}\p{N}]/u.test(term));
+}
+
+function toTsqueryPrefix(term: string): string {
+  const escapedTerm = term.replace(/\\/gu, '\\\\').replace(/'/gu, "''");
+  return `'${escapedTerm}':*`;
+}
+
+function toLikePrefix(term: string): string {
+  return `${term.replace(/[\\%_]/gu, '\\$&')}%`;
+}
+
 @Injectable()
 export class TobaccosRepository {
   constructor(
@@ -76,11 +91,12 @@ export class TobaccosRepository {
       );
     }
 
-    if (search) {
+    const searchWords = search ? splitSearchTerms(search) : [];
+
+    if (searchWords.length > 0) {
       // Use PostgreSQL Full-Text Search with Russian and English configurations
       // Search across tobacco.name, brand.name, and line.name
       // For multi-word searches, each word must match in at least one field (cross-field AND)
-      const searchWords = search.trim().split(/\s+/);
 
       // Build parameters object for all search words
       const searchParams: Record<string, string> = {};
@@ -92,8 +108,8 @@ export class TobaccosRepository {
         const paramNamePrefix = `searchWordPrefix${index}`;
         const paramNameILike = `searchWordILike${index}`;
 
-        searchParams[paramNamePrefix] = `${word}:*`;
-        searchParams[paramNameILike] = `${word}%`;
+        searchParams[paramNamePrefix] = toTsqueryPrefix(word);
+        searchParams[paramNameILike] = toLikePrefix(word);
 
         queryBuilder.andWhere(
           `(
@@ -103,9 +119,9 @@ export class TobaccosRepository {
              to_tsvector('english', brand.name) @@ to_tsquery('english', :${paramNamePrefix}) OR
             to_tsvector('russian', line.name) @@ to_tsquery('russian', :${paramNamePrefix}) OR
              to_tsvector('english', line.name) @@ to_tsquery('english', :${paramNamePrefix}) OR
-            LOWER(tobacco.name) LIKE LOWER(:${paramNameILike}) OR
-            LOWER(brand.name) LIKE LOWER(:${paramNameILike}) OR
-            LOWER(line.name) LIKE LOWER(:${paramNameILike})
+            LOWER(tobacco.name) LIKE LOWER(:${paramNameILike}) ESCAPE E'\\\\' OR
+            LOWER(brand.name) LIKE LOWER(:${paramNameILike}) ESCAPE E'\\\\' OR
+            LOWER(line.name) LIKE LOWER(:${paramNameILike}) ESCAPE E'\\\\'
           )`,
         );
       });
@@ -140,9 +156,9 @@ export class TobaccosRepository {
       const prefixMatchBonus = searchWords.map((_, index) => {
         const paramName = `searchWordILike${index}`;
         return `(
-          CASE WHEN LOWER(tobacco.name) LIKE LOWER(:${paramName}) THEN 50 ELSE 0 END +
-          CASE WHEN LOWER(brand.name) LIKE LOWER(:${paramName}) THEN 30 ELSE 0 END +
-          CASE WHEN LOWER(line.name) LIKE LOWER(:${paramName}) THEN 30 ELSE 0 END
+          CASE WHEN LOWER(tobacco.name) LIKE LOWER(:${paramName}) ESCAPE E'\\\\' THEN 50 ELSE 0 END +
+          CASE WHEN LOWER(brand.name) LIKE LOWER(:${paramName}) ESCAPE E'\\\\' THEN 30 ELSE 0 END +
+          CASE WHEN LOWER(line.name) LIKE LOWER(:${paramName}) ESCAPE E'\\\\' THEN 30 ELSE 0 END
         )`;
       });
 
