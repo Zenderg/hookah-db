@@ -51,6 +51,12 @@ curl -H "X-API-Key: local-dev-key" "http://localhost:3000/tobaccos?limit=5"
 
 > В `deploy/compose.yaml` daily parser cron выключен по умолчанию: `PARSER_CRON_ENABLED=false`.
 
+PostgreSQL доступен API внутри Docker Compose, но его порт не публикуется на хост. Для административного доступа используйте:
+
+```bash
+docker compose exec postgres sh -c 'exec psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+```
+
 ## Локальная сборка через Docker
 
 ```bash
@@ -120,13 +126,15 @@ git clone <repository-url>
 cd hookah-db
 npm install
 cp .env.example .env
-docker compose up -d postgres
+docker compose -f docker-compose.yaml -f docker-compose.local.yaml up -d postgres
 npm run migration:run
 npm run seed:sample:dev
 npm run start:dev
 ```
 
 API будет доступен на `http://localhost:3000`.
+
+Файл `docker-compose.local.yaml` явно публикует PostgreSQL только на loopback-адресе. Он нужен для локальных migration/seed-команд; обычный `docker compose up` оставляет базу доступной только другим Compose-сервисам. Для SQL-сессии можно также использовать `docker compose exec postgres sh -c 'exec psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'`.
 
 ## API
 
