@@ -51,6 +51,12 @@ curl -H "X-API-Key: local-dev-key" "http://localhost:3000/tobaccos?limit=5"
 
 > В `deploy/compose.yaml` daily parser cron выключен по умолчанию: `PARSER_CRON_ENABLED=false`.
 
+PostgreSQL доступен API внутри Docker Compose, но его порт не публикуется на хост. Для административного доступа используйте:
+
+```bash
+docker compose exec postgres sh -c 'exec psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+```
+
 ## Локальная сборка через Docker
 
 ```bash
@@ -59,6 +65,8 @@ cd hookah-db
 cp .env.example .env          # настроить при необходимости
 docker compose up --build -d   # API + PostgreSQL
 ```
+
+В `.env` для локального Compose задаются `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `DATABASE_NAME` и `CORS_ORIGIN`; `DATABASE_HOST=postgres` и `DATABASE_PORT=5432` фиксированы для внутреннего подключения между контейнерами. PostgreSQL применяет значения `POSTGRES_USER`, `POSTGRES_PASSWORD` и `POSTGRES_DB` только при инициализации пустого volume. Если `postgres_data` уже содержит данные, изменение `.env` не переименует пользователя или БД и не сбросит пароль.
 
 Проверить, что API поднялся:
 
@@ -92,23 +100,23 @@ npm run smoke
 API image публикуется в GHCR:
 
 ```text
-ghcr.io/Zenderg/hookah-db
+ghcr.io/zenderg/hookah-db
 ```
 
 Теги:
 
 | Тег | Когда публикуется | Назначение |
 |-----|-------------------|------------|
-| `main` | push в `main` | Последняя main-сборка |
-| `sha-<commit>` | push в `main` или tag | Точная привязка к commit |
-| `v0.1.0` | git tag `v0.1.0` | Релизная версия |
-| `v0.1` / `v0` | git tag `v0.1.0` | Semver aliases |
-| `latest` | только git tag `v*.*.*` | Последний релиз, не каждый push |
+| `main` | push в `main` | Последняя main-сборка; используется по умолчанию |
+| `sha-<commit>` | push в `main` или git tag | Точная привязка к commit |
+| `<version>`, `<major>.<minor>`, `<major>` | git tag `v<major>.<minor>.<patch>` | Релизные версии |
+| `latest` | git tag `v*.*.*` | Последний опубликованный релиз |
 
-Для pinning в self-host окружении лучше использовать релизный тег:
+Чтобы закрепить образ `main` по digest, получите digest и передайте его Compose:
 
 ```bash
-HOOKAH_DB_API_IMAGE=ghcr.io/Zenderg/hookah-db:v0.1.0 docker compose up -d
+HOOKAH_DB_API_DIGEST="$(docker buildx imagetools inspect ghcr.io/zenderg/hookah-db:main --format '{{.Manifest.Digest}}')"
+HOOKAH_DB_API_IMAGE="ghcr.io/zenderg/hookah-db@${HOOKAH_DB_API_DIGEST}" docker compose up -d
 ```
 
 Образ multi-arch: `linux/amd64` и `linux/arm64`.
@@ -120,13 +128,15 @@ git clone <repository-url>
 cd hookah-db
 npm install
 cp .env.example .env
-docker compose up -d postgres
+docker compose -f docker-compose.yaml -f docker-compose.local.yaml up -d postgres
 npm run migration:run
 npm run seed:sample:dev
 npm run start:dev
 ```
 
 API будет доступен на `http://localhost:3000`.
+
+Файл `docker-compose.local.yaml` явно публикует PostgreSQL только на loopback-адресе. Он нужен для локальных migration/seed-команд; обычный `docker compose up` оставляет базу доступной только другим Compose-сервисам. Для SQL-сессии можно также использовать `docker compose exec postgres sh -c 'exec psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'`.
 
 ## API
 

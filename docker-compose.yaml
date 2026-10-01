@@ -1,16 +1,14 @@
 services:
   postgres:
     image: postgres:18.1
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=hookah_db
+      - POSTGRES_USER=${DATABASE_USERNAME:-postgres}
+      - POSTGRES_PASSWORD=${DATABASE_PASSWORD:-postgres}
+      - POSTGRES_DB=${DATABASE_NAME:-hookah_db}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d hookah_db"]
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -27,10 +25,10 @@ services:
       - NODE_ENV=production
       - DATABASE_HOST=postgres
       - DATABASE_PORT=5432
-      - DATABASE_USERNAME=postgres
-      - DATABASE_PASSWORD=postgres
-      - DATABASE_NAME=hookah_db
-      - CORS_ORIGIN=*
+      - DATABASE_USERNAME=${DATABASE_USERNAME:-postgres}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD:-postgres}
+      - DATABASE_NAME=${DATABASE_NAME:-hookah_db}
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
       - SENTRY_DSN=${SENTRY_DSN:-}
       - PARSER_CRON_ENABLED=${PARSER_CRON_ENABLED:-true}
     healthcheck:

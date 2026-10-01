@@ -16,6 +16,21 @@ docker compose up --build -d
 docker compose up -d postgres
 ```
 
+PostgreSQL stays on the Compose network by default and is not published on the host. For database administration, open a `psql` session inside the container:
+
+```bash
+docker compose exec postgres sh -c 'exec psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+```
+
+Host-run migration or seed commands need a local TCP connection. Opt in to a loopback-only port mapping with the development override (set `POSTGRES_PORT` if host port 5432 is occupied):
+
+```bash
+POSTGRES_PORT=35445 docker compose -f docker-compose.yaml -f docker-compose.local.yaml up -d postgres
+DATABASE_HOST=127.0.0.1 DATABASE_PORT=35445 npm run migration:show
+```
+
+The override binds only `127.0.0.1`; it is not loaded by ordinary `docker compose` commands. Pass the matching `DATABASE_PORT` explicitly to host-run commands when using a non-default port.
+
 For agents, do not use `npm run start`, `npm run start:dev`, or
 `npm run start:prod` for application startup unless the user explicitly
 overrides the Docker Compose rule.
@@ -45,6 +60,10 @@ npm run migration:show
 - Migration commands load `.env` from the current working directory. Exported
   shell variables take precedence, and the same environment validation used by
   the app rejects invalid database ports before a migration starts.
+- The migration CLI runs on the host and connects to `localhost:5432` by
+  default. Start PostgreSQL with `docker-compose.local.yaml` first when running
+  migrations locally; when changing the published host port, pass the same
+  value as `DATABASE_PORT` to the CLI command.
 - Never set `synchronize: true`.
 - The app config has `migrationsRun: true`; account for that when changing startup or deployment behavior.
 
