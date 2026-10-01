@@ -1,5 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import type { Server } from 'node:http';
+import { APP_GUARD } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { ApiKeysService } from '../api-keys/api-keys.service';
@@ -31,7 +32,10 @@ describe('GET /tobaccos/:id', () => {
       controllers: [TobaccosController],
       providers: [
         TobaccosService,
-        ApiKeyGuard,
+        {
+          provide: APP_GUARD,
+          useClass: ApiKeyGuard,
+        },
         {
           provide: ApiKeysService,
           useValue: {
@@ -60,6 +64,14 @@ describe('GET /tobaccos/:id', () => {
 
   beforeEach(() => {
     repository.findOne.mockReset();
+  });
+
+  it('rejects a request without an API key before querying the repository', async () => {
+    await request(app.getHttpServer())
+      .get('/tobaccos/00000000-0000-4000-8000-000000000099')
+      .expect(401);
+
+    expect(repository.findOne).not.toHaveBeenCalled();
   });
 
   it('returns 404 when the repository has no matching tobacco', async () => {

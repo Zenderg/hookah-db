@@ -3,18 +3,15 @@ import {
   Get,
   Param,
   NotFoundException,
-  UseGuards,
   UseInterceptors,
   Query,
 } from '@nestjs/common';
 import { LinesService } from './lines.service';
-import { ApiKeyGuard } from '../common/guards/api-key.guard';
 import { LoggingInterceptor } from '../common/interceptors/logging.interceptor';
 import { FindLinesDto } from './dto/find-lines.dto';
 import { FindTobaccosDto } from '../tobaccos/dto/find-tobaccos.dto';
 
 @Controller('lines')
-@UseGuards(ApiKeyGuard)
 @UseInterceptors(LoggingInterceptor)
 export class LinesController {
   constructor(private readonly linesService: LinesService) {}

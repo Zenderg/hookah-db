@@ -1,19 +1,10 @@
-import {
-  Controller,
-  Get,
-  Param,
-  UseGuards,
-  UseInterceptors,
-  Query,
-} from '@nestjs/common';
+import { Controller, Get, Param, UseInterceptors, Query } from '@nestjs/common';
 import { TobaccosService } from './tobaccos.service';
-import { ApiKeyGuard } from '../common/guards/api-key.guard';
 import { LoggingInterceptor } from '../common/interceptors/logging.interceptor';
 import { FindTobaccosDto } from './dto/find-tobaccos.dto';
 import { FindTobaccoByUrlDto } from './dto/find-tobacco-by-url.dto';
 
 @Controller('tobaccos')
-@UseGuards(ApiKeyGuard)
 @UseInterceptors(LoggingInterceptor)
 export class TobaccosController {
   constructor(private readonly tobaccosService: TobaccosService) {}

@@ -57,7 +57,13 @@ npm run migration:show
 ```
 
 - Migration files live in `src/migrations/` and use timestamp-prefixed names.
-- The migration CLI runs on the host and connects to `localhost:5432` by default. Start PostgreSQL with `docker-compose.local.yaml` first when running migrations locally; when changing the published host port, pass the same value as `DATABASE_PORT` to the CLI command.
+- Migration commands load `.env` from the current working directory. Exported
+  shell variables take precedence, and the same environment validation used by
+  the app rejects invalid database ports before a migration starts.
+- The migration CLI runs on the host and connects to `localhost:5432` by
+  default. Start PostgreSQL with `docker-compose.local.yaml` first when running
+  migrations locally; when changing the published host port, pass the same
+  value as `DATABASE_PORT` to the CLI command.
 - Never set `synchronize: true`.
 - The app config has `migrationsRun: true`; account for that when changing startup or deployment behavior.
 
