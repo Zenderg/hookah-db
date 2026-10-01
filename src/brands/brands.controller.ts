@@ -10,7 +10,6 @@ import {
 import { BrandsService } from './brands.service';
 import { ApiKeyGuard } from '../common/guards/api-key.guard';
 import { LoggingInterceptor } from '../common/interceptors/logging.interceptor';
-import { Public } from '../common/decorators/public.decorator';
 import { FindBrandsDto } from './dto/find-brands.dto';
 import { FindTobaccosDto } from '../tobaccos/dto/find-tobaccos.dto';
 
@@ -21,7 +20,6 @@ export class BrandsController {
   constructor(private readonly brandsService: BrandsService) {}
 
   @Get()
-  @Public()
   async findAll(@Query() query: FindBrandsDto) {
     return this.brandsService.findAll(query);
   }
