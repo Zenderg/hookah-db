@@ -1,11 +1,4 @@
-import {
-  Controller,
-  Get,
-  Param,
-  NotFoundException,
-  UseInterceptors,
-  Query,
-} from '@nestjs/common';
+import { Controller, Get, Param, UseInterceptors, Query } from '@nestjs/common';
 import { TobaccosService } from './tobaccos.service';
 import { LoggingInterceptor } from '../common/interceptors/logging.interceptor';
 import { FindTobaccosDto } from './dto/find-tobaccos.dto';
@@ -33,10 +26,6 @@ export class TobaccosController {
 
   @Get(':id')
   async findOne(@Param('id') id: string) {
-    try {
-      return this.tobaccosService.findOne(id);
-    } catch {
-      throw new NotFoundException('Tobacco not found');
-    }
+    return this.tobaccosService.findOne(id);
   }
 }
