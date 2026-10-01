@@ -33,7 +33,7 @@ export class TobaccosService {
   async findOne(id: string): Promise<Tobacco> {
     const tobacco = await this.tobaccosRepository.findOne(id);
     if (!tobacco) {
-      throw new Error('Tobacco not found');
+      throw new NotFoundException('Tobacco not found');
     }
     return tobacco;
   }

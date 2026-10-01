@@ -156,14 +156,14 @@ describe('TobaccosService', () => {
       expect(mockTobaccosRepository.findOne).toHaveBeenCalledWith(tobaccoId);
     });
 
-    it('should throw Error when tobacco not found', async () => {
+    it('should throw NotFoundException when tobacco not found', async () => {
       // Arrange
       const tobaccoId = 'non-existent-id';
       mockTobaccosRepository.findOne.mockResolvedValue(null);
 
       // Act & Assert
       await expect(service.findOne(tobaccoId)).rejects.toThrow(
-        'Tobacco not found',
+        NotFoundException,
       );
       expect(mockTobaccosRepository.findOne).toHaveBeenCalledWith(tobaccoId);
     });

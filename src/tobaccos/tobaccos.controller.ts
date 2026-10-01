@@ -2,7 +2,6 @@ import {
   Controller,
   Get,
   Param,
-  NotFoundException,
   UseGuards,
   UseInterceptors,
   Query,
@@ -36,10 +35,6 @@ export class TobaccosController {
 
   @Get(':id')
   async findOne(@Param('id') id: string) {
-    try {
-      return this.tobaccosService.findOne(id);
-    } catch {
-      throw new NotFoundException('Tobacco not found');
-    }
+    return this.tobaccosService.findOne(id);
   }
 }

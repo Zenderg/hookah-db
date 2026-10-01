@@ -70,6 +70,7 @@ DTOs, and utilities.
 
 - All endpoints except `/health` require an API key.
 - Accepted auth headers: `X-API-Key` or `Authorization: Bearer <key>`.
+- `GET /tobaccos/:id` returns 404 with `Tobacco not found` when no record matches; repository errors remain 500.
 - Pagination defaults to 20 and maxes at 100.
 - Tobacco search uses PostgreSQL FTS with Russian and English configurations across `tobacco.name`, `brand.name`, and `line.name`.
 - Multi-word tobacco search uses cross-field AND logic: every word must match at least one searched field.
