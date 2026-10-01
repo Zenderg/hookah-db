@@ -241,6 +241,41 @@ describe('TobaccosRepository', () => {
       );
     });
 
+    it('should treat punctuation as separators while keeping safe search terms', async () => {
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
+
+      await repository.findAll({ search: '  apple & cafe\u0301 ! мят  ' });
+
+      const parameters = mockQueryBuilder.setParameter.mock.calls.map(
+        (call) => call[1] as string,
+      );
+      expect(parameters).toContain('apple:*');
+      expect(parameters).toContain('cafe\u0301:*');
+      expect(parameters).toContain('мят:*');
+      expect(parameters).toContain('apple%');
+      expect(parameters).toContain('cafe\u0301%');
+      expect(parameters).toContain('мят%');
+      expect(parameters).not.toContain('&:*');
+      expect(parameters).not.toContain('!:*');
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledTimes(3);
+    });
+
+    it.each(['  \t\n ', '& | : !'])(
+      'should use normal sorting when search has no searchable terms: %s',
+      async (search) => {
+        mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
+
+        await repository.findAll({ search, sortBy: 'rating', order: 'desc' });
+
+        expect(mockQueryBuilder.setParameter).not.toHaveBeenCalled();
+        expect(mockQueryBuilder.addSelect).not.toHaveBeenCalled();
+        expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
+          'tobacco.rating',
+          'DESC',
+        );
+      },
+    );
+
     it('should apply custom sortBy and order', async () => {
       // Arrange
       const query: FindTobaccosDto = { sortBy: 'name', order: 'asc' };

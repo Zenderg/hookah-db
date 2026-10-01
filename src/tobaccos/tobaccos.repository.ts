@@ -76,11 +76,12 @@ export class TobaccosRepository {
       );
     }
 
-    if (search) {
+    const searchWords = search?.match(/[\p{L}\p{N}][\p{L}\p{M}\p{N}]*/gu) ?? [];
+
+    if (searchWords.length > 0) {
       // Use PostgreSQL Full-Text Search with Russian and English configurations
       // Search across tobacco.name, brand.name, and line.name
       // For multi-word searches, each word must match in at least one field (cross-field AND)
-      const searchWords = search.trim().split(/\s+/);
 
       // Build parameters object for all search words
       const searchParams: Record<string, string> = {};
