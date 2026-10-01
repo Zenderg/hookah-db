@@ -92,23 +92,23 @@ npm run smoke
 API image публикуется в GHCR:
 
 ```text
-ghcr.io/Zenderg/hookah-db
+ghcr.io/zenderg/hookah-db
 ```
 
 Теги:
 
 | Тег | Когда публикуется | Назначение |
 |-----|-------------------|------------|
-| `main` | push в `main` | Последняя main-сборка |
-| `sha-<commit>` | push в `main` или tag | Точная привязка к commit |
-| `v0.1.0` | git tag `v0.1.0` | Релизная версия |
-| `v0.1` / `v0` | git tag `v0.1.0` | Semver aliases |
-| `latest` | только git tag `v*.*.*` | Последний релиз, не каждый push |
+| `main` | push в `main` | Последняя main-сборка; используется по умолчанию |
+| `sha-<commit>` | push в `main` или git tag | Точная привязка к commit |
+| `<version>`, `<major>.<minor>`, `<major>` | git tag `v<major>.<minor>.<patch>` | Релизные версии |
+| `latest` | git tag `v*.*.*` | Последний опубликованный релиз |
 
-Для pinning в self-host окружении лучше использовать релизный тег:
+Чтобы закрепить образ `main` по digest, получите digest и передайте его Compose:
 
 ```bash
-HOOKAH_DB_API_IMAGE=ghcr.io/Zenderg/hookah-db:v0.1.0 docker compose up -d
+HOOKAH_DB_API_DIGEST="$(docker buildx imagetools inspect ghcr.io/zenderg/hookah-db:main --format '{{.Manifest.Digest}}')"
+HOOKAH_DB_API_IMAGE="ghcr.io/zenderg/hookah-db@${HOOKAH_DB_API_DIGEST}" docker compose up -d
 ```
 
 Образ multi-arch: `linux/amd64` и `linux/arm64`.
