@@ -60,6 +60,8 @@ cp .env.example .env          # настроить при необходимос
 docker compose up --build -d   # API + PostgreSQL
 ```
 
+В `.env` для локального Compose задаются `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `DATABASE_NAME` и `CORS_ORIGIN`; `DATABASE_HOST=postgres` и `DATABASE_PORT=5432` фиксированы для внутреннего подключения между контейнерами. PostgreSQL применяет значения `POSTGRES_USER`, `POSTGRES_PASSWORD` и `POSTGRES_DB` только при инициализации пустого volume. Если `postgres_data` уже содержит данные, изменение `.env` не переименует пользователя или БД и не сбросит пароль.
+
 Проверить, что API поднялся:
 
 ```bash
