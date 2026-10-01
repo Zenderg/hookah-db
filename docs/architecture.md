@@ -71,6 +71,7 @@ DTOs, and utilities.
 - All endpoints except `/health` require an API key.
 - Accepted auth headers: `X-API-Key` or `Authorization: Bearer <key>`.
 - A valid key used on a protected request increments its request count and updates `lastUsedAt` once; public `/health` requests do neither.
+- `GET /tobaccos/by-url` validates an absolute URL under `https://htreviews.org/tobaccos/{brand}/{line}/{tobacco}` and strips query and hash components before lookup; malformed, relative, and out-of-scope URLs return HTTP 400.
 - Pagination defaults to 20 and maxes at 100.
 - Tobacco search uses PostgreSQL FTS with Russian and English configurations across `tobacco.name`, `brand.name`, and `line.name`.
 - Multi-word tobacco search uses cross-field AND logic: every word must match at least one searched field.

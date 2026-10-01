@@ -9,8 +9,13 @@ export class FindTobaccoByUrlDto {
       return value;
     }
     // Strip query parameters and hash from URL
-    const url = new URL(value);
-    return `${url.origin}${url.pathname}`;
+    try {
+      const url = new URL(value);
+      return `${url.origin}${url.pathname}`;
+    } catch {
+      // Let class-validator report malformed URLs as a validation error.
+      return value;
+    }
   })
   @Matches(/^https:\/\/htreviews\.org\/tobaccos\/[^/]+\/[^/]+\/[^/]+$/, {
     message:
