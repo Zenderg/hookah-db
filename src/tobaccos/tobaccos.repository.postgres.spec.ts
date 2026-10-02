@@ -84,6 +84,24 @@ describePostgres('TobaccosRepository PostgreSQL search', () => {
     );
   });
 
+  it('sorts the joined page by the dateAdded alias mapped to createdAt', async () => {
+    const ascending = await repository.findAll({
+      sortBy: 'dateAdded',
+      order: 'asc',
+      limit: 1,
+    });
+    const descending = await repository.findAll({
+      sortBy: 'dateAdded',
+      order: 'desc',
+      limit: 1,
+    });
+
+    expect(ascending.total).toBe(2);
+    expect(ascending.data.map((tobacco) => tobacco.name)).toEqual(['Tea 1.5']);
+    expect(descending.total).toBe(2);
+    expect(descending.data.map((tobacco) => tobacco.name)).toEqual(['Mix 2.0']);
+  });
+
   it('keeps AND flavor filtering unchanged when requested flavors repeat', async () => {
     const singleFlavor = await repository.findAll({ flavors: ['яблоко'] });
     const duplicateFlavor = await repository.findAll({
@@ -223,17 +241,35 @@ describePostgres('TobaccosRepository PostgreSQL search', () => {
       );
     }
 
-    const tobaccoFixtures: Array<[string, string, string, string[]]> = [
-      ['Tea 1.5', 'tea-15', 'postgres-search-tea-15', ['яблоко', 'мята']],
-      ['Mix 2.0', 'mix-20', 'postgres-search-mix-20', ['яблоко', 'лимон']],
+    const tobaccoFixtures: Array<[string, string, string, string, string[]]> = [
+      [
+        'Tea 1.5',
+        'tea-15',
+        'postgres-search-tea-15',
+        '2020-01-01T00:00:00.000Z',
+        ['яблоко', 'мята'],
+      ],
+      [
+        'Mix 2.0',
+        'mix-20',
+        'postgres-search-mix-20',
+        '2022-01-01T00:00:00.000Z',
+        ['яблоко', 'лимон'],
+      ],
     ];
-    for (const [name, slug, htreviewsId, flavorNames] of tobaccoFixtures) {
+    for (const [
+      name,
+      slug,
+      htreviewsId,
+      createdAt,
+      flavorNames,
+    ] of tobaccoFixtures) {
       const tobaccoId = randomUUID();
       await dataSource.query(
         `INSERT INTO ${quotedSchema}.tobaccos
           (id, name, slug, "brandId", "strengthOfficial", "strengthByRatings",
-           status, "htreviewsId", "imageUrl")
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+           status, "htreviewsId", "imageUrl", "createdAt")
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
         [
           tobaccoId,
           name,
@@ -244,6 +280,7 @@ describePostgres('TobaccosRepository PostgreSQL search', () => {
           'Active',
           htreviewsId,
           '',
+          createdAt,
         ],
       );
       for (const flavorName of flavorNames) {

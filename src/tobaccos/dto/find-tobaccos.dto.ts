@@ -13,8 +13,8 @@ import { PaginationDto } from '../../common/dto/pagination.dto';
 
 export class FindTobaccosDto extends PaginationDto {
   @IsOptional()
-  @IsString()
-  sortBy?: 'rating' | 'views' | 'dateAdded' | 'name' = 'rating';
+  @IsIn(['rating', 'name', 'dateAdded'])
+  sortBy?: 'rating' | 'name' | 'dateAdded' = 'rating';
 
   @IsOptional()
   @IsIn(['asc', 'desc'])
