@@ -143,6 +143,36 @@ describePostgres('TobaccosRepository PostgreSQL search', () => {
     expect(result.data.map((tobacco) => tobacco.name)).toEqual(['Tea 1.5']);
   });
 
+  describe('search relevance with nullable line', () => {
+    beforeAll(async () => insertRelevanceFixtures());
+
+    it.each(['mint', 'mint signal'])(
+      'ranks tobacco and brand matches for "%s" before a weaker match with a line',
+      async (search) => {
+        const firstPage = await repository.findAll({ search, limit: 1 });
+        const secondPage = await repository.findAll({
+          search,
+          limit: 1,
+          page: 2,
+        });
+        const allResults = await repository.findAll({ search });
+
+        expect(allResults.total).toBe(2);
+        expect(allResults.data.map((tobacco) => tobacco.name)).toEqual([
+          'Zzz mint mint mint',
+          'Zzz mint',
+        ]);
+        expect(allResults.data[0].line).toBeNull();
+        expect(firstPage.data.map((tobacco) => tobacco.name)).toEqual([
+          'Zzz mint mint mint',
+        ]);
+        expect(secondPage.data.map((tobacco) => tobacco.name)).toEqual([
+          'Zzz mint',
+        ]);
+      },
+    );
+  });
+
   it.each(["Tea'1.5", 'Tea\\1.5'])(
     'safely searches punctuation in %s as adjacent lexemes',
     async (search) => {
@@ -290,6 +320,63 @@ describePostgres('TobaccosRepository PostgreSQL search', () => {
           [tobaccoId, flavorIds.get(flavorName)],
         );
       }
+    }
+  }
+
+  async function insertRelevanceFixtures(): Promise<void> {
+    const brandId = randomUUID();
+    const lineId = randomUUID();
+    await dataSource.query(
+      `INSERT INTO ${quotedSchema}.brands
+        (id, name, slug, country, "logoUrl", status)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        brandId,
+        'Quiet Signal Brand',
+        'quiet-signal-brand',
+        'Russia',
+        '',
+        'Active',
+      ],
+    );
+    await dataSource.query(
+      `INSERT INTO ${quotedSchema}.lines
+        (id, name, slug, "brandId", "strengthOfficial", "strengthByRatings", status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        lineId,
+        'Quiet Line',
+        'quiet-line',
+        brandId,
+        'Medium',
+        'Medium',
+        'Active',
+      ],
+    );
+
+    const tobaccoFixtures: Array<[string, string, string, string | null]> = [
+      ['Zzz mint mint mint', 'zzz-mint-mint-mint', 'htr900001', null],
+      ['Zzz mint', 'zzz-mint', 'htr900002', lineId],
+    ];
+    for (const [name, slug, htreviewsId, fixtureLineId] of tobaccoFixtures) {
+      await dataSource.query(
+        `INSERT INTO ${quotedSchema}.tobaccos
+          (id, name, slug, "brandId", "lineId", "strengthOfficial",
+           "strengthByRatings", status, "htreviewsId", "imageUrl")
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        [
+          randomUUID(),
+          name,
+          slug,
+          brandId,
+          fixtureLineId,
+          'Medium',
+          'Medium',
+          'Active',
+          htreviewsId,
+          '',
+        ],
+      );
     }
   }
 });

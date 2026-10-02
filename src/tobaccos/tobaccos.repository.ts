@@ -154,7 +154,7 @@ export class TobaccosRepository {
 
       // Calculate base relevance ranking from Full-Text Search
       // Combines rankings from both language configurations across all fields
-      // Use COALESCE to handle NULL values from line.name (lineId can be null)
+      // The optional line relation contributes zero when absent, preserving other field ranks.
       const relevanceExpressions = searchWords.map((_, index) => {
         const paramNamePrefix = `searchWordPrefix${index}`;
         return `(
@@ -162,8 +162,8 @@ export class TobaccosRepository {
           ts_rank(to_tsvector('english', tobacco.name), to_tsquery('english', :${paramNamePrefix})) +
           ts_rank(to_tsvector('russian', brand.name), to_tsquery('russian', :${paramNamePrefix})) +
           ts_rank(to_tsvector('english', brand.name), to_tsquery('english', :${paramNamePrefix})) +
-          ts_rank(to_tsvector('russian', line.name), to_tsquery('russian', :${paramNamePrefix})) +
-          ts_rank(to_tsvector('english', line.name), to_tsquery('english', :${paramNamePrefix}))
+          COALESCE(ts_rank(to_tsvector('russian', line.name), to_tsquery('russian', :${paramNamePrefix})), 0) +
+          COALESCE(ts_rank(to_tsvector('english', line.name), to_tsquery('english', :${paramNamePrefix})), 0)
         )`;
       });
 
