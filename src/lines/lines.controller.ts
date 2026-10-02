@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Param,
+  ParseUUIDPipe,
   NotFoundException,
   UseInterceptors,
   Query,
@@ -27,7 +28,7 @@ export class LinesController {
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string) {
+  async findOne(@Param('id', ParseUUIDPipe) id: string) {
     try {
       return this.linesService.findOne(id);
     } catch {
@@ -37,7 +38,7 @@ export class LinesController {
 
   @Get(':id/tobaccos')
   async findTobaccosByLine(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Query() query: FindTobaccosDto,
   ) {
     return this.linesService.findTobaccosByLine(id, query);

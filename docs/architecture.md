@@ -63,7 +63,9 @@ DTOs, and utilities.
 - Daily parsing runs brands, then lines, then tobaccos. Current progression is gated by created/updated counters, not a separate success flag.
 - Per-entity save failures are continue-on-error and should not stop the whole batch.
 - Batch strategies return parsed `items` and a numeric `errors` count. Daily refresh keeps processing successful items, then rejects with its stage counts when any strategy or save failed so Sentry cron reports the run as failed; a truly empty, error-free catalog resolves successfully. CLI batch parsing exits nonzero when its result contains errors.
+- Parser normalizers provide `createdAt` for inserts because the schema columns have no defaults; parser updates omit that field so refreshes preserve each record's original creation time.
 - `saveTobaccoWithFlavors()` resolves flavors with find-or-create logic.
+- Tobacco saves require a canonical `htreviewsId` matching `^htr\d+$` with no surrounding whitespace before entity normalization or flavor/tobacco repository access. Invalid identities fail the entity save; batch parsing records the error and continues.
 - Flavor parsing extracts `<a>` links whose `href` contains `?r=flavor` from tobacco pages.
 - Current identity checks are specific: brands by `name`, lines by `slug + brandId`, tobaccos by `htreviewsId`. Do not describe this as generic upsert by slug.
 
@@ -72,6 +74,7 @@ DTOs, and utilities.
 - All endpoints except `/health` require an API key.
 - Accepted auth headers: `X-API-Key` or `Authorization: Bearer <key>`.
 - `GET /tobaccos/:id` returns 404 with `Tobacco not found` when no record matches; repository errors remain 500.
+- UUID path parameters for brand, line, and tobacco item and nested-list routes use `ParseUUIDPipe`: malformed IDs return HTTP 400 before catalog repository access, while valid but missing IDs retain their existing 404 behavior.
 - A valid key used on a protected request increments its request count and updates `lastUsedAt` once; public `/health` requests do neither.
 - `GET /tobaccos/by-url` validates an absolute URL under `https://htreviews.org/tobaccos/{brand}/{line}/{tobacco}` and strips query and hash components before lookup; malformed, relative, and out-of-scope URLs return HTTP 400.
 - Pagination defaults to 20 and maxes at 100.
@@ -79,5 +82,5 @@ DTOs, and utilities.
 - Search splits on whitespace and PostgreSQL tsquery operators. Other punctuation stays within a term and is quoted for PostgreSQL normalization, preserving decimals and compounds such as `1.5` and `apple-mint`. Every term must match at least one searched field, so multi-term searches use cross-field AND logic.
 - Each term retains PostgreSQL prefix matching and Russian/English stemming, plus case-insensitive field-prefix matching with LIKE wildcards escaped. Whitespace-only or operator-only input uses the normal requested sort without a search filter.
 - Search ranking includes exact match bonus +100, tobacco prefix bonus +50, and brand/line prefix bonus +30.
-- Flavor filtering uses AND logic: a tobacco must have every requested flavor.
+- Flavor filtering uses AND logic: a tobacco must have every requested flavor. Repeated flavor names count once, so duplicates do not change the matching results.
 - Global exception responses use `{ statusCode, timestamp, path, message }`.

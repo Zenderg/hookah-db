@@ -107,6 +107,7 @@ export class ParserService {
           });
 
           if (existingBrand) {
+            delete brandData.createdAt;
             await this.brandRepository.update(existingBrand.id, brandData);
             results.brands.updated++;
             this.logger.debug(`Updated brand: ${brandData.name}`);
@@ -369,6 +370,15 @@ export class ParserService {
   private async saveTobaccoWithFlavors(
     parsedTobacco: ParsedTobaccoData,
   ): Promise<{ action: 'created' | 'updated' }> {
+    if (
+      parsedTobacco.htreviewsId !== parsedTobacco.htreviewsId.trim() ||
+      !/^htr\d+$/.test(parsedTobacco.htreviewsId)
+    ) {
+      throw new Error(
+        `Invalid htreviewsId for tobacco "${parsedTobacco.name}": expected htr followed by digits`,
+      );
+    }
+
     const tobaccoData =
       this.tobaccoParserStrategy.normalizeToEntity(parsedTobacco);
 
@@ -390,6 +400,7 @@ export class ParserService {
     });
 
     if (existingTobacco) {
+      delete tobaccoData.createdAt;
       await this.tobaccoRepository.update(existingTobacco.id, tobaccoData);
       // Update flavors relation
       const tobacco = await this.tobaccoRepository.findOne({
@@ -433,6 +444,7 @@ export class ParserService {
           });
 
           if (existingBrand) {
+            delete brandData.createdAt;
             await this.brandRepository.update(existingBrand.id, brandData);
             updatedCount++;
             this.logger.debug(`Updated brand: ${brandData.name}`);
@@ -680,6 +692,7 @@ export class ParserService {
 
       if (existingBrand) {
         // Update existing brand
+        delete brandData.createdAt;
         await this.brandRepository.update(existingBrand.id, brandData);
         this.logger.log(
           `Updated brand: ${brandData.name} (ID: ${existingBrand.id})`,
@@ -732,6 +745,7 @@ export class ParserService {
 
       if (existingLine) {
         // Update existing line
+        delete lineData.createdAt;
         await this.lineRepository.update(existingLine.id, {
           ...lineData,
           imageUrl: lineData.imageUrl ?? existingLine.imageUrl,
