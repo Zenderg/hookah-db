@@ -81,5 +81,6 @@ DTOs, and utilities.
 - Search splits on whitespace and PostgreSQL tsquery operators. Other punctuation stays within a term and is quoted for PostgreSQL normalization, preserving decimals and compounds such as `1.5` and `apple-mint`. Every term must match at least one searched field, so multi-term searches use cross-field AND logic.
 - Each term retains PostgreSQL prefix matching and Russian/English stemming, plus case-insensitive field-prefix matching with LIKE wildcards escaped. Whitespace-only or operator-only input uses the normal requested sort without a search filter.
 - Search ranking includes exact match bonus +100, tobacco prefix bonus +50, and brand/line prefix bonus +30.
+- A tobacco without a line contributes zero line relevance while retaining its tobacco and brand relevance.
 - Flavor filtering uses AND logic: a tobacco must have every requested flavor. Repeated flavor names count once, so duplicates do not change the matching results.
 - Global exception responses use `{ statusCode, timestamp, path, message }`.
