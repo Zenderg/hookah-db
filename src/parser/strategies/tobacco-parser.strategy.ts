@@ -9,6 +9,7 @@ import {
   type ItemLoadResult,
   type ItemLoaderOptions,
 } from '../browser/item-loader';
+import type { ParserBatchResult } from './parser-result';
 
 export type TobaccoUrlInfo = {
   url: string;
@@ -183,12 +184,13 @@ export class TobaccoParserStrategy {
   async parseTobaccos(
     lineUrls: TobaccoUrlInfo[],
     limit?: number,
-  ): Promise<ParsedTobaccoData[]> {
+  ): Promise<ParserBatchResult<ParsedTobaccoData>> {
     if (!this.page) {
       throw new Error('Browser not initialized. Call initialize() first.');
     }
 
     const allTobaccos: ParsedTobaccoData[] = [];
+    let errorCount = 0;
 
     for (let i = 0; i < lineUrls.length; i++) {
       const lineInfo = lineUrls[i];
@@ -205,7 +207,10 @@ export class TobaccoParserStrategy {
         );
 
         // Extract tobacco URLs from line page
-        const tobaccoUrls = await this.extractTobaccoUrlsFromLinePage(lineInfo);
+        const tobaccoUrlResult =
+          await this.extractTobaccoUrlsFromLinePage(lineInfo);
+        errorCount += tobaccoUrlResult.errors;
+        const tobaccoUrls = tobaccoUrlResult.urls;
         this.logger.log(`Found ${tobaccoUrls.length} tobaccos on line page`);
 
         // Parse each tobacco detail page
@@ -225,6 +230,7 @@ export class TobaccoParserStrategy {
             allTobaccos.push(tobaccoData);
             this.logger.log(`Parsed tobacco: ${tobaccoData.name}`);
           } catch (error) {
+            errorCount++;
             this.logger.warn(
               `Failed to parse tobacco ${tobaccoUrl}: ${error instanceof Error ? error.message : String(error)}`,
             );
@@ -251,6 +257,7 @@ export class TobaccoParserStrategy {
           break;
         }
       } catch (error) {
+        errorCount++;
         this.logger.error(
           `Failed to parse tobaccos from line ${lineInfo.lineSlug}: ${error instanceof Error ? error.message : String(error)}`,
         );
@@ -272,7 +279,10 @@ export class TobaccoParserStrategy {
       await this.page.waitForTimeout(500);
     }
 
-    return limit ? allTobaccos.slice(0, limit) : allTobaccos;
+    return {
+      items: limit ? allTobaccos.slice(0, limit) : allTobaccos,
+      errors: errorCount,
+    };
   }
 
   /**
@@ -281,7 +291,7 @@ export class TobaccoParserStrategy {
    */
   private async extractTobaccoUrlsFromLinePage(
     lineInfo: TobaccoUrlInfo,
-  ): Promise<string[]> {
+  ): Promise<{ urls: string[]; errors: number }> {
     if (!this.page) {
       throw new Error('Browser not initialized');
     }
@@ -324,7 +334,10 @@ export class TobaccoParserStrategy {
       `Filtered to ${filteredUrls.length} URLs for line ${lineInfo.lineSlug}`,
     );
 
-    return filteredUrls;
+    return {
+      urls: filteredUrls,
+      errors: result.totalCount > 0 && !result.isComplete ? 1 : 0,
+    };
   }
 
   /**

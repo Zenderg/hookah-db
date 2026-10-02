@@ -4,6 +4,7 @@ import type { Browser, Page, BrowserContext } from 'playwright';
 import { Line } from '../../lines/lines.entity';
 import { createBrowser, createContext } from '../browser/browser.config';
 import { navigateWithCheck } from '../browser/http-checker';
+import type { ParserBatchResult } from './parser-result';
 
 export type LineUrlInfo = {
   name: string;
@@ -110,12 +111,13 @@ export class LineParserStrategy {
   async parseLines(
     brandUrls: { url: string; brandId: string }[],
     limit?: number,
-  ): Promise<ParsedLineData[]> {
+  ): Promise<ParserBatchResult<ParsedLineData>> {
     if (!this.page) {
       throw new Error('Browser not initialized. Call initialize() first.');
     }
 
     const allLines: ParsedLineData[] = [];
+    let errorCount = 0;
 
     for (let i = 0; i < brandUrls.length; i++) {
       const { url, brandId } = brandUrls[i];
@@ -132,7 +134,9 @@ export class LineParserStrategy {
         );
 
         // Extract line data from brand page (basic data)
-        const lineData = await this.extractLinesFromBrandPage(url, brandId);
+        const lineResult = await this.extractLinesFromBrandPage(url, brandId);
+        const lineData = lineResult.items;
+        errorCount += lineResult.errors;
         this.logger.log(`Found ${lineData.length} lines on ${url}`);
 
         // Extract brand slug from URL for detail page navigation
@@ -154,6 +158,9 @@ export class LineParserStrategy {
                   line.slug,
                   brandSlug,
                 );
+              if (!additionalData.success) {
+                errorCount++;
+              }
               line.ratingsCount = additionalData.ratingsCount;
               line.imageUrl = additionalData.imageUrl;
               line.strengthOfficial = additionalData.strengthOfficial;
@@ -174,6 +181,7 @@ export class LineParserStrategy {
                   `description=${line.description ? 'yes' : 'no'}`,
               );
             } catch (error) {
+              errorCount++;
               this.logger.warn(
                 `Failed to extract additional data for ${line.name}: ${error instanceof Error ? error.message : String(error)}`,
               );
@@ -201,6 +209,7 @@ export class LineParserStrategy {
           break;
         }
       } catch (error) {
+        errorCount++;
         this.logger.error(
           `Failed to parse lines from ${url}: ${error instanceof Error ? error.message : String(error)}`,
         );
@@ -218,7 +227,10 @@ export class LineParserStrategy {
       }
     }
 
-    return limit ? allLines.slice(0, limit) : allLines;
+    return {
+      items: limit ? allLines.slice(0, limit) : allLines,
+      errors: errorCount,
+    };
   }
 
   /**
@@ -228,14 +240,14 @@ export class LineParserStrategy {
   private async extractLinesFromBrandPage(
     url: string,
     brandId: string,
-  ): Promise<ParsedLineData[]> {
+  ): Promise<ParserBatchResult<ParsedLineData>> {
     if (!this.page) {
       throw new Error('Browser not initialized');
     }
 
     const success = await this.safeNavigate(url);
     if (!success) {
-      return [];
+      return { items: [], errors: 1 };
     }
 
     const { items: lineItems, errors: lineErrors } = await this.page.evaluate(
@@ -388,10 +400,13 @@ export class LineParserStrategy {
     }
 
     // Set brandId for all lines
-    return lineItems.map((line) => ({
-      ...line,
-      brandId,
-    }));
+    return {
+      items: lineItems.map((line) => ({
+        ...line,
+        brandId,
+      })),
+      errors: lineErrors.length,
+    };
   }
 
   /**
@@ -407,6 +422,7 @@ export class LineParserStrategy {
     strengthByRatings: string | null;
     status: string | null;
     description: string | null;
+    success: boolean;
   }> {
     if (!this.page) {
       throw new Error('Browser not initialized. Call initialize() first.');
@@ -426,6 +442,7 @@ export class LineParserStrategy {
           strengthByRatings: null,
           status: null,
           description: null,
+          success: false,
         };
       }
 
@@ -674,7 +691,7 @@ export class LineParserStrategy {
           `description=${data.description ? 'yes' : 'no'}`,
       );
 
-      return data;
+      return { ...data, success: true };
     } catch (error) {
       this.logger.error(
         `Failed to parse line detail page ${fullUrl}: ${error instanceof Error ? error.message : String(error)}`,
@@ -717,11 +734,13 @@ export class LineParserStrategy {
 
     // Extract basic line data from brand page
     const brandPageUrl = `/tobaccos/${brandSlug}`;
-    const lineDataList = await this.extractLinesFromBrandPage(
+    const lineDataResult = await this.extractLinesFromBrandPage(
       brandPageUrl,
       brandId,
     );
-    const lineData = lineDataList.find((line) => line.slug === lineSlug);
+    const lineData = lineDataResult.items.find(
+      (line) => line.slug === lineSlug,
+    );
 
     if (!lineData) {
       throw new Error(`Line not found on brand page: ${lineSlug}`);

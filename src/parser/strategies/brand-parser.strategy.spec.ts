@@ -110,7 +110,7 @@ describe('BrandParserStrategy', () => {
 
     const result = await strategy.parseBrands();
 
-    expect(result).toEqual([]);
+    expect(result).toEqual({ items: [], errors: 2 });
     expect(mockedNavigateWithCheck).toHaveBeenCalled();
     expect(mockError).toHaveBeenCalledWith(expect.stringContaining('HTTP 403'));
   });
@@ -153,7 +153,9 @@ describe('BrandParserStrategy', () => {
 
     mockDollarEval.mockResolvedValue([]);
 
-    await strategy.parseBrands();
+    const result = await strategy.parseBrands();
+
+    expect(result).toEqual({ items: [], errors: 0 });
 
     expect(mockWaitForLoadState).toHaveBeenCalledWith('domcontentloaded', {
       timeout: 10000,
@@ -162,5 +164,20 @@ describe('BrandParserStrategy', () => {
       timeout: 10000,
       state: 'attached',
     });
+  });
+
+  it('counts a thrown list failure and continues to the other brand list', async () => {
+    mockedNavigateWithCheck.mockResolvedValue({
+      ok: true,
+      status: 200,
+      url: 'https://htreviews.org/tobaccos/brands',
+    });
+    mockDollarEval.mockRejectedValueOnce(new Error('fixture list failure'));
+    mockDollarEval.mockResolvedValue([]);
+
+    const result = await strategy.parseBrands();
+
+    expect(result).toEqual({ items: [], errors: 1 });
+    expect(mockedNavigateWithCheck).toHaveBeenCalledTimes(2);
   });
 });

@@ -119,7 +119,7 @@ describe('LineParserStrategy', () => {
 
     const result = await strategy.parseLines([{ url: brandUrl, brandId }]);
 
-    expect(result).toEqual([]);
+    expect(result).toEqual({ items: [], errors: 1 });
     expect(mockError).toHaveBeenCalledWith(expect.stringContaining('HTTP 403'));
   });
 
@@ -167,11 +167,12 @@ describe('LineParserStrategy', () => {
     const result = await strategy.parseLines([{ url: brandUrl, brandId }]);
 
     // Line should still be parsed but with default additional data
-    expect(result).toHaveLength(1);
-    expect(result[0].name).toBe('Xperience');
-    expect(result[0].brandId).toBe(brandId);
-    expect(result[0].ratingsCount).toBe(0);
-    expect(result[0].imageUrl).toBeNull();
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].name).toBe('Xperience');
+    expect(result.items[0].brandId).toBe(brandId);
+    expect(result.items[0].ratingsCount).toBe(0);
+    expect(result.items[0].imageUrl).toBeNull();
+    expect(result.errors).toBe(1);
     // Error should be logged for the detail page failure
     expect(mockError).toHaveBeenCalledWith(expect.stringContaining('HTTP 403'));
   });

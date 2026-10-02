@@ -141,7 +141,7 @@ describe('TobaccoParserStrategy', () => {
 
     const result = await strategy.parseTobaccos([lineInfo]);
 
-    expect(result).toEqual([]);
+    expect(result).toEqual({ items: [], errors: 1 });
     expect(mockError).toHaveBeenCalledWith(expect.stringContaining('HTTP 403'));
   });
 
@@ -165,9 +165,10 @@ describe('TobaccoParserStrategy', () => {
 
     const result = await strategy.parseTobaccos([lineInfo]);
 
-    expect(result).toHaveLength(1);
-    expect(result[0].name).toBe('Energy Drift');
-    expect(result[0].htreviewsId).toBe('htr12345');
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].name).toBe('Energy Drift');
+    expect(result.items[0].htreviewsId).toBe('htr12345');
+    expect(result.errors).toBe(0);
     expect(mockLog).toHaveBeenCalledWith(
       expect.stringContaining('htmx-direct'),
     );
@@ -190,11 +191,73 @@ describe('TobaccoParserStrategy', () => {
 
     mockEvaluate.mockResolvedValue(mockTobaccoEvaluateResult);
 
-    await strategy.parseTobaccos([lineInfo]);
+    const result = await strategy.parseTobaccos([lineInfo]);
 
     expect(mockWarn).toHaveBeenCalledWith(
       expect.stringContaining('Loaded 20 of 29'),
     );
+    expect(result.errors).toBe(1);
+  });
+
+  it('treats a known empty tobacco list as a successful batch', async () => {
+    mockedNavigateWithCheck.mockResolvedValue({
+      ok: true,
+      status: 200,
+      url: 'https://htreviews.org/tobaccos/darkside/xperience',
+    });
+    mockedLoadAllItems.mockResolvedValue({
+      urls: [],
+      totalCount: 0,
+      loadedCount: 0,
+      isComplete: false,
+      method: 'htmx-direct',
+    });
+
+    const result = await strategy.parseTobaccos([lineInfo]);
+
+    expect(result).toEqual({ items: [], errors: 0 });
+  });
+
+  it('counts a failed detail, preserves the next item, and ignores limit-skipped URLs', async () => {
+    const secondTobaccoUrl =
+      'https://htreviews.org/tobaccos/darkside/xperience/second-tobacco';
+    const skippedTobaccoUrl =
+      'https://htreviews.org/tobaccos/darkside/xperience/skipped-tobacco';
+    mockedNavigateWithCheck
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        url: 'https://htreviews.org/tobaccos/darkside/xperience',
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        url: tobaccoUrl,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        url: secondTobaccoUrl,
+      });
+    mockedLoadAllItems.mockResolvedValue({
+      urls: [tobaccoUrl, secondTobaccoUrl, skippedTobaccoUrl],
+      totalCount: 3,
+      loadedCount: 3,
+      isComplete: true,
+      method: 'htmx-direct',
+    });
+    mockEvaluate.mockResolvedValue({
+      ...mockTobaccoEvaluateResult,
+      name: 'Second Tobacco',
+      htreviewsId: 'htr-second',
+    });
+
+    const result = await strategy.parseTobaccos([lineInfo], 1);
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].name).toBe('Second Tobacco');
+    expect(result.errors).toBe(1);
+    expect(mockedNavigateWithCheck).toHaveBeenCalledTimes(3);
   });
 
   it('should pass correct options to loadAllItems', async () => {

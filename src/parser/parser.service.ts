@@ -15,6 +15,25 @@ import { SentryTraced, SentryCron } from '@sentry/nestjs';
 import { ConfigService } from '@nestjs/config';
 import { isParserCronEnabled } from '../config/env.validation';
 
+export type ParserStageResult = {
+  created: number;
+  updated: number;
+  errors: number;
+};
+
+export type DailyRefreshResult = {
+  brands: ParserStageResult;
+  lines: ParserStageResult;
+  tobaccos: ParserStageResult;
+};
+
+export class ParserRefreshError extends Error {
+  constructor(readonly results: DailyRefreshResult) {
+    super('Daily parser refresh completed with errors');
+    this.name = 'ParserRefreshError';
+  }
+}
+
 export const PARSER_DAILY_REFRESH_MONITOR_CONFIG = {
   schedule: { type: 'crontab' as const, value: '0 2 * * *' },
   checkinMargin: 2,
@@ -43,11 +62,7 @@ export class ParserService {
   @SentryTraced('parser.daily-refresh')
   @SentryCron('hookah-db-daily-parse', PARSER_DAILY_REFRESH_MONITOR_CONFIG)
   @Cron(CronExpression.EVERY_DAY_AT_2AM)
-  async handleDailyRefresh(): Promise<{
-    brands: { created: number; updated: number; errors: number };
-    lines: { created: number; updated: number; errors: number };
-    tobaccos: { created: number; updated: number; errors: number };
-  }> {
+  async handleDailyRefresh(): Promise<DailyRefreshResult> {
     if (
       !isParserCronEnabled(
         this.configService.get<string>('PARSER_CRON_ENABLED'),
@@ -76,7 +91,9 @@ export class ParserService {
       this.logger.log('Step 1: Parsing brands...');
       await this.brandParserStrategy.initialize();
 
-      const parsedBrands = await this.brandParserStrategy.parseBrands();
+      const parsedBrandResult = await this.brandParserStrategy.parseBrands();
+      const parsedBrands = parsedBrandResult.items;
+      results.brands.errors += parsedBrandResult.errors;
       this.logger.log(
         `Parsed ${parsedBrands.length} brands from htreviews.org`,
       );
@@ -158,7 +175,10 @@ export class ParserService {
 
         this.logger.log(`Parsing lines for ${brandUrls.length} brands`);
 
-        const parsedLines = await this.lineParserStrategy.parseLines(brandUrls);
+        const parsedLineResult =
+          await this.lineParserStrategy.parseLines(brandUrls);
+        const parsedLines = parsedLineResult.items;
+        results.lines.errors += parsedLineResult.errors;
         this.logger.log(
           `Parsed ${parsedLines.length} lines from htreviews.org`,
         );
@@ -264,8 +284,10 @@ export class ParserService {
 
         this.logger.log(`Parsing tobaccos for ${lineUrls.length} lines`);
 
-        const parsedTobaccos =
+        const parsedTobaccoResult =
           await this.tobaccoParserStrategy.parseTobaccos(lineUrls);
+        const parsedTobaccos = parsedTobaccoResult.items;
+        results.tobaccos.errors += parsedTobaccoResult.errors;
         this.logger.log(
           `Parsed ${parsedTobaccos.length} tobaccos from htreviews.org`,
         );
@@ -333,6 +355,13 @@ export class ParserService {
       `Daily refresh completed: Brands (${results.brands.created}c/${results.brands.updated}u/${results.brands.errors}e), Lines (${results.lines.created}c/${results.lines.updated}u/${results.lines.errors}e), Tobaccos (${results.tobaccos.created}c/${results.tobaccos.updated}u/${results.tobaccos.errors}e)`,
     );
 
+    if (
+      results.brands.errors + results.lines.errors + results.tobaccos.errors >
+      0
+    ) {
+      throw new ParserRefreshError(results);
+    }
+
     return results;
   }
 
@@ -381,72 +410,73 @@ export class ParserService {
   }
 
   @SentryTraced('parser.parse-brands')
-  async parseBrandsManually(limit?: number): Promise<{
-    created: number;
-    updated: number;
-    errors: number;
-  }> {
+  async parseBrandsManually(limit?: number): Promise<ParserStageResult> {
     this.logger.log('Starting manual brand parsing...');
-    await this.brandParserStrategy.initialize();
+    try {
+      await this.brandParserStrategy.initialize();
 
-    const parsedBrands = await this.brandParserStrategy.parseBrands(limit);
-    this.logger.log(`Parsed ${parsedBrands.length} brands from htreviews.org`);
+      const parsedResult = await this.brandParserStrategy.parseBrands(limit);
+      this.logger.log(
+        `Parsed ${parsedResult.items.length} brands from htreviews.org`,
+      );
 
-    let updatedCount = 0;
-    let createdCount = 0;
-    let errorCount = 0;
+      let updatedCount = 0;
+      let createdCount = 0;
+      let errorCount = parsedResult.errors;
 
-    for (const parsedBrand of parsedBrands) {
-      try {
-        const brandData =
-          this.brandParserStrategy.normalizeToEntity(parsedBrand);
-        const existingBrand = await this.brandRepository.findOne({
-          where: { name: brandData.name },
-        });
-
-        if (existingBrand) {
-          await this.brandRepository.update(existingBrand.id, brandData);
-          updatedCount++;
-          this.logger.debug(`Updated brand: ${brandData.name}`);
-        } else {
-          const newBrand = this.brandRepository.create(brandData);
-          await this.brandRepository.save(newBrand);
-          createdCount++;
-          this.logger.debug(`Created brand: ${brandData.name}`);
-        }
-      } catch (error) {
-        errorCount++;
-        this.logger.error(
-          `Failed to save brand ${parsedBrand.name}: ${error instanceof Error ? error.message : String(error)}`,
-        );
-        Sentry.captureException(error, (scope) => {
-          scope.setTag('parser_strategy', 'brand');
-          scope.setTag('entity_slug', parsedBrand.slug || 'unknown');
-          scope.setContext('parser', {
-            strategy: 'brand',
-            entityName: parsedBrand.name,
+      for (const parsedBrand of parsedResult.items) {
+        try {
+          const brandData =
+            this.brandParserStrategy.normalizeToEntity(parsedBrand);
+          const existingBrand = await this.brandRepository.findOne({
+            where: { name: brandData.name },
           });
-          return scope;
-        });
+
+          if (existingBrand) {
+            await this.brandRepository.update(existingBrand.id, brandData);
+            updatedCount++;
+            this.logger.debug(`Updated brand: ${brandData.name}`);
+          } else {
+            const newBrand = this.brandRepository.create(brandData);
+            await this.brandRepository.save(newBrand);
+            createdCount++;
+            this.logger.debug(`Created brand: ${brandData.name}`);
+          }
+        } catch (error) {
+          errorCount++;
+          this.logger.error(
+            `Failed to save brand ${parsedBrand.name}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+          Sentry.captureException(error, (scope) => {
+            scope.setTag('parser_strategy', 'brand');
+            scope.setTag('entity_slug', parsedBrand.slug || 'unknown');
+            scope.setContext('parser', {
+              strategy: 'brand',
+              entityName: parsedBrand.name,
+            });
+            return scope;
+          });
+        }
       }
+
+      this.logger.log(
+        `Brand parsing completed: ${createdCount} created, ${updatedCount} updated, ${errorCount} errors`,
+      );
+
+      return {
+        created: createdCount,
+        updated: updatedCount,
+        errors: errorCount,
+      };
+    } finally {
+      await this.brandParserStrategy.close();
     }
-
-    this.logger.log(
-      `Brand parsing completed: ${createdCount} created, ${updatedCount} updated, ${errorCount} errors`,
-    );
-
-    await this.brandParserStrategy.close();
-
-    return {
-      created: createdCount,
-      updated: updatedCount,
-      errors: errorCount,
-    };
   }
 
   @SentryTraced('parser.parse-lines')
-  async parseLinesManually(limit?: number): Promise<void> {
+  async parseLinesManually(limit?: number): Promise<ParserStageResult> {
     this.logger.log('Starting manual line parsing...');
+    const results: ParserStageResult = { created: 0, updated: 0, errors: 0 };
 
     try {
       await this.lineParserStrategy.initialize();
@@ -468,17 +498,15 @@ export class ParserService {
       );
 
       // Parse lines - strategy extracts all data from brand pages
-      const parsedLines = await this.lineParserStrategy.parseLines(
+      const parsedLineResult = await this.lineParserStrategy.parseLines(
         brandUrls,
         limit,
       );
+      const parsedLines = parsedLineResult.items;
+      results.errors += parsedLineResult.errors;
       this.logger.log(`Parsed ${parsedLines.length} lines from htreviews.org`);
 
       // Update or create lines in database
-      let updatedCount = 0;
-      let createdCount = 0;
-      let errorCount = 0;
-
       for (const parsedLine of parsedLines) {
         try {
           const lineData =
@@ -504,7 +532,7 @@ export class ParserService {
               ratingsCount: lineData.ratingsCount,
             };
             await this.lineRepository.update(existingLine.id, updateData);
-            updatedCount++;
+            results.updated++;
             this.logger.debug(
               `Updated line: ${lineData.name} (ID: ${existingLine.id})`,
             );
@@ -512,11 +540,11 @@ export class ParserService {
             // Create new line
             const newLine = this.lineRepository.create(lineData);
             await this.lineRepository.save(newLine);
-            createdCount++;
+            results.created++;
             this.logger.debug(`Created line: ${lineData.name}`);
           }
         } catch (error) {
-          errorCount++;
+          results.errors++;
           this.logger.error(
             `Failed to save line ${parsedLine.name}: ${error instanceof Error ? error.message : String(error)}`,
           );
@@ -535,8 +563,9 @@ export class ParserService {
       }
 
       this.logger.log(
-        `Line parsing completed: ${createdCount} created, ${updatedCount} updated, ${errorCount} errors`,
+        `Line parsing completed: ${results.created} created, ${results.updated} updated, ${results.errors} errors`,
       );
+      return results;
     } catch (error) {
       this.logger.error(
         `Line parsing failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -548,8 +577,9 @@ export class ParserService {
   }
 
   @SentryTraced('parser.parse-tobaccos')
-  async parseTobaccosManually(limit?: number): Promise<void> {
+  async parseTobaccosManually(limit?: number): Promise<ParserStageResult> {
     this.logger.log('Starting manual tobacco parsing...');
+    const results: ParserStageResult = { created: 0, updated: 0, errors: 0 };
 
     try {
       await this.tobaccoParserStrategy.initialize();
@@ -578,31 +608,27 @@ export class ParserService {
       );
 
       // Parse tobaccos
-      const parsedTobaccos = await this.tobaccoParserStrategy.parseTobaccos(
-        lineUrls,
-        limit,
-      );
+      const parsedTobaccoResult =
+        await this.tobaccoParserStrategy.parseTobaccos(lineUrls, limit);
+      const parsedTobaccos = parsedTobaccoResult.items;
+      results.errors += parsedTobaccoResult.errors;
       this.logger.log(
         `Parsed ${parsedTobaccos.length} tobaccos from htreviews.org`,
       );
 
       // Update or create tobaccos in database
-      let updatedCount = 0;
-      let createdCount = 0;
-      let errorCount = 0;
-
       for (const parsedTobacco of parsedTobaccos) {
         try {
           const { action } = await this.saveTobaccoWithFlavors(parsedTobacco);
           if (action === 'updated') {
-            updatedCount++;
+            results.updated++;
             this.logger.debug(`Updated tobacco: ${parsedTobacco.name}`);
           } else {
-            createdCount++;
+            results.created++;
             this.logger.debug(`Created tobacco: ${parsedTobacco.name}`);
           }
         } catch (error) {
-          errorCount++;
+          results.errors++;
           this.logger.error(
             `Failed to save tobacco ${parsedTobacco.name}: ${error instanceof Error ? error.message : String(error)}`,
           );
@@ -620,8 +646,9 @@ export class ParserService {
       }
 
       this.logger.log(
-        `Tobacco parsing completed: ${createdCount} created, ${updatedCount} updated, ${errorCount} errors`,
+        `Tobacco parsing completed: ${results.created} created, ${results.updated} updated, ${results.errors} errors`,
       );
+      return results;
     } catch (error) {
       this.logger.error(
         `Tobacco parsing failed: ${error instanceof Error ? error.message : String(error)}`,
