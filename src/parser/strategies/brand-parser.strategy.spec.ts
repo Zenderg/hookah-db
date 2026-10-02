@@ -138,7 +138,7 @@ describe('BrandParserStrategy', () => {
 
     const result = await strategy.parseBrands();
 
-    expect(result).toEqual([]);
+    expect(result).toEqual({ items: [], errors: 2 });
     expect(mockedNavigateWithCheck).toHaveBeenCalled();
     expect(mockError).toHaveBeenCalledWith(expect.stringContaining('HTTP 403'));
   });
@@ -196,7 +196,7 @@ describe('BrandParserStrategy', () => {
 
     const result = await strategy.parseBrands(2);
 
-    expect(result).toEqual([
+    expect(result.items).toEqual([
       expect.objectContaining({
         name: 'Second Brand',
         logoUrl: '/detail-logo.png',
@@ -204,6 +204,7 @@ describe('BrandParserStrategy', () => {
         status: 'Выпускается',
       }),
     ]);
+    expect(result.errors).toBe(1);
   });
 
   it('keeps a brand when its detail page succeeds but optional fields are empty', async () => {
@@ -231,8 +232,12 @@ describe('BrandParserStrategy', () => {
 
     const result = await strategy.parseBrands(1);
 
-    expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({ name: 'Sparse Brand', logoUrl: '' });
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toMatchObject({
+      name: 'Sparse Brand',
+      logoUrl: '',
+    });
+    expect(result.errors).toBe(0);
   });
 
   it('skips a brand when detail extraction throws', async () => {
@@ -258,7 +263,10 @@ describe('BrandParserStrategy', () => {
       return Promise.resolve(true);
     };
 
-    await expect(strategy.parseBrands(1)).resolves.toEqual([]);
+    await expect(strategy.parseBrands(1)).resolves.toEqual({
+      items: [],
+      errors: 1,
+    });
   });
 
   it('fails when brand basic data loads but the detail navigation fails', async () => {
@@ -289,7 +297,9 @@ describe('BrandParserStrategy', () => {
 
     mockDollarEval.mockResolvedValue([]);
 
-    await strategy.parseBrands();
+    const result = await strategy.parseBrands();
+
+    expect(result).toEqual({ items: [], errors: 0 });
 
     expect(mockWaitForLoadState).toHaveBeenCalledWith('domcontentloaded', {
       timeout: 10000,
@@ -298,6 +308,21 @@ describe('BrandParserStrategy', () => {
       timeout: 10000,
       state: 'attached',
     });
+  });
+
+  it('counts a thrown list failure and continues to the other brand list', async () => {
+    mockedNavigateWithCheck.mockResolvedValue({
+      ok: true,
+      status: 200,
+      url: 'https://htreviews.org/tobaccos/brands',
+    });
+    mockDollarEval.mockRejectedValueOnce(new Error('fixture list failure'));
+    mockDollarEval.mockResolvedValue([]);
+
+    const result = await strategy.parseBrands();
+
+    expect(result).toEqual({ items: [], errors: 1 });
+    expect(mockedNavigateWithCheck).toHaveBeenCalledTimes(2);
   });
 
   it.each([
@@ -316,11 +341,12 @@ describe('BrandParserStrategy', () => {
 
       const result = await strategy['parseBrandList']('/fixture');
 
-      expect(result).toHaveLength(1);
-      expect(result[0]).toMatchObject({
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0]).toMatchObject({
         rating: Number(rating),
         ratingsCount: Number(ratingsCount),
       });
+      expect(result.errors).toBe(0);
     },
   );
 });

@@ -98,11 +98,14 @@ function setup(
     strategy.initialize = async () => {};
     strategy.close = async () => {};
   }
-  brandStrategy.parseBrands = () => Promise.resolve([brandData]);
+  brandStrategy.parseBrands = () =>
+    Promise.resolve({ items: [brandData], errors: 0 });
   brandStrategy.parseBrandByUrl = () => Promise.resolve(brandData);
-  lineStrategy.parseLines = () => Promise.resolve([lineData]);
+  lineStrategy.parseLines = () =>
+    Promise.resolve({ items: [lineData], errors: 0 });
   lineStrategy.parseLineByUrl = () => Promise.resolve(lineData);
-  tobaccoStrategy.parseTobaccos = () => Promise.resolve([tobaccoData]);
+  tobaccoStrategy.parseTobaccos = () =>
+    Promise.resolve({ items: [tobaccoData], errors: 0 });
   tobaccoStrategy.parseTobaccoByUrl = () => Promise.resolve(tobaccoData);
 
   const service = new ParserService(

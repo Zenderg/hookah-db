@@ -4,6 +4,7 @@ import type { Browser, Page, BrowserContext } from 'playwright';
 import { Brand } from '../../brands/brands.entity';
 import { createBrowser, createContext } from '../browser/browser.config';
 import { navigateWithCheck } from '../browser/http-checker';
+import type { ParserBatchResult } from './parser-result';
 
 export type ParsedBrandData = {
   name: string;
@@ -89,7 +90,9 @@ export class BrandParserStrategy {
     }
   }
 
-  async parseBrands(limit?: number): Promise<ParsedBrandData[]> {
+  async parseBrands(
+    limit?: number,
+  ): Promise<ParserBatchResult<ParsedBrandData>> {
     if (!this.page) {
       throw new Error('Browser not initialized. Call initialize() first.');
     }
@@ -101,19 +104,33 @@ export class BrandParserStrategy {
       'https://htreviews.org/tobaccos/brands?r=others&s=rating&d=desc';
 
     this.logger.log('Parsing brands from Best Brands page...');
-    const bestBrands = await this.parseBrandList(bestBrandsUrl, limit);
-    this.logger.log(`Parsed ${bestBrands.length} brands from Best Brands page`);
+    let bestBrands: ParserBatchResult<ParsedBrandData>;
+    try {
+      bestBrands = await this.parseBrandList(bestBrandsUrl, limit);
+    } catch (error) {
+      this.captureBatchError(bestBrandsUrl, error);
+      bestBrands = { items: [], errors: 1 };
+    }
+    this.logger.log(
+      `Parsed ${bestBrands.items.length} brands from Best Brands page`,
+    );
 
     this.logger.log('Parsing brands from Other Brands page...');
-    const otherBrands = await this.parseBrandList(otherBrandsUrl, limit);
+    let otherBrands: ParserBatchResult<ParsedBrandData>;
+    try {
+      otherBrands = await this.parseBrandList(otherBrandsUrl, limit);
+    } catch (error) {
+      this.captureBatchError(otherBrandsUrl, error);
+      otherBrands = { items: [], errors: 1 };
+    }
     this.logger.log(
-      `Parsed ${otherBrands.length} brands from Other Brands page`,
+      `Parsed ${otherBrands.items.length} brands from Other Brands page`,
     );
 
     // Combine and deduplicate by slug
     const allBrandsMap = new Map<string, ParsedBrandData>();
 
-    for (const brand of [...bestBrands, ...otherBrands]) {
+    for (const brand of [...bestBrands.items, ...otherBrands.items]) {
       if (!allBrandsMap.has(brand.slug)) {
         allBrandsMap.set(brand.slug, brand);
       }
@@ -121,9 +138,9 @@ export class BrandParserStrategy {
 
     const allBrands = Array.from(allBrandsMap.values());
     const duplicateCount =
-      bestBrands.length + otherBrands.length - allBrands.length;
+      bestBrands.items.length + otherBrands.items.length - allBrands.length;
     this.logger.log(
-      `Combined ${bestBrands.length} + ${otherBrands.length} brands, found ${duplicateCount} duplicates, total unique: ${allBrands.length}`,
+      `Combined ${bestBrands.items.length} + ${otherBrands.items.length} brands, found ${duplicateCount} duplicates, total unique: ${allBrands.length}`,
     );
 
     // Apply limit if specified
@@ -132,6 +149,7 @@ export class BrandParserStrategy {
 
     // Parse detail pages for logoUrl and full description
     this.logger.log('Parsing brand detail pages...');
+    let errors = bestBrands.errors + otherBrands.errors;
     for (let i = 0; i < brandsToProcess.length; i++) {
       const brand = brandsToProcess[i];
       try {
@@ -146,6 +164,7 @@ export class BrandParserStrategy {
           status: detailData.status,
         });
       } catch (error) {
+        errors++;
         this.logger.error(
           `Failed to parse detail page for ${brand.name}: ${error instanceof Error ? error.message : String(error)}`,
         );
@@ -163,20 +182,20 @@ export class BrandParserStrategy {
       }
     }
 
-    return brandsWithDetails;
+    return { items: brandsWithDetails, errors };
   }
 
   private async parseBrandList(
     url: string,
     limit?: number,
-  ): Promise<ParsedBrandData[]> {
+  ): Promise<ParserBatchResult<ParsedBrandData>> {
     if (!this.page) {
       throw new Error('Browser not initialized');
     }
 
     const navigated = await this.safeNavigate(url);
     if (!navigated) {
-      return [];
+      return { items: [], errors: 1 };
     }
 
     const brands: ParsedBrandData[] = [];
@@ -198,95 +217,101 @@ export class BrandParserStrategy {
         break;
       }
 
-      // Scroll to bottom to trigger infinite scroll
-      await this.page.evaluate(() => {
-        window.scrollTo(0, document.body.scrollHeight);
-      });
-      await this.page.waitForTimeout(3000);
+      let brandItems: ParsedBrandData[];
+      try {
+        // Scroll to bottom to trigger infinite scroll
+        await this.page.evaluate(() => {
+          window.scrollTo(0, document.body.scrollHeight);
+        });
+        await this.page.waitForTimeout(3000);
 
-      // Extract brand items using actual CSS selectors
-      const brandItems = await this.page.$$eval(
-        '.tobacco_list_item',
-        (elements) => {
-          return elements.map((element) => {
-            const nameElement = element.querySelector(
-              '.tobacco_list_item_slug span:first-child',
-            );
-            const countryElement = element.querySelector(
-              '.tobacco_list_item_slug .country',
-            );
-            const imageElement = element.querySelector(
-              '.tobacco_list_item_image img',
-            );
-            const linkElement = element.querySelector(
-              '.tobacco_list_item_slug',
-            );
-
-            // Get all div children to find rating, ratings count, and description
-            const divs = Array.from(
-              element.querySelectorAll(':scope > div > div'),
-            );
-
-            // Skip first div (rank/position number) and find rating div
-            // Rating must be in range 0-5 to avoid matching ratings count
-            const ratingDiv = divs.slice(1).find((div) => {
-              const text = div.textContent.trim();
-              const match = text.match(/^(\d+(\.\d+)?)$/);
-              if (!match) return false;
-              const rating = parseFloat(match[1]);
-              return rating >= 0 && rating <= 5;
-            });
-
-            // Find ratings count div (contains 1-5 digit number)
-            // Skip first div (rank) and skip rating div
-            const ratingsCountDiv = divs.slice(1).find((div) => {
-              if (div === ratingDiv) return false;
-
-              const text = div.textContent.trim();
-              const match = text.match(/^(\d{1,5})$/);
-              if (!match) return false;
-              const count = parseInt(match[1], 10);
-              // Ratings counts are positive integers.
-              return count >= 1;
-            });
-
-            // Find description div (long text with brand/tobacco keywords)
-            const descriptionDiv = divs.find((div) => {
-              const text = div.textContent.trim();
-              return (
-                text.length > 50 &&
-                (text.includes('табак') || text.includes('бренд'))
+        // Extract brand items using actual CSS selectors
+        brandItems = await this.page.$$eval(
+          '.tobacco_list_item',
+          (elements) => {
+            return elements.map((element) => {
+              const nameElement = element.querySelector(
+                '.tobacco_list_item_slug span:first-child',
               );
-            });
+              const countryElement = element.querySelector(
+                '.tobacco_list_item_slug .country',
+              );
+              const imageElement = element.querySelector(
+                '.tobacco_list_item_image img',
+              );
+              const linkElement = element.querySelector(
+                '.tobacco_list_item_slug',
+              );
 
-            const detailUrl = linkElement?.getAttribute('href') || '';
+              // Get all div children to find rating, ratings count, and description
+              const divs = Array.from(
+                element.querySelectorAll(':scope > div > div'),
+              );
 
-            // Extract slug from detailUrl (format: /tobaccos/{slug})
-            let slug = '';
-            if (detailUrl) {
-              const urlMatch = detailUrl.match(/\/tobaccos\/([^/?]+)/);
-              if (urlMatch) {
-                slug = urlMatch[1];
+              // Skip first div (rank/position number) and find rating div
+              // Rating must be in range 0-5 to avoid matching ratings count
+              const ratingDiv = divs.slice(1).find((div) => {
+                const text = div.textContent.trim();
+                const match = text.match(/^(\d+(\.\d+)?)$/);
+                if (!match) return false;
+                const rating = parseFloat(match[1]);
+                return rating >= 0 && rating <= 5;
+              });
+
+              // Find ratings count div (contains 1-5 digit number)
+              // Skip first div (rank) and skip rating div
+              const ratingsCountDiv = divs.slice(1).find((div) => {
+                if (div === ratingDiv) return false;
+
+                const text = div.textContent.trim();
+                const match = text.match(/^(\d{1,5})$/);
+                if (!match) return false;
+                const count = parseInt(match[1], 10);
+                // Ratings counts are positive integers.
+                return count >= 1;
+              });
+
+              // Find description div (long text with brand/tobacco keywords)
+              const descriptionDiv = divs.find((div) => {
+                const text = div.textContent.trim();
+                return (
+                  text.length > 50 &&
+                  (text.includes('табак') || text.includes('бренд'))
+                );
+              });
+
+              const detailUrl = linkElement?.getAttribute('href') || '';
+
+              // Extract slug from detailUrl (format: /tobaccos/{slug})
+              let slug = '';
+              if (detailUrl) {
+                const urlMatch = detailUrl.match(/\/tobaccos\/([^/?]+)/);
+                if (urlMatch) {
+                  slug = urlMatch[1];
+                }
               }
-            }
 
-            return {
-              name: nameElement?.textContent?.trim() || '',
-              slug,
-              country: countryElement?.textContent?.trim() || '',
-              rating: parseFloat(ratingDiv?.textContent?.trim() || '0'),
-              ratingsCount: parseInt(
-                ratingsCountDiv?.textContent?.trim() || '0',
-                10,
-              ),
-              detailUrl,
-              description: descriptionDiv?.textContent?.trim() || '',
-              logoUrl: imageElement?.getAttribute('src') || '',
-              status: 'Не указано',
-            };
-          });
-        },
-      );
+              return {
+                name: nameElement?.textContent?.trim() || '',
+                slug,
+                country: countryElement?.textContent?.trim() || '',
+                rating: parseFloat(ratingDiv?.textContent?.trim() || '0'),
+                ratingsCount: parseInt(
+                  ratingsCountDiv?.textContent?.trim() || '0',
+                  10,
+                ),
+                detailUrl,
+                description: descriptionDiv?.textContent?.trim() || '',
+                logoUrl: imageElement?.getAttribute('src') || '',
+                status: 'Не указано',
+              };
+            });
+          },
+        );
+      } catch (error) {
+        this.captureBatchError(url, error);
+        return { items: brands, errors: 1 };
+      }
 
       // Filter out duplicates
       const newBrands = brandItems.filter((brand) => {
@@ -315,7 +340,19 @@ export class BrandParserStrategy {
       }
     }
 
-    return brands;
+    return { items: brands, errors: 0 };
+  }
+
+  private captureBatchError(url: string, error: unknown): void {
+    this.logger.error(
+      `Failed to parse brand list ${url}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    Sentry.captureException(error, (scope) => {
+      scope.setTag('parser_strategy', 'brand');
+      scope.setTag('step', 'brand-list');
+      scope.setContext('parser', { strategy: 'brand', listUrl: url });
+      return scope;
+    });
   }
 
   private async parseBrandDetail(detailUrl: string): Promise<{

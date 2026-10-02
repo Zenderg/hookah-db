@@ -66,6 +66,7 @@ DTOs, and utilities.
 - Confirm the effective environment before starting the app if parser cron behavior matters.
 - Daily parsing runs brands, then lines, then tobaccos. Current progression is gated by created/updated counters, not a separate success flag.
 - Per-entity save failures are continue-on-error and should not stop the whole batch.
+- Batch strategies return parsed `items` and a numeric `errors` count. Daily refresh keeps processing successful items, then rejects with its stage counts when any strategy or save failed so Sentry cron reports the run as failed; a truly empty, error-free catalog resolves successfully. CLI batch parsing exits nonzero when its result contains errors.
 - Parser normalizers provide `createdAt` for inserts because the schema columns have no defaults; parser updates omit that field so refreshes preserve each record's original creation time.
 - `saveTobaccoWithFlavors()` resolves flavors with find-or-create logic.
 - Tobacco saves require a canonical `htreviewsId` matching `^htr\d+$` with no surrounding whitespace before entity normalization or flavor/tobacco repository access. Invalid identities fail the entity save; batch parsing records the error and continues.

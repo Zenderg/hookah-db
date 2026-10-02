@@ -9,6 +9,7 @@ import type { Repository } from 'typeorm';
 import { AppModule } from '../app.module';
 import { ApiKeysService } from '../api-keys/api-keys.service';
 import { ParserService } from '../parser/parser.service';
+import type { ParserStageResult } from '../parser/parser.service';
 import * as Sentry from '@sentry/nestjs';
 import { ApiKey } from '../api-keys/api-keys.entity';
 import { Brand } from '../brands/brands.entity';
@@ -337,12 +338,14 @@ program
             console.error(
               '❌ Cannot use both --url and --limit options together.',
             );
-            process.exit(1);
+            process.exitCode = 1;
+            return;
           }
 
           if (limit !== undefined && (isNaN(limit) || limit < 1)) {
             console.error('❌ Invalid limit value. Must be a positive number.');
-            process.exit(1);
+            process.exitCode = 1;
+            return;
           }
 
           const startTime = Date.now();
@@ -364,7 +367,8 @@ program
                   console.error(
                     '❌ Invalid line URL format. Expected: /tobaccos/{brand}/{line}',
                   );
-                  process.exit(1);
+                  process.exitCode = 1;
+                  return;
                 }
 
                 // Find brand by slug to get brandId
@@ -374,7 +378,8 @@ program
                 });
                 if (!brands || brands.length === 0) {
                   console.error(`❌ Brand not found in database: ${brandSlug}`);
-                  process.exit(1);
+                  process.exitCode = 1;
+                  return;
                 }
 
                 const brandId = brands[0].id;
@@ -390,7 +395,8 @@ program
                   console.error(
                     '❌ Invalid tobacco URL format. Expected: /tobaccos/{brand}/{line}/{tobacco}',
                   );
-                  process.exit(1);
+                  process.exitCode = 1;
+                  return;
                 }
 
                 // Find brand by slug to get brandId
@@ -400,7 +406,8 @@ program
                 });
                 if (!brands || brands.length === 0) {
                   console.error(`❌ Brand not found in database: ${brandSlug}`);
-                  process.exit(1);
+                  process.exitCode = 1;
+                  return;
                 }
 
                 const brandId = brands[0].id;
@@ -412,7 +419,8 @@ program
                 });
                 if (!lines || lines.length === 0) {
                   console.error(`❌ Line not found in database: ${lineSlug}`);
-                  process.exit(1);
+                  process.exitCode = 1;
+                  return;
                 }
 
                 const lineId = lines[0].id;
@@ -423,8 +431,8 @@ program
                 console.error(
                   `❌ Invalid type: ${type}. Must be 'brand', 'line', or 'tobacco'.`,
                 );
-                process.exit(1);
-                break;
+                process.exitCode = 1;
+                return;
             }
           } else {
             // Parse all items with limit
@@ -433,22 +441,31 @@ program
             );
             console.log('');
 
+            let result: ParserStageResult;
             switch (type.toLowerCase()) {
               case 'brand':
-                await service.parseBrandsManually(limit);
+                result = await service.parseBrandsManually(limit);
                 break;
               case 'line':
-                await service.parseLinesManually(limit);
+                result = await service.parseLinesManually(limit);
                 break;
               case 'tobacco':
-                await service.parseTobaccosManually(limit);
+                result = await service.parseTobaccosManually(limit);
                 break;
               default:
                 console.error(
                   `❌ Invalid type: ${type}. Must be 'brand', 'line', or 'tobacco'.`,
                 );
-                process.exit(1);
-                break;
+                process.exitCode = 1;
+                return;
+            }
+
+            if (result.errors > 0) {
+              console.error(
+                `❌ ${type} parsing completed with ${result.errors} errors (${result.created} created, ${result.updated} updated).`,
+              );
+              process.exitCode = 1;
+              return;
             }
           }
 
@@ -462,7 +479,7 @@ program
             error instanceof Error ? error.message : error,
           );
           await Sentry.flush(2000);
-          process.exit(1);
+          process.exitCode = 1;
         } finally {
           if (app) {
             await app.close();

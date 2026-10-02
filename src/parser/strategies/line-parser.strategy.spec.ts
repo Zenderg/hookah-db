@@ -119,7 +119,7 @@ describe('LineParserStrategy', () => {
 
     const result = await strategy.parseLines([{ url: brandUrl, brandId }]);
 
-    expect(result).toEqual([]);
+    expect(result).toEqual({ items: [], errors: 1 });
     expect(mockError).toHaveBeenCalledWith(expect.stringContaining('HTTP 403'));
   });
 
@@ -166,7 +166,7 @@ describe('LineParserStrategy', () => {
 
     const result = await strategy.parseLines([{ url: brandUrl, brandId }]);
 
-    expect(result).toEqual([]);
+    expect(result).toEqual({ items: [], errors: 1 });
     // Error should be logged for the detail page failure
     expect(mockError).toHaveBeenCalledWith(expect.stringContaining('HTTP 403'));
   });
@@ -186,14 +186,17 @@ describe('LineParserStrategy', () => {
 
     const result = await strategy.parseLines([{ url: brandUrl, brandId }]);
 
-    expect(result).toEqual([
-      expect.objectContaining({
-        name: 'Xperience',
-        brandId,
-        imageUrl: null,
-        ratingsCount: 0,
-      }),
-    ]);
+    expect(result).toEqual({
+      items: [
+        expect.objectContaining({
+          name: 'Xperience',
+          brandId,
+          imageUrl: null,
+          ratingsCount: 0,
+        }),
+      ],
+      errors: 0,
+    });
   });
 
   it('continues to later lines after a detail failure', async () => {
@@ -222,13 +225,14 @@ describe('LineParserStrategy', () => {
 
     const result = await strategy.parseLines([{ url: brandUrl, brandId }]);
 
-    expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toMatchObject({
       name: 'Later line',
       slug: 'later-line',
       imageUrl: '/later-line.png',
       ratingsCount: 12,
     });
+    expect(result.errors).toBe(1);
   });
 
   it('skips a line when detail extraction throws', async () => {
@@ -239,7 +243,7 @@ describe('LineParserStrategy', () => {
 
     await expect(
       strategy.parseLines([{ url: brandUrl, brandId }]),
-    ).resolves.toEqual([]);
+    ).resolves.toEqual({ items: [], errors: 1 });
   });
 
   it('fails a single line parse when detail navigation fails', async () => {
