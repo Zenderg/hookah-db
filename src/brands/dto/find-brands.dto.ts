@@ -3,7 +3,7 @@ import { PaginationDto } from '../../common/dto/pagination.dto';
 
 export class FindBrandsDto extends PaginationDto {
   @IsOptional()
-  @IsString()
+  @IsIn(['rating', 'name'])
   sortBy?: 'rating' | 'name' = 'rating';
 
   @IsOptional()

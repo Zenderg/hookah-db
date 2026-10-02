@@ -145,6 +145,7 @@ export class BrandParserStrategy {
 
     // Apply limit if specified
     const brandsToProcess = limit ? allBrands.slice(0, limit) : allBrands;
+    const brandsWithDetails: ParsedBrandData[] = [];
 
     // Parse detail pages for logoUrl and full description
     this.logger.log('Parsing brand detail pages...');
@@ -156,15 +157,12 @@ export class BrandParserStrategy {
           `Parsing detail page for brand ${i + 1}/${brandsToProcess.length}: ${brand.name}`,
         );
         const detailData = await this.parseBrandDetail(brand.detailUrl);
-        if (!detailData.success) {
-          errors++;
-        }
-        brandsToProcess[i] = {
+        brandsWithDetails.push({
           ...brand,
           logoUrl: detailData.logoUrl,
           description: detailData.description,
           status: detailData.status,
-        };
+        });
       } catch (error) {
         errors++;
         this.logger.error(
@@ -184,7 +182,7 @@ export class BrandParserStrategy {
       }
     }
 
-    return { items: brandsToProcess, errors };
+    return { items: brandsWithDetails, errors };
   }
 
   private async parseBrandList(
@@ -263,11 +261,13 @@ export class BrandParserStrategy {
               // Find ratings count div (contains 1-5 digit number)
               // Skip first div (rank) and skip rating div
               const ratingsCountDiv = divs.slice(1).find((div) => {
+                if (div === ratingDiv) return false;
+
                 const text = div.textContent.trim();
                 const match = text.match(/^(\d{1,5})$/);
                 if (!match) return false;
                 const count = parseInt(match[1], 10);
-                // Ratings count should be >= 1 to avoid matching ratings (which are decimals)
+                // Ratings counts are positive integers.
                 return count >= 1;
               });
 
@@ -359,7 +359,6 @@ export class BrandParserStrategy {
     logoUrl: string;
     description: string;
     status: string;
-    success: boolean;
   }> {
     if (!this.page) {
       throw new Error('Browser not initialized');
@@ -371,12 +370,7 @@ export class BrandParserStrategy {
 
     const navigated = await this.safeNavigate(fullUrl);
     if (!navigated) {
-      return {
-        logoUrl: '',
-        description: '',
-        status: 'Не указано',
-        success: false,
-      };
+      throw new Error(`Failed to navigate to brand detail page: ${fullUrl}`);
     }
 
     const data = await this.page.evaluate(() => {
@@ -415,7 +409,7 @@ export class BrandParserStrategy {
       };
     });
 
-    return { ...data, success: true };
+    return data;
   }
 
   /**
@@ -436,17 +430,7 @@ export class BrandParserStrategy {
 
     const navigated = await this.safeNavigate(fullUrl);
     if (!navigated) {
-      return {
-        name: '',
-        slug: '',
-        country: '',
-        rating: 0,
-        ratingsCount: 0,
-        description: '',
-        logoUrl: '',
-        detailUrl: url,
-        status: 'Не указано',
-      };
+      throw new Error(`Failed to navigate to brand page: ${fullUrl}`);
     }
 
     // Extract basic brand data from detail page

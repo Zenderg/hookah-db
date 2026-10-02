@@ -1,8 +1,30 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Brand } from './brands.entity';
 import { FindBrandsDto } from './dto/find-brands.dto';
+
+const BRAND_SORT_FIELDS = {
+  rating: 'brand.rating',
+  name: 'brand.name',
+} as const;
+
+function getSortField(sortBy: unknown): string {
+  if (
+    typeof sortBy !== 'string' ||
+    !Object.prototype.hasOwnProperty.call(BRAND_SORT_FIELDS, sortBy)
+  ) {
+    throw new BadRequestException('Unsupported brand sort field');
+  }
+  return BRAND_SORT_FIELDS[sortBy as keyof typeof BRAND_SORT_FIELDS];
+}
+
+function getSortOrder(order: unknown): 'ASC' | 'DESC' {
+  if (order !== 'asc' && order !== 'desc') {
+    throw new BadRequestException('Unsupported sort order');
+  }
+  return order.toUpperCase() as 'ASC' | 'DESC';
+}
 
 @Injectable()
 export class BrandsRepository {
@@ -24,6 +46,8 @@ export class BrandsRepository {
       status,
     } = query;
     const skip = (page - 1) * limit;
+    const sortField = getSortField(sortBy);
+    const sortOrder = getSortOrder(order);
 
     const queryBuilder = this.brandRepository.createQueryBuilder('brand');
 
@@ -41,10 +65,7 @@ export class BrandsRepository {
       queryBuilder.andWhere('brand.status = :status', { status });
     }
 
-    queryBuilder
-      .orderBy(`brand.${sortBy}`, order.toUpperCase() as 'ASC' | 'DESC')
-      .skip(skip)
-      .take(limit);
+    queryBuilder.orderBy(sortField, sortOrder).skip(skip).take(limit);
 
     const [data, total] = await queryBuilder.getManyAndCount();
 

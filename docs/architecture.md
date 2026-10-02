@@ -57,6 +57,10 @@ DTOs, and utilities.
 ## Parser
 
 - The parser is Playwright-based with brand, line, and tobacco strategies.
+- Brand and line batch parsing skips an entity when its detail-page navigation
+  or extraction fails; successful entities continue through the batch.
+  Single-URL brand and line parsing rejects on detail failure before catalog
+  writes.
 - Automatic parser cron is scheduled at 02:00 when `PARSER_CRON_ENABLED` is enabled.
 - `PARSER_CRON_ENABLED` defaults to enabled in code when unset. `.env.example` and `deploy/compose.yaml` set it to false for fresh self-host installs.
 - Confirm the effective environment before starting the app if parser cron behavior matters.
@@ -78,9 +82,16 @@ DTOs, and utilities.
 - A valid key used on a protected request increments its request count and updates `lastUsedAt` once; public `/health` requests do neither.
 - `GET /tobaccos/by-url` validates an absolute URL under `https://htreviews.org/tobaccos/{brand}/{line}/{tobacco}` and strips query and hash components before lookup; malformed, relative, and out-of-scope URLs return HTTP 400.
 - Pagination defaults to 20 and maxes at 100.
+- Brand lists accept `sortBy=rating|name`; tobacco lists, including brand- and
+  line-nested tobacco lists, accept `sortBy=rating|name|dateAdded`. The
+  `dateAdded` API name sorts by the tobacco `createdAt` column. Both list types
+  accept `order=asc|desc`; unsupported sort fields and directions return HTTP
+  400 before repository access. Line and flavor lists do not accept sort
+  parameters.
 - Tobacco search uses PostgreSQL FTS with Russian and English configurations across `tobacco.name`, `brand.name`, and `line.name`.
 - Search splits on whitespace and PostgreSQL tsquery operators. Other punctuation stays within a term and is quoted for PostgreSQL normalization, preserving decimals and compounds such as `1.5` and `apple-mint`. Every term must match at least one searched field, so multi-term searches use cross-field AND logic.
 - Each term retains PostgreSQL prefix matching and Russian/English stemming, plus case-insensitive field-prefix matching with LIKE wildcards escaped. Whitespace-only or operator-only input uses the normal requested sort without a search filter.
 - Search ranking includes exact match bonus +100, tobacco prefix bonus +50, and brand/line prefix bonus +30.
+- A tobacco without a line contributes zero line relevance while retaining its tobacco and brand relevance.
 - Flavor filtering uses AND logic: a tobacco must have every requested flavor. Repeated flavor names count once, so duplicates do not change the matching results.
 - Global exception responses use `{ statusCode, timestamp, path, message }`.

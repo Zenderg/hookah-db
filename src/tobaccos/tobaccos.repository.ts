@@ -1,8 +1,31 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Tobacco } from './tobaccos.entity';
 import { FindTobaccosDto } from './dto/find-tobaccos.dto';
+
+const TOBACCO_SORT_FIELDS = {
+  rating: 'tobacco.rating',
+  name: 'tobacco.name',
+  dateAdded: 'tobacco.createdAt',
+} as const;
+
+function getSortField(sortBy: unknown): string {
+  if (
+    typeof sortBy !== 'string' ||
+    !Object.prototype.hasOwnProperty.call(TOBACCO_SORT_FIELDS, sortBy)
+  ) {
+    throw new BadRequestException('Unsupported tobacco sort field');
+  }
+  return TOBACCO_SORT_FIELDS[sortBy as keyof typeof TOBACCO_SORT_FIELDS];
+}
+
+function getSortOrder(order: unknown): 'ASC' | 'DESC' {
+  if (order !== 'asc' && order !== 'desc') {
+    throw new BadRequestException('Unsupported sort order');
+  }
+  return order.toUpperCase() as 'ASC' | 'DESC';
+}
 
 function splitSearchTerms(search: string): string[] {
   return search
@@ -44,6 +67,8 @@ export class TobaccosRepository {
       flavors,
     } = query;
     const skip = (page - 1) * limit;
+    const sortField = getSortField(sortBy);
+    const sortOrder = getSortOrder(order);
 
     const queryBuilder = this.tobaccoRepository.createQueryBuilder('tobacco');
 
@@ -129,7 +154,7 @@ export class TobaccosRepository {
 
       // Calculate base relevance ranking from Full-Text Search
       // Combines rankings from both language configurations across all fields
-      // Use COALESCE to handle NULL values from line.name (lineId can be null)
+      // The optional line relation contributes zero when absent, preserving other field ranks.
       const relevanceExpressions = searchWords.map((_, index) => {
         const paramNamePrefix = `searchWordPrefix${index}`;
         return `(
@@ -137,8 +162,8 @@ export class TobaccosRepository {
           ts_rank(to_tsvector('english', tobacco.name), to_tsquery('english', :${paramNamePrefix})) +
           ts_rank(to_tsvector('russian', brand.name), to_tsquery('russian', :${paramNamePrefix})) +
           ts_rank(to_tsvector('english', brand.name), to_tsquery('english', :${paramNamePrefix})) +
-          ts_rank(to_tsvector('russian', line.name), to_tsquery('russian', :${paramNamePrefix})) +
-          ts_rank(to_tsvector('english', line.name), to_tsquery('english', :${paramNamePrefix}))
+          COALESCE(ts_rank(to_tsvector('russian', line.name), to_tsquery('russian', :${paramNamePrefix})), 0) +
+          COALESCE(ts_rank(to_tsvector('english', line.name), to_tsquery('english', :${paramNamePrefix})), 0)
         )`;
       });
 
@@ -179,10 +204,7 @@ export class TobaccosRepository {
       queryBuilder.orderBy('relevance', 'DESC');
     } else {
       // Use normal sorting when no search is provided
-      queryBuilder.orderBy(
-        `tobacco.${sortBy}`,
-        order.toUpperCase() as 'ASC' | 'DESC',
-      );
+      queryBuilder.orderBy(sortField, sortOrder);
     }
 
     queryBuilder.skip(skip).take(limit);

@@ -166,15 +166,94 @@ describe('LineParserStrategy', () => {
 
     const result = await strategy.parseLines([{ url: brandUrl, brandId }]);
 
-    // Line should still be parsed but with default additional data
-    expect(result.items).toHaveLength(1);
-    expect(result.items[0].name).toBe('Xperience');
-    expect(result.items[0].brandId).toBe(brandId);
-    expect(result.items[0].ratingsCount).toBe(0);
-    expect(result.items[0].imageUrl).toBeNull();
-    expect(result.errors).toBe(1);
+    expect(result).toEqual({ items: [], errors: 1 });
     // Error should be logged for the detail page failure
     expect(mockError).toHaveBeenCalledWith(expect.stringContaining('HTTP 403'));
+  });
+
+  it('keeps a line when detail navigation succeeds with optional fields missing', async () => {
+    mockedNavigateWithCheck.mockResolvedValue({ ok: true, status: 200 });
+    mockEvaluate
+      .mockResolvedValueOnce({ items: [mockLineFromBrandPage], errors: [] })
+      .mockResolvedValueOnce({
+        imageUrl: null,
+        ratingsCount: 0,
+        strengthOfficial: null,
+        strengthByRatings: null,
+        status: null,
+        description: null,
+      });
+
+    const result = await strategy.parseLines([{ url: brandUrl, brandId }]);
+
+    expect(result).toEqual({
+      items: [
+        expect.objectContaining({
+          name: 'Xperience',
+          brandId,
+          imageUrl: null,
+          ratingsCount: 0,
+        }),
+      ],
+      errors: 0,
+    });
+  });
+
+  it('continues to later lines after a detail failure', async () => {
+    const laterLine = {
+      ...mockLineFromBrandPage,
+      name: 'Later line',
+      slug: 'later-line',
+    };
+    mockedNavigateWithCheck
+      .mockResolvedValueOnce({ ok: true, status: 200 })
+      .mockResolvedValueOnce({ ok: false, status: 403 })
+      .mockResolvedValueOnce({ ok: true, status: 200 });
+    mockEvaluate
+      .mockResolvedValueOnce({
+        items: [mockLineFromBrandPage, laterLine],
+        errors: [],
+      })
+      .mockResolvedValueOnce({
+        imageUrl: '/later-line.png',
+        ratingsCount: 12,
+        strengthOfficial: 'Средняя',
+        strengthByRatings: 'Средняя',
+        status: 'Выпускается',
+        description: null,
+      });
+
+    const result = await strategy.parseLines([{ url: brandUrl, brandId }]);
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toMatchObject({
+      name: 'Later line',
+      slug: 'later-line',
+      imageUrl: '/later-line.png',
+      ratingsCount: 12,
+    });
+    expect(result.errors).toBe(1);
+  });
+
+  it('skips a line when detail extraction throws', async () => {
+    mockedNavigateWithCheck.mockResolvedValue({ ok: true, status: 200 });
+    mockEvaluate
+      .mockResolvedValueOnce({ items: [mockLineFromBrandPage], errors: [] })
+      .mockRejectedValueOnce(new Error('detail DOM extraction failed'));
+
+    await expect(
+      strategy.parseLines([{ url: brandUrl, brandId }]),
+    ).resolves.toEqual({ items: [], errors: 1 });
+  });
+
+  it('fails a single line parse when detail navigation fails', async () => {
+    mockedNavigateWithCheck.mockResolvedValue({ ok: false, status: 403 });
+
+    await expect(
+      strategy.parseLineByUrl('/tobaccos/darkside/xperience', brandId),
+    ).rejects.toThrow('Failed to navigate to line detail page');
+
+    expect(mockEvaluate).not.toHaveBeenCalled();
   });
 
   it('should preserve a missing image as null when normalizing a line', () => {

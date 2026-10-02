@@ -158,9 +158,6 @@ export class LineParserStrategy {
                   line.slug,
                   brandSlug,
                 );
-              if (!additionalData.success) {
-                errorCount++;
-              }
               line.ratingsCount = additionalData.ratingsCount;
               line.imageUrl = additionalData.imageUrl;
               line.strengthOfficial = additionalData.strengthOfficial;
@@ -196,7 +193,7 @@ export class LineParserStrategy {
                 });
                 return scope;
               });
-              // Continue with line even if detail page extraction fails
+              continue;
             }
           }
 
@@ -422,7 +419,6 @@ export class LineParserStrategy {
     strengthByRatings: string | null;
     status: string | null;
     description: string | null;
-    success: boolean;
   }> {
     if (!this.page) {
       throw new Error('Browser not initialized. Call initialize() first.');
@@ -435,15 +431,7 @@ export class LineParserStrategy {
     try {
       const success = await this.safeNavigate(fullUrl);
       if (!success) {
-        return {
-          imageUrl: null,
-          ratingsCount: 0,
-          strengthOfficial: null,
-          strengthByRatings: null,
-          status: null,
-          description: null,
-          success: false,
-        };
+        throw new Error(`Failed to navigate to line detail page: ${fullUrl}`);
       }
 
       const data = await this.page.evaluate(() => {
@@ -691,7 +679,7 @@ export class LineParserStrategy {
           `description=${data.description ? 'yes' : 'no'}`,
       );
 
-      return { ...data, success: true };
+      return data;
     } catch (error) {
       this.logger.error(
         `Failed to parse line detail page ${fullUrl}: ${error instanceof Error ? error.message : String(error)}`,

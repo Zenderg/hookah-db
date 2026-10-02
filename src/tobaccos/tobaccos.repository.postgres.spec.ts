@@ -84,6 +84,24 @@ describePostgres('TobaccosRepository PostgreSQL search', () => {
     );
   });
 
+  it('sorts the joined page by the dateAdded alias mapped to createdAt', async () => {
+    const ascending = await repository.findAll({
+      sortBy: 'dateAdded',
+      order: 'asc',
+      limit: 1,
+    });
+    const descending = await repository.findAll({
+      sortBy: 'dateAdded',
+      order: 'desc',
+      limit: 1,
+    });
+
+    expect(ascending.total).toBe(2);
+    expect(ascending.data.map((tobacco) => tobacco.name)).toEqual(['Tea 1.5']);
+    expect(descending.total).toBe(2);
+    expect(descending.data.map((tobacco) => tobacco.name)).toEqual(['Mix 2.0']);
+  });
+
   it('keeps AND flavor filtering unchanged when requested flavors repeat', async () => {
     const singleFlavor = await repository.findAll({ flavors: ['яблоко'] });
     const duplicateFlavor = await repository.findAll({
@@ -123,6 +141,36 @@ describePostgres('TobaccosRepository PostgreSQL search', () => {
 
     expect(result.total).toBe(1);
     expect(result.data.map((tobacco) => tobacco.name)).toEqual(['Tea 1.5']);
+  });
+
+  describe('search relevance with nullable line', () => {
+    beforeAll(async () => insertRelevanceFixtures());
+
+    it.each(['mint', 'mint signal'])(
+      'ranks tobacco and brand matches for "%s" before a weaker match with a line',
+      async (search) => {
+        const firstPage = await repository.findAll({ search, limit: 1 });
+        const secondPage = await repository.findAll({
+          search,
+          limit: 1,
+          page: 2,
+        });
+        const allResults = await repository.findAll({ search });
+
+        expect(allResults.total).toBe(2);
+        expect(allResults.data.map((tobacco) => tobacco.name)).toEqual([
+          'Zzz mint mint mint',
+          'Zzz mint',
+        ]);
+        expect(allResults.data[0].line).toBeNull();
+        expect(firstPage.data.map((tobacco) => tobacco.name)).toEqual([
+          'Zzz mint mint mint',
+        ]);
+        expect(secondPage.data.map((tobacco) => tobacco.name)).toEqual([
+          'Zzz mint',
+        ]);
+      },
+    );
   });
 
   it.each(["Tea'1.5", 'Tea\\1.5'])(
@@ -223,17 +271,35 @@ describePostgres('TobaccosRepository PostgreSQL search', () => {
       );
     }
 
-    const tobaccoFixtures: Array<[string, string, string, string[]]> = [
-      ['Tea 1.5', 'tea-15', 'postgres-search-tea-15', ['яблоко', 'мята']],
-      ['Mix 2.0', 'mix-20', 'postgres-search-mix-20', ['яблоко', 'лимон']],
+    const tobaccoFixtures: Array<[string, string, string, string, string[]]> = [
+      [
+        'Tea 1.5',
+        'tea-15',
+        'postgres-search-tea-15',
+        '2020-01-01T00:00:00.000Z',
+        ['яблоко', 'мята'],
+      ],
+      [
+        'Mix 2.0',
+        'mix-20',
+        'postgres-search-mix-20',
+        '2022-01-01T00:00:00.000Z',
+        ['яблоко', 'лимон'],
+      ],
     ];
-    for (const [name, slug, htreviewsId, flavorNames] of tobaccoFixtures) {
+    for (const [
+      name,
+      slug,
+      htreviewsId,
+      createdAt,
+      flavorNames,
+    ] of tobaccoFixtures) {
       const tobaccoId = randomUUID();
       await dataSource.query(
         `INSERT INTO ${quotedSchema}.tobaccos
           (id, name, slug, "brandId", "strengthOfficial", "strengthByRatings",
-           status, "htreviewsId", "imageUrl")
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+           status, "htreviewsId", "imageUrl", "createdAt")
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
         [
           tobaccoId,
           name,
@@ -244,6 +310,7 @@ describePostgres('TobaccosRepository PostgreSQL search', () => {
           'Active',
           htreviewsId,
           '',
+          createdAt,
         ],
       );
       for (const flavorName of flavorNames) {
@@ -253,6 +320,63 @@ describePostgres('TobaccosRepository PostgreSQL search', () => {
           [tobaccoId, flavorIds.get(flavorName)],
         );
       }
+    }
+  }
+
+  async function insertRelevanceFixtures(): Promise<void> {
+    const brandId = randomUUID();
+    const lineId = randomUUID();
+    await dataSource.query(
+      `INSERT INTO ${quotedSchema}.brands
+        (id, name, slug, country, "logoUrl", status)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        brandId,
+        'Quiet Signal Brand',
+        'quiet-signal-brand',
+        'Russia',
+        '',
+        'Active',
+      ],
+    );
+    await dataSource.query(
+      `INSERT INTO ${quotedSchema}.lines
+        (id, name, slug, "brandId", "strengthOfficial", "strengthByRatings", status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        lineId,
+        'Quiet Line',
+        'quiet-line',
+        brandId,
+        'Medium',
+        'Medium',
+        'Active',
+      ],
+    );
+
+    const tobaccoFixtures: Array<[string, string, string, string | null]> = [
+      ['Zzz mint mint mint', 'zzz-mint-mint-mint', 'htr900001', null],
+      ['Zzz mint', 'zzz-mint', 'htr900002', lineId],
+    ];
+    for (const [name, slug, htreviewsId, fixtureLineId] of tobaccoFixtures) {
+      await dataSource.query(
+        `INSERT INTO ${quotedSchema}.tobaccos
+          (id, name, slug, "brandId", "lineId", "strengthOfficial",
+           "strengthByRatings", status, "htreviewsId", "imageUrl")
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        [
+          randomUUID(),
+          name,
+          slug,
+          brandId,
+          fixtureLineId,
+          'Medium',
+          'Medium',
+          'Active',
+          htreviewsId,
+          '',
+        ],
+      );
     }
   }
 });
