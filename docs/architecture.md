@@ -63,6 +63,7 @@ DTOs, and utilities.
 - Daily parsing runs brands, then lines, then tobaccos. Current progression is gated by created/updated counters, not a separate success flag.
 - Per-entity save failures are continue-on-error and should not stop the whole batch.
 - `saveTobaccoWithFlavors()` resolves flavors with find-or-create logic.
+- Tobacco saves require a canonical `htreviewsId` matching `^htr\d+$` with no surrounding whitespace before entity normalization or flavor/tobacco repository access. Invalid identities fail the entity save; batch parsing records the error and continues.
 - Flavor parsing extracts `<a>` links whose `href` contains `?r=flavor` from tobacco pages.
 - Current identity checks are specific: brands by `name`, lines by `slug + brandId`, tobaccos by `htreviewsId`. Do not describe this as generic upsert by slug.
 
