@@ -73,6 +73,34 @@ const mockedCreateBrowser = createBrowser as jest.Mock;
 const mockedCreateContext = createContext as jest.Mock;
 const mockedNavigateWithCheck = navigateWithCheck as jest.Mock;
 
+function createBrandListElement(rating: string, ratingsCount: string) {
+  const rankDiv = { textContent: '1' };
+  const ratingDiv = { textContent: rating };
+  const ratingsCountDiv = { textContent: ratingsCount };
+  const nameElement = { textContent: 'Example' };
+  const countryElement = { textContent: 'Testland' };
+  const imageElement = { getAttribute: () => '/example.png' };
+  const linkElement = { getAttribute: () => '/tobaccos/example' };
+
+  return {
+    querySelector: (selector: string) => {
+      if (selector === '.tobacco_list_item_slug span:first-child') {
+        return nameElement;
+      }
+      if (selector === '.tobacco_list_item_slug .country') {
+        return countryElement;
+      }
+      if (selector === '.tobacco_list_item_image img') return imageElement;
+      if (selector === '.tobacco_list_item_slug') return linkElement;
+      return null;
+    },
+    querySelectorAll: (selector: string) =>
+      selector === ':scope > div > div'
+        ? [rankDiv, ratingDiv, ratingsCountDiv]
+        : [],
+  };
+}
+
 // ---- Tests ----
 
 describe('BrandParserStrategy', () => {
@@ -163,4 +191,28 @@ describe('BrandParserStrategy', () => {
       state: 'attached',
     });
   });
+
+  it.each([
+    { rating: '5', ratingsCount: '42' },
+    { rating: '4.5', ratingsCount: '42' },
+    { rating: '5', ratingsCount: '5' },
+    { rating: '3', ratingsCount: '1' },
+  ])(
+    'extracts rating $rating and independent count $ratingsCount',
+    async ({ rating, ratingsCount }) => {
+      mockedNavigateWithCheck.mockResolvedValue({ ok: true, status: 200 });
+      mockDollarEval.mockImplementation(
+        (_selector, extract: (elements: Element[]) => unknown[]) =>
+          extract([createBrandListElement(rating, ratingsCount) as Element]),
+      );
+
+      const result = await strategy['parseBrandList']('/fixture');
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        rating: Number(rating),
+        ratingsCount: Number(ratingsCount),
+      });
+    },
+  );
 });
