@@ -340,6 +340,15 @@ export class ParserService {
   private async saveTobaccoWithFlavors(
     parsedTobacco: ParsedTobaccoData,
   ): Promise<{ action: 'created' | 'updated' }> {
+    if (
+      parsedTobacco.htreviewsId !== parsedTobacco.htreviewsId.trim() ||
+      !/^htr\d+$/.test(parsedTobacco.htreviewsId)
+    ) {
+      throw new Error(
+        `Invalid htreviewsId for tobacco "${parsedTobacco.name}": expected htr followed by digits`,
+      );
+    }
+
     const tobaccoData =
       this.tobaccoParserStrategy.normalizeToEntity(parsedTobacco);
 
