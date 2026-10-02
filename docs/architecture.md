@@ -71,6 +71,7 @@ DTOs, and utilities.
 - All endpoints except `/health` require an API key.
 - Accepted auth headers: `X-API-Key` or `Authorization: Bearer <key>`.
 - `GET /tobaccos/:id` returns 404 with `Tobacco not found` when no record matches; repository errors remain 500.
+- UUID path parameters for brand, line, and tobacco item and nested-list routes use `ParseUUIDPipe`: malformed IDs return HTTP 400 before catalog repository access, while valid but missing IDs retain their existing 404 behavior.
 - A valid key used on a protected request increments its request count and updates `lastUsedAt` once; public `/health` requests do neither.
 - `GET /tobaccos/by-url` validates an absolute URL under `https://htreviews.org/tobaccos/{brand}/{line}/{tobacco}` and strips query and hash components before lookup; malformed, relative, and out-of-scope URLs return HTTP 400.
 - Pagination defaults to 20 and maxes at 100.
