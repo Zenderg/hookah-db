@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { BadRequestException } from '@nestjs/common';
 import { Repository, SelectQueryBuilder } from 'typeorm';
 import { TobaccosRepository } from './tobaccos.repository';
 import { Tobacco } from './tobaccos.entity';
@@ -454,6 +455,48 @@ describe('TobaccosRepository', () => {
         'tobacco.rating',
         'DESC',
       );
+    });
+
+    it.each([
+      ['rating', 'tobacco.rating', 'DESC'],
+      ['name', 'tobacco.name', 'ASC'],
+      ['dateAdded', 'tobacco.createdAt', 'DESC'],
+    ] as const)(
+      'maps %s to its fixed entity field',
+      async (sortBy, field, direction) => {
+        mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
+        await repository.findAll({
+          sortBy,
+          order: direction.toLowerCase() as 'asc' | 'desc',
+        });
+        expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(field, direction);
+      },
+    );
+
+    it('keeps relevance sorting when search overrides a valid catalog sort', async () => {
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
+      await repository.findAll({ sortBy: 'dateAdded', search: 'mint' });
+      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
+        'relevance',
+        'DESC',
+      );
+    });
+
+    it.each(['views', 'unsupported', 'toString', '__proto__'])(
+      'rejects unsupported direct sort field %s before query creation',
+      async (sortBy) => {
+        await expect(
+          repository.findAll({ sortBy, search: 'mint' } as FindTobaccosDto),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(mockTobaccoRepository.createQueryBuilder).not.toHaveBeenCalled();
+      },
+    );
+
+    it('rejects unsupported direct sort order before query creation', async () => {
+      await expect(
+        repository.findAll({ order: 'desc,unsupported' } as FindTobaccosDto),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(mockTobaccoRepository.createQueryBuilder).not.toHaveBeenCalled();
     });
 
     // Tests for improved search with prefix matching and ranking

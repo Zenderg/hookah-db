@@ -81,6 +81,12 @@ DTOs, and utilities.
 - A valid key used on a protected request increments its request count and updates `lastUsedAt` once; public `/health` requests do neither.
 - `GET /tobaccos/by-url` validates an absolute URL under `https://htreviews.org/tobaccos/{brand}/{line}/{tobacco}` and strips query and hash components before lookup; malformed, relative, and out-of-scope URLs return HTTP 400.
 - Pagination defaults to 20 and maxes at 100.
+- Brand lists accept `sortBy=rating|name`; tobacco lists, including brand- and
+  line-nested tobacco lists, accept `sortBy=rating|name|dateAdded`. The
+  `dateAdded` API name sorts by the tobacco `createdAt` column. Both list types
+  accept `order=asc|desc`; unsupported sort fields and directions return HTTP
+  400 before repository access. Line and flavor lists do not accept sort
+  parameters.
 - Tobacco search uses PostgreSQL FTS with Russian and English configurations across `tobacco.name`, `brand.name`, and `line.name`.
 - Search splits on whitespace and PostgreSQL tsquery operators. Other punctuation stays within a term and is quoted for PostgreSQL normalization, preserving decimals and compounds such as `1.5` and `apple-mint`. Every term must match at least one searched field, so multi-term searches use cross-field AND logic.
 - Each term retains PostgreSQL prefix matching and Russian/English stemming, plus case-insensitive field-prefix matching with LIKE wildcards escaped. Whitespace-only or operator-only input uses the normal requested sort without a search filter.

@@ -1,8 +1,31 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Tobacco } from './tobaccos.entity';
 import { FindTobaccosDto } from './dto/find-tobaccos.dto';
+
+const TOBACCO_SORT_FIELDS = {
+  rating: 'tobacco.rating',
+  name: 'tobacco.name',
+  dateAdded: 'tobacco.createdAt',
+} as const;
+
+function getSortField(sortBy: unknown): string {
+  if (
+    typeof sortBy !== 'string' ||
+    !Object.prototype.hasOwnProperty.call(TOBACCO_SORT_FIELDS, sortBy)
+  ) {
+    throw new BadRequestException('Unsupported tobacco sort field');
+  }
+  return TOBACCO_SORT_FIELDS[sortBy as keyof typeof TOBACCO_SORT_FIELDS];
+}
+
+function getSortOrder(order: unknown): 'ASC' | 'DESC' {
+  if (order !== 'asc' && order !== 'desc') {
+    throw new BadRequestException('Unsupported sort order');
+  }
+  return order.toUpperCase() as 'ASC' | 'DESC';
+}
 
 function splitSearchTerms(search: string): string[] {
   return search
@@ -44,6 +67,8 @@ export class TobaccosRepository {
       flavors,
     } = query;
     const skip = (page - 1) * limit;
+    const sortField = getSortField(sortBy);
+    const sortOrder = getSortOrder(order);
 
     const queryBuilder = this.tobaccoRepository.createQueryBuilder('tobacco');
 
@@ -179,10 +204,7 @@ export class TobaccosRepository {
       queryBuilder.orderBy('relevance', 'DESC');
     } else {
       // Use normal sorting when no search is provided
-      queryBuilder.orderBy(
-        `tobacco.${sortBy}`,
-        order.toUpperCase() as 'ASC' | 'DESC',
-      );
+      queryBuilder.orderBy(sortField, sortOrder);
     }
 
     queryBuilder.skip(skip).take(limit);
