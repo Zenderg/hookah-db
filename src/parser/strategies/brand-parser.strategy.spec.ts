@@ -115,7 +115,7 @@ describe('BrandParserStrategy', () => {
     expect(mockError).toHaveBeenCalledWith(expect.stringContaining('HTTP 403'));
   });
 
-  it('should return minimal data when parseBrandByUrl navigation fails', async () => {
+  it('should fail when parseBrandByUrl navigation fails', async () => {
     const url = '/tobaccos/dogma';
 
     mockedNavigateWithCheck.mockResolvedValue({
@@ -124,24 +124,132 @@ describe('BrandParserStrategy', () => {
       url: 'https://htreviews.org/tobaccos/dogma',
     });
 
-    const result = await strategy.parseBrandByUrl(url);
-
-    expect(result).toEqual({
-      name: '',
-      slug: '',
-      country: '',
-      rating: 0,
-      ratingsCount: 0,
-      description: '',
-      logoUrl: '',
-      detailUrl: url,
-      status: 'Не указано',
-    });
+    await expect(strategy.parseBrandByUrl(url)).rejects.toThrow(
+      'Failed to navigate to brand page',
+    );
     expect(mockedNavigateWithCheck).toHaveBeenCalledWith(
       mockPage,
       'https://htreviews.org/tobaccos/dogma',
     );
     expect(mockError).toHaveBeenCalledWith(expect.stringContaining('HTTP 403'));
+  });
+
+  it('skips brands whose detail page fails while retaining successful details', async () => {
+    const firstBrand = {
+      name: 'First Brand',
+      slug: 'first-brand',
+      country: 'Testland',
+      rating: 4.2,
+      ratingsCount: 20,
+      detailUrl: '/tobaccos/first-brand',
+      description: 'List description',
+      logoUrl: '/list-logo.png',
+      status: 'Не указано',
+    };
+    const secondBrand = {
+      ...firstBrand,
+      name: 'Second Brand',
+      slug: 'second-brand',
+      detailUrl: '/tobaccos/second-brand',
+    };
+    mockedNavigateWithCheck
+      .mockResolvedValueOnce({ ok: true, status: 200 })
+      .mockResolvedValueOnce({ ok: true, status: 200 })
+      .mockResolvedValueOnce({ ok: false, status: 403 })
+      .mockResolvedValueOnce({ ok: true, status: 200 });
+    mockDollarEval
+      .mockResolvedValueOnce([firstBrand, secondBrand])
+      .mockResolvedValue([]);
+    mockEvaluate.mockResolvedValue({
+      logoUrl: '/detail-logo.png',
+      description: 'Detail description',
+      status: 'Выпускается',
+    });
+
+    const result = await strategy.parseBrands(2);
+
+    expect(result).toEqual([
+      expect.objectContaining({
+        name: 'Second Brand',
+        logoUrl: '/detail-logo.png',
+        description: 'Detail description',
+        status: 'Выпускается',
+      }),
+    ]);
+  });
+
+  it('keeps a brand when its detail page succeeds but optional fields are empty', async () => {
+    mockedNavigateWithCheck.mockResolvedValue({ ok: true, status: 200 });
+    mockDollarEval
+      .mockResolvedValueOnce([
+        {
+          name: 'Sparse Brand',
+          slug: 'sparse-brand',
+          country: 'Testland',
+          rating: 0,
+          ratingsCount: 0,
+          detailUrl: '/tobaccos/sparse-brand',
+          description: '',
+          logoUrl: '',
+          status: 'Не указано',
+        },
+      ])
+      .mockResolvedValue([]);
+    mockEvaluate.mockResolvedValue({
+      logoUrl: '',
+      description: '',
+      status: 'Не указано',
+    });
+
+    const result = await strategy.parseBrands(1);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ name: 'Sparse Brand', logoUrl: '' });
+  });
+
+  it('skips a brand when detail extraction throws', async () => {
+    mockDollarEval.mockResolvedValue([
+      {
+        name: 'Broken Detail Brand',
+        slug: 'broken-detail-brand',
+        country: 'Testland',
+        rating: 4,
+        ratingsCount: 10,
+        detailUrl: '/tobaccos/broken-detail-brand',
+        description: '',
+        logoUrl: '',
+        status: 'Не указано',
+      },
+    ]);
+    strategy.safeNavigate = (url) => {
+      if (url.includes('/tobaccos/broken-detail-brand')) {
+        mockEvaluate.mockRejectedValueOnce(
+          new Error('detail DOM extraction failed'),
+        );
+      }
+      return Promise.resolve(true);
+    };
+
+    await expect(strategy.parseBrands(1)).resolves.toEqual([]);
+  });
+
+  it('fails when brand basic data loads but the detail navigation fails', async () => {
+    const url = '/tobaccos/dogma';
+    mockedNavigateWithCheck
+      .mockResolvedValueOnce({ ok: true, status: 200 })
+      .mockResolvedValueOnce({ ok: false, status: 403 });
+    mockEvaluate.mockResolvedValue({
+      name: 'Dogma',
+      slug: 'dogma',
+      country: 'Testland',
+      rating: 4.5,
+      ratingsCount: 10,
+      status: 'Выпускается',
+    });
+
+    await expect(strategy.parseBrandByUrl(url)).rejects.toThrow(
+      'Failed to navigate to brand detail page',
+    );
   });
 
   it('should use domcontentloaded and waitForSelector after successful navigation', async () => {

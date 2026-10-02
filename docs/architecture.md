@@ -57,6 +57,10 @@ DTOs, and utilities.
 ## Parser
 
 - The parser is Playwright-based with brand, line, and tobacco strategies.
+- Brand and line batch parsing skips an entity when its detail-page navigation
+  or extraction fails; successful entities continue through the batch.
+  Single-URL brand and line parsing rejects on detail failure before catalog
+  writes.
 - Automatic parser cron is scheduled at 02:00 when `PARSER_CRON_ENABLED` is enabled.
 - `PARSER_CRON_ENABLED` defaults to enabled in code when unset. `.env.example` and `deploy/compose.yaml` set it to false for fresh self-host installs.
 - Confirm the effective environment before starting the app if parser cron behavior matters.

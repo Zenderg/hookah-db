@@ -128,6 +128,7 @@ export class BrandParserStrategy {
 
     // Apply limit if specified
     const brandsToProcess = limit ? allBrands.slice(0, limit) : allBrands;
+    const brandsWithDetails: ParsedBrandData[] = [];
 
     // Parse detail pages for logoUrl and full description
     this.logger.log('Parsing brand detail pages...');
@@ -138,12 +139,12 @@ export class BrandParserStrategy {
           `Parsing detail page for brand ${i + 1}/${brandsToProcess.length}: ${brand.name}`,
         );
         const detailData = await this.parseBrandDetail(brand.detailUrl);
-        brandsToProcess[i] = {
+        brandsWithDetails.push({
           ...brand,
           logoUrl: detailData.logoUrl,
           description: detailData.description,
           status: detailData.status,
-        };
+        });
       } catch (error) {
         this.logger.error(
           `Failed to parse detail page for ${brand.name}: ${error instanceof Error ? error.message : String(error)}`,
@@ -162,7 +163,7 @@ export class BrandParserStrategy {
       }
     }
 
-    return brandsToProcess;
+    return brandsWithDetails;
   }
 
   private async parseBrandList(
@@ -330,7 +331,7 @@ export class BrandParserStrategy {
 
     const navigated = await this.safeNavigate(fullUrl);
     if (!navigated) {
-      return { logoUrl: '', description: '', status: 'Не указано' };
+      throw new Error(`Failed to navigate to brand detail page: ${fullUrl}`);
     }
 
     const data = await this.page.evaluate(() => {
@@ -390,17 +391,7 @@ export class BrandParserStrategy {
 
     const navigated = await this.safeNavigate(fullUrl);
     if (!navigated) {
-      return {
-        name: '',
-        slug: '',
-        country: '',
-        rating: 0,
-        ratingsCount: 0,
-        description: '',
-        logoUrl: '',
-        detailUrl: url,
-        status: 'Не указано',
-      };
+      throw new Error(`Failed to navigate to brand page: ${fullUrl}`);
     }
 
     // Extract basic brand data from detail page
