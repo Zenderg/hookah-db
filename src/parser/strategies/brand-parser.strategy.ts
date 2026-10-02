@@ -239,11 +239,13 @@ export class BrandParserStrategy {
             // Find ratings count div (contains 1-5 digit number)
             // Skip first div (rank) and skip rating div
             const ratingsCountDiv = divs.slice(1).find((div) => {
+              if (div === ratingDiv) return false;
+
               const text = div.textContent.trim();
               const match = text.match(/^(\d{1,5})$/);
               if (!match) return false;
               const count = parseInt(match[1], 10);
-              // Ratings count should be >= 1 to avoid matching ratings (which are decimals)
+              // Ratings counts are positive integers.
               return count >= 1;
             });
 
