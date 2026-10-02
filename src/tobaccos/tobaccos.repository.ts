@@ -77,6 +77,7 @@ export class TobaccosRepository {
 
     // Filter by flavors (AND logic: tobacco must have ALL selected flavors)
     if (flavors && flavors.length > 0) {
+      const uniqueFlavors = [...new Set(flavors)];
       // Use a subquery to find tobaccos that have ALL requested flavors
       queryBuilder.andWhere(
         `tobacco.id IN (
@@ -87,7 +88,7 @@ export class TobaccosRepository {
           GROUP BY tf."tobaccoId"
           HAVING COUNT(DISTINCT f.id) = :flavorsCount
         )`,
-        { flavorNames: flavors, flavorsCount: flavors.length },
+        { flavorNames: uniqueFlavors, flavorsCount: uniqueFlavors.length },
       );
     }
 
