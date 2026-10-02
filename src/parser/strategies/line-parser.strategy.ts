@@ -188,7 +188,7 @@ export class LineParserStrategy {
                 });
                 return scope;
               });
-              // Continue with line even if detail page extraction fails
+              continue;
             }
           }
 
@@ -419,14 +419,7 @@ export class LineParserStrategy {
     try {
       const success = await this.safeNavigate(fullUrl);
       if (!success) {
-        return {
-          imageUrl: null,
-          ratingsCount: 0,
-          strengthOfficial: null,
-          strengthByRatings: null,
-          status: null,
-          description: null,
-        };
+        throw new Error(`Failed to navigate to line detail page: ${fullUrl}`);
       }
 
       const data = await this.page.evaluate(() => {
