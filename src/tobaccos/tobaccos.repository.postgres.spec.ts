@@ -36,6 +36,7 @@ describePostgres('TobaccosRepository PostgreSQL search', () => {
     dataSource = new DataSource({
       ...connectionOptions,
       schema,
+      extra: { options: `-c search_path=${schema}` },
       entities: [Brand, Line, Tobacco, Flavor],
       synchronize: false,
     });
@@ -81,6 +82,40 @@ describePostgres('TobaccosRepository PostgreSQL search', () => {
     expect(new Set(result.data.map((tobacco) => tobacco.name))).toEqual(
       new Set(['Tea 1.5', 'Mix 2.0']),
     );
+  });
+
+  it('keeps AND flavor filtering unchanged when requested flavors repeat', async () => {
+    const singleFlavor = await repository.findAll({ flavors: ['яблоко'] });
+    const duplicateFlavor = await repository.findAll({
+      flavors: ['яблоко', 'яблоко'],
+    });
+    const distinctFlavors = await repository.findAll({
+      flavors: ['яблоко', 'мята'],
+    });
+    const mixedDuplicates = await repository.findAll({
+      flavors: ['яблоко', 'яблоко', 'мята'],
+    });
+    const impossibleCombination = await repository.findAll({
+      flavors: ['мята', 'лимон'],
+    });
+
+    expect(singleFlavor.data.map((tobacco) => tobacco.name).sort()).toEqual([
+      'Mix 2.0',
+      'Tea 1.5',
+    ]);
+    expect(duplicateFlavor.data.map((tobacco) => tobacco.name).sort()).toEqual([
+      'Mix 2.0',
+      'Tea 1.5',
+    ]);
+    expect(duplicateFlavor.total).toBe(singleFlavor.total);
+    expect(distinctFlavors.data.map((tobacco) => tobacco.name)).toEqual([
+      'Tea 1.5',
+    ]);
+    expect(mixedDuplicates.data.map((tobacco) => tobacco.name)).toEqual([
+      'Tea 1.5',
+    ]);
+    expect(mixedDuplicates.total).toBe(distinctFlavors.total);
+    expect(impossibleCombination.total).toBe(0);
   });
 
   it('treats a trailing tsquery operator as punctuation', async () => {
@@ -178,17 +213,29 @@ describePostgres('TobaccosRepository PostgreSQL search', () => {
       [brandId, 'Regression Brand', 'regression-brand', 'Russia', '', 'Active'],
     );
 
-    for (const [name, slug, htreviewsId] of [
-      ['Tea 1.5', 'tea-15', 'postgres-search-tea-15'],
-      ['Mix 2.0', 'mix-20', 'postgres-search-mix-20'],
-    ]) {
+    const flavorIds = new Map<string, string>();
+    for (const name of ['яблоко', 'мята', 'лимон']) {
+      const id = randomUUID();
+      flavorIds.set(name, id);
+      await dataSource.query(
+        `INSERT INTO ${quotedSchema}.flavors (id, name) VALUES ($1, $2)`,
+        [id, name],
+      );
+    }
+
+    const tobaccoFixtures: Array<[string, string, string, string[]]> = [
+      ['Tea 1.5', 'tea-15', 'postgres-search-tea-15', ['яблоко', 'мята']],
+      ['Mix 2.0', 'mix-20', 'postgres-search-mix-20', ['яблоко', 'лимон']],
+    ];
+    for (const [name, slug, htreviewsId, flavorNames] of tobaccoFixtures) {
+      const tobaccoId = randomUUID();
       await dataSource.query(
         `INSERT INTO ${quotedSchema}.tobaccos
           (id, name, slug, "brandId", "strengthOfficial", "strengthByRatings",
            status, "htreviewsId", "imageUrl")
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
         [
-          randomUUID(),
+          tobaccoId,
           name,
           slug,
           brandId,
@@ -199,6 +246,13 @@ describePostgres('TobaccosRepository PostgreSQL search', () => {
           '',
         ],
       );
+      for (const flavorName of flavorNames) {
+        await dataSource.query(
+          `INSERT INTO ${quotedSchema}.tobacco_flavors ("tobaccoId", "flavorId")
+           VALUES ($1, $2)`,
+          [tobaccoId, flavorIds.get(flavorName)],
+        );
+      }
     }
   }
 });

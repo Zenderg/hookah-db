@@ -217,6 +217,22 @@ describe('TobaccosRepository', () => {
       );
     });
 
+    it('should use unique requested flavors for the AND match count', async () => {
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
+
+      await repository.findAll({ flavors: ['яблоко', 'яблоко', 'мята'] });
+
+      const flavorFilterCall = mockQueryBuilder.andWhere.mock.calls.find(
+        ([clause]) =>
+          (clause as string).includes('HAVING COUNT(DISTINCT f.id)'),
+      );
+      expect(flavorFilterCall).toBeDefined();
+      expect(flavorFilterCall?.[1]).toEqual({
+        flavorNames: ['яблоко', 'мята'],
+        flavorsCount: 2,
+      });
+    });
+
     it('should apply search filter with full-text search', async () => {
       // Arrange
       const query: FindTobaccosDto = { search: 'test' };
