@@ -91,16 +91,24 @@ DTOs, and utilities.
 - Catalog list methods return an exact `total`. Tobacco pagination first selects
   distinct matching IDs and counts the filtered catalog before loading brand,
   optional line, and flavors for only the requested page.
-- Tobacco search covers tobacco, brand, and line names; flavors remain an
-  explicit filter. Search terms use cross-field AND logic, so each term may
-  match any of the three name fields while every term must match.
+- Tobacco search covers tobacco, brand, and line names, with their current
+  slugs as an indexed auxiliary source; flavors remain an explicit filter.
+  Search terms use cross-field AND logic, so each term may match any name or
+  slug field while every term must match.
 - Search supports Russian and English stemming, literal stopwords,
   punctuation-insensitive decimal and compound names, and joined or separated
-  spellings. Deterministic transliteration and conservative fuzzy matching
-  support common spelling variants and typos. Ranking is strict term matches,
-  complete names or name combinations, whole-query prefixes, FTS relevance, the
-  requested sort, rating count, then UUID. Approximate results are identified
-  by `meta.search.matchQuality` and `meta.search.approximateResultIds`.
+  spellings. Deterministic transliteration and known catalog spellings count as
+  strict matches. Mixed-script lookalikes are folded per token toward its
+  majority alphabet. Conservative fuzzy matching supports typos. Ranking is
+  strict term matches, whole-token matches, complete names or name
+  combinations, prefixes, FTS relevance, the requested sort, rating count, then
+  UUID. Approximate results are identified by `meta.search.matchQuality` and
+  `meta.search.approximateResultIds` only when a page contains a typo or
+  stopword-fallback match.
+- Search pre-aggregates brand and line matches once per entity, then maps those
+  matches to tobacco IDs. A shared materialized filtered-ID set supplies the
+  exact total and ordered page, with relation hydration in the same read-only
+  repeatable-read transaction.
 - Empty whitespace means an unfiltered browse request. Nonempty input with no
   searchable terms returns no results. Search length and term count are bounded
   at both the HTTP DTO and repository boundaries.

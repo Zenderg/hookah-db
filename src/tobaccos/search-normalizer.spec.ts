@@ -2,8 +2,11 @@ import { BadRequestException } from '@nestjs/common';
 import {
   MAX_SEARCH_LENGTH,
   MAX_SEARCH_TERMS,
+  compactSearchText,
+  compactVisualSearchText,
   normalizeSearch,
   searchSpellings,
+  visualSearchText,
 } from './search-normalizer';
 
 describe('tobacco search normalization', () => {
@@ -23,6 +26,17 @@ describe('tobacco search normalization', () => {
       'darkside',
     ]);
     expect(searchSpellings('кола')).toEqual(['кола', 'kola', 'cola']);
+  });
+
+  it('normalizes mixed alphabets while preserving ordinary Cyrillic tokens', () => {
+    expect(compactSearchText('МОRЕ ²')).toBe('more2');
+    expect(compactSearchText('море')).toBe('more');
+    expect(compactVisualSearchText('Jаgerbomb')).toBe('jagerbomb');
+    expect(compactVisualSearchText('ICE AСAI')).toBe('iceacai');
+    expect(compactVisualSearchText('Cочный')).toBe('sochnyy');
+    expect(compactVisualSearchText('sochnyy')).toBe('sochnyy');
+    expect(visualSearchText('Darkside Черника')).toBe('darkside черника');
+    expect(visualSearchText('Cочный')).toBe('сочный');
   });
 
   it('rejects oversized query strings and excessive term counts', () => {

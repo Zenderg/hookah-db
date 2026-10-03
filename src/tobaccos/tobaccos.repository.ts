@@ -13,6 +13,7 @@ import { Line } from '../lines/lines.entity';
 import { Tobacco } from './tobaccos.entity';
 import { FindTobaccosDto } from './dto/find-tobaccos.dto';
 import {
+  compactVisualSearchText,
   compactSearchText,
   exactSearchSpellings,
   normalizeSearch,
@@ -24,9 +25,21 @@ const TOBACCO_SORT_FIELDS = {
   name: 't.name',
   dateAdded: 't."createdAt"',
 } as const;
-const SEARCH_COMPACT = (column: string) =>
+const SEARCH_COMPACT = (column: string) => `catalog_search_compact(${column})`;
+const SEARCH_VISUAL_COMPACT = (column: string) =>
+  `catalog_search_compact_visual(${column})`;
+const SEARCH_NORMALIZED = (column: string) => `catalog_search_words(${column})`;
+const SEARCH_VISUAL_NORMALIZED = (column: string) =>
+  `catalog_search_words_visual(${column})`;
+const SEARCH_HAS_MIXED_TOKEN = (column: string) =>
+  `catalog_search_has_mixed_token(${column})`;
+const SEARCH_VISUAL_MATCH = (column: string, pattern: string) =>
+  `CASE WHEN ${SEARCH_HAS_MIXED_TOKEN(column)}
+    THEN ${SEARCH_VISUAL_COMPACT(column)} ~* ${pattern}::text
+    ELSE FALSE END`;
+const SEARCH_FUZZY_COMPACT = (column: string) =>
   `regexp_replace(replace(lower(normalize(${column}, NFKC)), 'ё', 'е'), '[^[:alnum:]]+', '', 'g')`;
-const SEARCH_NORMALIZED = (column: string) =>
+const SEARCH_FUZZY_NORMALIZED = (column: string) =>
   `regexp_replace(replace(lower(normalize(${column}, NFKC)), 'ё', 'е'), '[^[:alnum:]]+', ' ', 'g')`;
 const ENGLISH_STOPWORDS = new Set([
   'a',
@@ -97,6 +110,32 @@ function toBoundarySequencePattern(compactTerm: string): string {
   return `(^|[^[:alnum:]])${sequence}`;
 }
 
+function toWholeTokenPattern(compactTerms: string[]): string {
+  const alternatives = [...new Set(compactTerms)]
+    .filter((term) => term.length > 0)
+    .map((term) => [...term].join('[^[:alnum:]]*'));
+  return alternatives.length
+    ? `(^|[^[:alnum:]])(${alternatives.join('|')})([^[:alnum:]]|$)`
+    : 'a^';
+}
+
+function compactWholeQueryPattern(terms: string[]): string {
+  return `^${terms
+    .map((term) => {
+      const alternatives = [
+        ...new Set(searchSpellings(term).map(compactSearchText)),
+      ]
+        .filter((spelling) => spelling.length > 0)
+        .map((spelling) => [...spelling].join('[^[:alnum:]]*'));
+      return alternatives.length ? `(${alternatives.join('|')})` : '(a^)';
+    })
+    .join('')}$`;
+}
+
+function compactWholeQueryPrefixPattern(terms: string[]): string {
+  return compactWholeQueryPattern(terms).slice(0, -1);
+}
+
 function getSortField(sortBy: unknown): string {
   if (
     typeof sortBy !== 'string' ||
@@ -105,6 +144,14 @@ function getSortField(sortBy: unknown): string {
     throw new BadRequestException('Unsupported tobacco sort field');
   }
   return TOBACCO_SORT_FIELDS[sortBy as keyof typeof TOBACCO_SORT_FIELDS];
+}
+
+function compactLiteralSearchText(value: string): string {
+  return value
+    .normalize('NFKC')
+    .toLocaleLowerCase('ru-RU')
+    .replaceAll('ё', 'е')
+    .replace(/[^\p{L}\p{N}]/gu, '');
 }
 
 function getSortOrder(order: unknown): 'ASC' | 'DESC' {
@@ -215,21 +262,23 @@ export class TobaccosRepository {
       RUSSIAN_STOPWORDS.has(term.toLocaleLowerCase('ru-RU'));
     const hasNonStopwordTerm = searchTerms.some((term) => !isStopword(term));
     const compactWhole = searchTerms.length
-      ? compactSearchText(searchTerms.join(''))
+      ? compactLiteralSearchText(searchTerms.join(''))
       : '';
     const wholeQueryMatches =
       searchTerms.length > 1 && [...compactWhole].length >= 3
         ? (() => {
             const whole = bind(compactWhole);
             const columns = [`t.name`, `b.name`, `l.name`];
+            const wholePattern = bind(compactWholeQueryPattern(searchTerms));
             const exactBranches = columns.map(
               (column) => `SELECT t.id FROM ${tables.tobacco} t
           LEFT JOIN ${tables.brand} b ON b.id = t."brandId"
           LEFT JOIN ${tables.line} l ON l.id = t."lineId"
-          WHERE ${SEARCH_COMPACT(column)} = ${whole}`,
+          WHERE ${SEARCH_COMPACT(column)} ~* ${wholePattern}::text
+            OR ${SEARCH_VISUAL_COMPACT(column)} ~* ${wholePattern}::text`,
             );
             const fuzzyBranches = columns.map((column) => {
-              const compactField = SEARCH_COMPACT(column);
+              const compactField = SEARCH_FUZZY_COMPACT(column);
               const maxEdits = `CASE WHEN length(${whole}) <= 5 THEN 1 ELSE 2 END`;
               return `SELECT t.id FROM ${tables.tobacco} t
           LEFT JOIN ${tables.brand} b ON b.id = t."brandId"
@@ -256,112 +305,212 @@ export class TobaccosRepository {
         const escaped = spelling.replace(/\\/gu, '\\\\').replace(/'/gu, "''");
         return [bind(`'${escaped}':*`)];
       });
-      const compactTerm = compactSearchText(term);
-      const useCompactCandidates = [...compactTerm].length >= 3;
+      const literalCompactTerm = compactLiteralSearchText(term);
+      const visualCompactTerm = compactVisualSearchText(term);
       const fuzzyTerms =
-        [...compactTerm].length >= 4
-          ? spellings.map((spelling) => bind(compactSearchText(spelling)))
+        [...literalCompactTerm].length >= 4
+          ? [...new Set(spellings.map(compactLiteralSearchText))].map(bind)
           : [];
-      const compactExact = useCompactCandidates ? bind(compactTerm) : undefined;
-      const sequencePattern = useCompactCandidates
-        ? bind(toBoundarySequencePattern(compactTerm))
-        : undefined;
       const alias = `term_${index}`;
       const branches = [
-        { table: `${tables.tobacco} t`, field: 't.name' },
         {
-          table: `${tables.brand} b JOIN ${tables.tobacco} t ON t."brandId" = b.id`,
-          field: 'b.name',
+          table: tables.tobacco,
+          tableAlias: 't',
+          id: 't.id',
+          relation: undefined,
+          field: 't.name',
+          name: true,
         },
         {
-          table: `${tables.line} l JOIN ${tables.tobacco} t ON t."lineId" = l.id`,
+          table: tables.tobacco,
+          tableAlias: 't',
+          id: 't.id',
+          relation: undefined,
+          field: 't.slug',
+          name: false,
+        },
+        {
+          table: tables.brand,
+          tableAlias: 'b',
+          id: 'b.id',
+          relation: 'brand',
+          field: 'b.name',
+          name: true,
+        },
+        {
+          table: tables.brand,
+          tableAlias: 'b',
+          id: 'b.id',
+          relation: 'brand',
+          field: 'b.slug',
+          name: false,
+        },
+        {
+          table: tables.line,
+          tableAlias: 'l',
+          id: 'l.id',
+          relation: 'line',
           field: 'l.name',
+          name: true,
+        },
+        {
+          table: tables.line,
+          tableAlias: 'l',
+          id: 'l.id',
+          relation: 'line',
+          field: 'l.slug',
+          name: false,
         },
       ];
-      const fieldBranches = branches.map(({ table, field }) => {
-        const compactField = SEARCH_COMPACT(field);
-        const normalizedField = SEARCH_NORMALIZED(field);
-        const compactSequenceMatch = useCompactCandidates
-          ? `(
-              ${compactField} LIKE '%' || ${compactExact} || '%'
-              AND ${normalizedField} ~* ${sequencePattern}
-            )`
-          : 'FALSE';
-        const fts = tsQueries
-          .map((lexemeParams) => {
-            const configMatches = ['simple', 'russian', 'english'].map(
-              (config) =>
-                lexemeParams
-                  .map(
-                    (param) =>
-                      `to_tsvector('${config}', ${field}) @@ to_tsquery('${config}', ${param})`,
-                  )
-                  .join(' AND '),
-            );
-            const compactPrefix = useCompactCandidates
-              ? `${compactField} LIKE ${compactExact} || '%'`
+      const fieldBranches = branches.map(
+        ({ table, tableAlias, id, relation, field, name }) => {
+          const compactField = SEARCH_COMPACT(field);
+          const visualCompactField = SEARCH_VISUAL_COMPACT(field);
+          const normalizedField = SEARCH_NORMALIZED(field);
+          const visualNormalizedField = SEARCH_VISUAL_NORMALIZED(field);
+          const visualCompactExact =
+            name && [...visualCompactTerm].length >= 3
+              ? bind(visualCompactTerm)
+              : undefined;
+          const strictVariants = [
+            ...new Set(spellings.map(compactSearchText)),
+          ].filter((spelling) => [...spelling].length >= 3);
+          const compactPrefix = strictVariants.length
+            ? strictVariants
+                .map((spelling) => {
+                  const parameter = bind(spelling);
+                  return `${compactField} LIKE ${parameter} || '%'`;
+                })
+                .join(' OR ')
+            : 'FALSE';
+          const visualSequenceMatch =
+            name && visualCompactExact
+              ? `(${visualCompactField} LIKE '%' || ${visualCompactExact} || '%'
+              AND ${visualNormalizedField} ~* ${bind(toBoundarySequencePattern(visualCompactTerm))}::text)`
               : 'FALSE';
-            return `(${[...configMatches, compactPrefix, compactSequenceMatch].join(' OR ')})`;
-          })
-          .join(' OR ');
-        const relevance = tsQueries
-          .flatMap((lexemeParams) =>
-            ['simple', 'russian', 'english'].flatMap((config) =>
-              lexemeParams.map(
-                (param) =>
-                  `ts_rank(to_tsvector('${config}', ${field}), to_tsquery('${config}', ${param}))`,
-              ),
-            ),
-          )
-          .join(' + ');
-        const sequenceRelevance = `CASE WHEN ${compactSequenceMatch} THEN 1.0 ELSE 0.0 END`;
-        const fuzzy = fuzzyTerms.length
-          ? fuzzyTerms
-              .map((param) => {
-                const maxEdits = `CASE WHEN length(${param}) <= 5 THEN 1 ELSE 2 END`;
-                const closeWord = `EXISTS (
-              SELECT 1 FROM regexp_split_to_table(replace(lower(normalize(${field}, NFKC)), 'ё', 'е'), '[^[:alnum:]]+') AS candidate_word(word)
+          const compactSequenceMatch = strictVariants.length
+            ? strictVariants
+                .map((spelling) => {
+                  const parameter = bind(spelling);
+                  const pattern = bind(toBoundarySequencePattern(spelling));
+                  return `(${compactField} LIKE '%' || ${parameter} || '%'
+                  AND ${normalizedField} ~* ${pattern}::text)`;
+                })
+                .join(' OR ')
+            : 'FALSE';
+          const nameFts = tsQueries
+            .map((lexemeParams) => {
+              const configMatches = ['simple', 'russian', 'english'].map(
+                (config) =>
+                  lexemeParams
+                    .map(
+                      (param) =>
+                        `to_tsvector('${config}', ${field}) @@ to_tsquery('${config}', ${param})`,
+                    )
+                    .join(' AND '),
+              );
+              const nfkcTextMatch = `to_tsvector('simple', normalize(${field}, NFKC)) @@ to_tsquery('simple', ${lexemeParams[0]})`;
+              return `(${[...configMatches, nfkcTextMatch, compactPrefix, compactSequenceMatch].join(' OR ')})`;
+            })
+            .join(' OR ');
+          const fts = name
+            ? `(${nameFts}${visualSequenceMatch !== 'FALSE' ? ` OR ${visualSequenceMatch}` : ''})`
+            : `(${compactPrefix} OR ${compactSequenceMatch})`;
+          const relevance = name
+            ? tsQueries
+                .flatMap((lexemeParams) =>
+                  ['simple', 'russian', 'english'].flatMap((config) =>
+                    lexemeParams.map(
+                      (param) =>
+                        `ts_rank(to_tsvector('${config}', ${field}), to_tsquery('${config}', ${param}))`,
+                    ),
+                  ),
+                )
+                .join(' + ')
+            : '0::real';
+          const sequenceRelevance = `CASE WHEN ${compactSequenceMatch} OR ${visualSequenceMatch} THEN 1.0 ELSE 0.0 END`;
+          const fuzzyNormalizedField = SEARCH_FUZZY_NORMALIZED(field);
+          const fuzzyCompactField = SEARCH_FUZZY_COMPACT(field);
+          const fuzzy =
+            name && fuzzyTerms.length
+              ? fuzzyTerms
+                  .map((param) => {
+                    const maxEdits = `CASE WHEN length(${param}) <= 5 THEN 1 ELSE 2 END`;
+                    const closeWord = `EXISTS (
+              SELECT 1 FROM regexp_split_to_table(${fuzzyNormalizedField}, ' ') AS candidate_word(word)
               WHERE CASE
                 WHEN char_length(candidate_word.word) <= 255 AND char_length(${param}) <= 255
-                THEN levenshtein_less_equal(lower(candidate_word.word), ${param}, ${maxEdits})
+                THEN levenshtein_less_equal(candidate_word.word, ${param}, ${maxEdits})
                 ELSE 256
               END <= ${maxEdits}
             )`;
-                const closeCompactName = `CASE
-              WHEN char_length(${compactField}) <= 255 AND char_length(${param}) <= 255
-              THEN levenshtein_less_equal(${compactField}, ${param}, ${maxEdits})
+                    const closeCompactName = `CASE
+                WHEN char_length(${fuzzyCompactField}) <= 255 AND char_length(${param}) <= 255
+              THEN levenshtein_less_equal(${fuzzyCompactField}, ${param}, ${maxEdits})
               ELSE 256
             END <= ${maxEdits}`;
-                const fuzzyWord = `(${normalizedField} %> ${param}
-              AND word_similarity(${param}, ${normalizedField}) >= 0.42
+                    const fuzzyWord = `(${fuzzyNormalizedField} %> ${param}
+              AND word_similarity(${param}, ${fuzzyNormalizedField}) >= 0.42
               AND ${closeWord})`;
-                const fuzzyCompactName = `(length(${param}) >= 8
-              AND ${compactField} % ${param}
-              AND similarity(${compactField}, ${param}) >= 0.15
+                    const fuzzyCompactName = `(length(${param}) >= 8
+              AND ${fuzzyCompactField} % ${param}
+              AND similarity(${fuzzyCompactField}, ${param}) >= 0.15
               AND ${closeCompactName})`;
-                return `(length(${param}) >= 4 AND (${fuzzyWord} OR ${fuzzyCompactName}))`;
-              })
-              .join(' OR ')
-          : 'FALSE';
-        return `SELECT t.id, BOOL_OR(${fts}) AS exact, COALESCE(MAX(${relevance} + ${sequenceRelevance}), 0) AS relevance
-          FROM ${table}
+                    return `(length(${param}) >= 4 AND (${fuzzyWord} OR ${fuzzyCompactName}))`;
+                  })
+                  .join(' OR ')
+              : 'FALSE';
+          const tokenPattern = name
+            ? bind(toWholeTokenPattern(spellings.map(compactSearchText)))
+            : '';
+          const visualTokenPattern =
+            name && visualCompactExact
+              ? bind(toWholeTokenPattern([visualCompactTerm]))
+              : '';
+          const wholeToken = name
+            ? `(${normalizedField} ~* ${tokenPattern}::text` +
+              (visualCompactExact
+                ? ` OR ${visualNormalizedField} ~* ${visualTokenPattern}::text`
+                : '') +
+              ')'
+            : 'FALSE';
+          const entityMatch = `SELECT ${id} AS entity_id,
+          BOOL_OR(${fts}) AS exact,
+          BOOL_OR(${wholeToken}) AS whole_token,
+          COALESCE(MAX(${relevance} + ${sequenceRelevance}), 0) AS relevance
+          FROM ${table} ${tableAlias}
           WHERE (${fts}) OR (${fuzzy})
-          GROUP BY t.id`;
-      });
+          GROUP BY ${id}`;
+          return relation
+            ? `SELECT matched_tobacco.id, matched_entity.exact,
+              matched_entity.whole_token, matched_entity.relevance
+            FROM ${tables.tobacco} matched_tobacco
+            JOIN (${entityMatch}) matched_entity
+              ON matched_tobacco."${relation}Id" = matched_entity.entity_id`
+            : `SELECT matched_entity.entity_id AS id, matched_entity.exact,
+              matched_entity.whole_token, matched_entity.relevance
+            FROM (${entityMatch}) matched_entity`;
+        },
+      );
       const ignoredTermBranch =
         hasNonStopwordTerm && isStopword(term)
-          ? `UNION ALL SELECT id, FALSE AS exact FROM ${tables.tobacco}`
+          ? `UNION ALL SELECT id, FALSE AS exact, FALSE AS whole_token FROM ${tables.tobacco}`
           : '';
       termCtes.push(`${alias} AS (
-        SELECT id, BOOL_OR(exact) AS exact, MAX(relevance) AS relevance FROM (
+        SELECT id, BOOL_OR(exact) AS exact, BOOL_OR(whole_token) AS whole_token,
+          MAX(relevance) AS relevance FROM (
           ${fieldBranches.join('\nUNION ALL\n')}
-          ${ignoredTermBranch ? `UNION ALL SELECT id, FALSE AS exact, 0::real AS relevance FROM ${tables.tobacco}` : ''}
+          ${ignoredTermBranch ? `UNION ALL SELECT id, FALSE AS exact, FALSE AS whole_token, 0::real AS relevance FROM ${tables.tobacco}` : ''}
         ) matched_fields GROUP BY id
       )`);
     }
 
-    const countParameters = [...parameters];
-    const wholePhraseParameter = searchTerms.length ? bind(compactWhole) : '';
+    const wholePhrasePattern = searchTerms.length
+      ? bind(compactWholeQueryPattern(searchTerms))
+      : '';
+    const wholePhrasePrefixPattern = searchTerms.length
+      ? bind(compactWholeQueryPrefixPattern(searchTerms))
+      : '';
     let candidateCte = '';
     if (searchTerms.length) {
       const termsIntersected = searchTerms.map(
@@ -370,61 +519,100 @@ export class TobaccosRepository {
       const exactCount = searchTerms
         .map((_, index) => `CASE WHEN t${index}.exact THEN 1 ELSE 0 END`)
         .join(' + ');
+      const wholeTokenCount = searchTerms
+        .map((_, index) => `CASE WHEN t${index}.whole_token THEN 1 ELSE 0 END`)
+        .join(' + ');
       const relevanceTotal = searchTerms
         .map((_, index) => `COALESCE(t${index}.relevance, 0)`)
         .join(' + ');
       const from = termsIntersected.join('\nJOIN ');
       const joinedExact = wholeQueryMatches
-        ? `UNION ALL SELECT id, ${searchTerms.length} AS exact_count, ${searchTerms.length}::real AS relevance FROM (${wholeQueryMatches.exact}) joined_exact`
+        ? `UNION ALL SELECT id, ${searchTerms.length} AS exact_count, ${searchTerms.length} AS whole_token_count, ${searchTerms.length}::real AS relevance FROM (${wholeQueryMatches.exact}) joined_exact`
         : '';
       const joinedFuzzy = wholeQueryMatches
-        ? `UNION ALL SELECT id, GREATEST(${searchTerms.length} - 1, 0) AS exact_count, 0::real AS relevance FROM (${wholeQueryMatches.fuzzy}) joined_fuzzy`
+        ? `UNION ALL SELECT id, GREATEST(${searchTerms.length} - 1, 0) AS exact_count, 0 AS whole_token_count, 0::real AS relevance FROM (${wholeQueryMatches.fuzzy}) joined_fuzzy`
         : '';
       candidateCte = `WITH ${termCtes.join(',\n')}, strict_or_fuzzy AS (
-        SELECT t0.id, (${exactCount}) AS exact_count, (${relevanceTotal}) AS relevance FROM ${from.replace(/\nJOIN term_(\d+) t(\d+)/gu, '\nJOIN term_$1 t$2 ON t$2.id = t0.id')}
+        SELECT t0.id, (${exactCount}) AS exact_count, (${wholeTokenCount}) AS whole_token_count, (${relevanceTotal}) AS relevance FROM ${from.replace(/\nJOIN term_(\d+) t(\d+)/gu, '\nJOIN term_$1 t$2 ON t$2.id = t0.id')}
         ${joinedExact}
         ${joinedFuzzy}
       ), matched AS (
-        SELECT id, MAX(exact_count) AS exact_count, MAX(relevance) AS relevance
+        SELECT id, MAX(exact_count) AS exact_count,
+          MAX(whole_token_count) AS whole_token_count, MAX(relevance) AS relevance
         FROM strict_or_fuzzy GROUP BY id
       )`;
     }
 
     const filterClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
-    const wholeQueryPrefix = `${wholePhraseParameter} || '%'`;
     const phraseMatch = `CASE WHEN
-      ${SEARCH_COMPACT('t.name')} = ${wholePhraseParameter}
-      OR ${SEARCH_COMPACT('b.name')} = ${wholePhraseParameter}
-      OR ${SEARCH_COMPACT('l.name')} = ${wholePhraseParameter}
-      OR ${SEARCH_COMPACT("concat_ws(' ', b.name, t.name)")} = ${wholePhraseParameter}
-      OR ${SEARCH_COMPACT("concat_ws(' ', b.name, l.name, t.name)")} = ${wholePhraseParameter}
-      OR ${SEARCH_COMPACT("concat_ws(' ', l.name, t.name)")} = ${wholePhraseParameter}
+      ${SEARCH_COMPACT('t.name')} ~* ${wholePhrasePattern}::text
+      OR ${SEARCH_VISUAL_MATCH('t.name', wholePhrasePattern)}
+      OR ${SEARCH_COMPACT('b.name')} ~* ${wholePhrasePattern}::text
+      OR ${SEARCH_VISUAL_MATCH('b.name', wholePhrasePattern)}
+      OR ${SEARCH_COMPACT('l.name')} ~* ${wholePhrasePattern}::text
+      OR ${SEARCH_VISUAL_MATCH('l.name', wholePhrasePattern)}
+      OR ${SEARCH_COMPACT('t.slug')} ~* ${wholePhrasePattern}::text
+      OR ${SEARCH_VISUAL_MATCH('t.slug', wholePhrasePattern)}
+      OR ${SEARCH_COMPACT('b.slug')} ~* ${wholePhrasePattern}::text
+      OR ${SEARCH_VISUAL_MATCH('b.slug', wholePhrasePattern)}
+      OR ${SEARCH_COMPACT('l.slug')} ~* ${wholePhrasePattern}::text
+      OR ${SEARCH_VISUAL_MATCH('l.slug', wholePhrasePattern)}
+      OR ${SEARCH_COMPACT("concat_ws(' ', b.name, t.name)")} ~* ${wholePhrasePattern}::text
+      OR ${SEARCH_VISUAL_MATCH("concat_ws(' ', b.name, t.name)", wholePhrasePattern)}
+      OR ${SEARCH_COMPACT("concat_ws(' ', b.name, l.name, t.name)")} ~* ${wholePhrasePattern}::text
+      OR ${SEARCH_VISUAL_MATCH("concat_ws(' ', b.name, l.name, t.name)", wholePhrasePattern)}
+      OR ${SEARCH_COMPACT("concat_ws(' ', l.name, t.name)")} ~* ${wholePhrasePattern}::text
+      OR ${SEARCH_VISUAL_MATCH("concat_ws(' ', l.name, t.name)", wholePhrasePattern)}
       THEN 1 ELSE 0 END`;
     const phrasePrefix = `CASE WHEN
-      ${SEARCH_COMPACT('t.name')} LIKE ${wholeQueryPrefix}
-      OR ${SEARCH_COMPACT('b.name')} LIKE ${wholeQueryPrefix}
-      OR ${SEARCH_COMPACT('l.name')} LIKE ${wholeQueryPrefix}
+      ${SEARCH_COMPACT('t.name')} ~* ${wholePhrasePrefixPattern}::text
+      OR ${SEARCH_VISUAL_MATCH('t.name', wholePhrasePrefixPattern)}
+      OR ${SEARCH_COMPACT('b.name')} ~* ${wholePhrasePrefixPattern}::text
+      OR ${SEARCH_VISUAL_MATCH('b.name', wholePhrasePrefixPattern)}
+      OR ${SEARCH_COMPACT('l.name')} ~* ${wholePhrasePrefixPattern}::text
+      OR ${SEARCH_VISUAL_MATCH('l.name', wholePhrasePrefixPattern)}
       THEN 1 ELSE 0 END`;
-    const ordering = searchTerms.length
-      ? `matched.exact_count DESC,
-         ${phraseMatch} DESC,
-         ${phrasePrefix} DESC,
-         matched.relevance DESC,
-         ${sortField} ${sortOrder}, t."ratingsCount" DESC, t.id ASC`
-      : `${sortField} ${sortOrder}, t."ratingsCount" DESC, t.id ASC`;
-    const countSql = `${candidateCte}
-      SELECT COUNT(*)::int AS total
-      FROM ${tables.tobacco} t ${country ? `JOIN ${tables.brand} filter_brand ON filter_brand.id = t."brandId"` : ''}
-      ${searchTerms.length ? 'JOIN matched ON matched.id = t.id' : ''}
-      ${filterClause}`;
-    const pageSql = `${candidateCte}
-      SELECT t.id${searchTerms.length ? ', matched.exact_count' : ''}
-      FROM ${tables.tobacco} t ${country ? `JOIN ${tables.brand} filter_brand ON filter_brand.id = t."brandId"` : ''}
-      ${searchTerms.length ? `LEFT JOIN ${tables.brand} b ON b.id = t."brandId" LEFT JOIN ${tables.line} l ON l.id = t."lineId"` : ''}
-      ${searchTerms.length ? 'JOIN matched ON matched.id = t.id' : ''}
+    const ordering = `filtered.exact_count DESC,
+      filtered.whole_token_count DESC,
+      filtered.phrase_match DESC,
+      filtered.phrase_prefix DESC,
+      filtered.relevance DESC,
+      filtered.sort_value ${sortOrder}, filtered.ratings_count DESC, filtered.id ASC`;
+    const pageSliceOrdering = ordering.replaceAll('filtered.', 'page_slice.');
+    const queryCtes = candidateCte
+      ? `${candidateCte}, filtered AS MATERIALIZED (`
+      : 'WITH filtered AS MATERIALIZED (';
+    const filteredSql = `${queryCtes}
+      SELECT t.id,
+        ${searchTerms.length ? 'matched.exact_count' : '0::int'} AS exact_count,
+        ${searchTerms.length ? 'matched.whole_token_count' : '0::int'} AS whole_token_count,
+        ${searchTerms.length ? `${phraseMatch}` : '0'} AS phrase_match,
+        ${searchTerms.length ? `${phrasePrefix}` : '0'} AS phrase_prefix,
+        ${searchTerms.length ? 'matched.relevance' : '0::real'} AS relevance,
+        ${sortField} AS sort_value,
+        t."ratingsCount" AS ratings_count
+      FROM ${tables.tobacco} t
+      ${country ? `JOIN ${tables.brand} filter_brand ON filter_brand.id = t."brandId"` : ''}
+      ${searchTerms.length ? `LEFT JOIN ${tables.brand} b ON b.id = t."brandId" LEFT JOIN ${tables.line} l ON l.id = t."lineId" JOIN matched ON matched.id = t.id` : ''}
       ${filterClause}
-      ORDER BY ${ordering}
-      OFFSET ${bind(skip)} LIMIT ${bind(limit)}`;
+    ), totals AS (
+      SELECT COUNT(*)::int AS total FROM filtered
+    ), page_rows AS (
+      SELECT page_slice.id, page_slice.exact_count,
+        row_number() OVER (ORDER BY ${pageSliceOrdering}) AS ordinal
+      FROM (
+        SELECT filtered.id, filtered.exact_count,
+          filtered.whole_token_count, filtered.phrase_match,
+          filtered.phrase_prefix, filtered.relevance,
+          filtered.sort_value, filtered.ratings_count
+        FROM filtered
+        ORDER BY ${ordering}
+        OFFSET ${bind(skip)} LIMIT ${bind(limit)}
+      ) page_slice
+    )
+    SELECT totals.total, page_rows.id, page_rows.exact_count
+    FROM totals LEFT JOIN page_rows ON TRUE
+    ORDER BY page_rows.ordinal`;
 
     const result = await this.tobaccoRepository.manager.transaction(
       'REPEATABLE READ',
@@ -438,19 +626,18 @@ export class TobaccosRepository {
             "SET LOCAL pg_trgm.similarity_threshold = '0.15'",
           );
         }
-        const countRowsResult: unknown = await manager.query(
-          countSql,
-          countParameters,
-        );
         const pageRowsResult: unknown = await manager.query(
-          pageSql,
+          filteredSql,
           parameters,
         );
-        const countRows = queryRows<{ total: number }>(countRowsResult);
-        const pageRows = queryRows<{ id: string; exact_count?: number }>(
-          pageRowsResult,
+        const pageRows = queryRows<{
+          total: number;
+          id: string | null;
+          exact_count?: number;
+        }>(pageRowsResult);
+        const rows = pageRows.filter(
+          (row): row is typeof row & { id: string } => row.id !== null,
         );
-        const rows = pageRows;
         const ids = rows.map((row) => row.id);
         const records = ids.length
           ? await manager.getRepository(Tobacco).find({
@@ -460,7 +647,7 @@ export class TobaccosRepository {
           : [];
         const byId = new Map(records.map((record) => [record.id, record]));
         return {
-          total: Number(countRows[0]?.total ?? 0),
+          total: Number(pageRows[0]?.total ?? 0),
           rows,
           data: ids.flatMap((id) => {
             const record = byId.get(id);

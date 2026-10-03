@@ -48,9 +48,9 @@ describe('TobaccosRepository', () => {
   beforeEach(async () => {
     sqlQuery = jest.fn((sql: string) =>
       Promise.resolve(
-        sql.includes('COUNT(*)')
-          ? [{ total: 7 }]
-          : [{ id: tobacco.id, exact_count: 2 }],
+        sql.startsWith('SET ')
+          ? []
+          : [{ total: 7, id: tobacco.id, exact_count: 2 }],
       ),
     );
     transactionMock = jest.fn(
@@ -114,10 +114,10 @@ describe('TobaccosRepository', () => {
       const queries = sqlQuery.mock.calls;
 
       expect(result).toEqual({ data: [tobacco], total: 7 });
-      expect(queries).toHaveLength(3);
+      expect(queries).toHaveLength(2);
       expect(queries[1][0]).toContain('COUNT(*)');
-      expect(queries[2][0]).toContain('OFFSET $1 LIMIT $2');
-      expect(queries[2][1]).toEqual([3, 3]);
+      expect(queries[1][0]).toContain('OFFSET $1 LIMIT $2');
+      expect(queries[1][1]).toEqual([3, 3]);
       expect(findPageMock).toHaveBeenCalledTimes(1);
       const findOptions = findPageMock.mock.calls[0]?.[0];
       expect(Object.keys(findOptions?.where ?? {})).toEqual(['id']);
@@ -176,9 +176,7 @@ describe('TobaccosRepository', () => {
       );
       const countSql = countCall?.[0] as string;
       const parameters = countCall?.[1] as unknown[];
-      const pageSql = queries.find(([sql]) =>
-        String(sql).includes('OFFSET'),
-      )?.[0] as string;
+      const pageSql = countSql;
 
       expect(countSql).toContain('t."brandId" = $1');
       expect(countSql).toContain('t."lineId" = $2');
@@ -207,9 +205,7 @@ describe('TobaccosRepository', () => {
         Promise.resolve(
           sql.startsWith('SET ')
             ? []
-            : sql.includes('COUNT(*)')
-              ? [{ total: 1 }]
-              : [{ id: tobacco.id, exact_count: 0 }],
+            : [{ total: 1, id: tobacco.id, exact_count: 0 }],
         ),
       );
 
@@ -223,8 +219,8 @@ describe('TobaccosRepository', () => {
       const pageSql = calls.find(([sql]) =>
         String(sql).includes('OFFSET'),
       )?.[0] as string;
-      expect(pageSql).toContain('matched.exact_count DESC');
-      expect(pageSql).toContain('t."ratingsCount" DESC, t.id ASC');
+      expect(pageSql).toContain('filtered.exact_count DESC');
+      expect(pageSql).toContain('filtered.ratings_count DESC, filtered.id ASC');
     });
 
     it('treats whitespace as browse and nonempty punctuation as zero matches', async () => {

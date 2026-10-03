@@ -6,6 +6,12 @@ import { Flavor } from '../flavors/flavors.entity';
 import { Line } from '../lines/lines.entity';
 import { Tobacco } from './tobaccos.entity';
 import { TobaccosRepository } from './tobaccos.repository';
+import { AddCrossAlphabetCatalogSearch1791027000000 } from '../migrations/1791027000000-AddCrossAlphabetCatalogSearch';
+import {
+  compactSearchText,
+  compactVisualSearchText,
+  visualSearchText,
+} from './search-normalizer';
 
 const describePostgres =
   process.env.POSTGRES_SEARCH_TESTS === 'true' ? describe : describe.skip;
@@ -44,12 +50,26 @@ describePostgres('TobaccosRepository PostgreSQL search', () => {
     });
     await dataSource.initialize();
     await createFixtureTables();
+    const queryRunner = dataSource.createQueryRunner();
+    try {
+      await new AddCrossAlphabetCatalogSearch1791027000000().up(queryRunner);
+    } finally {
+      await queryRunner.release();
+    }
     await insertFixtureData();
     repository = new TobaccosRepository(dataSource.getRepository(Tobacco));
   });
 
   afterAll(async () => {
     if (dataSource?.isInitialized) {
+      const queryRunner = dataSource.createQueryRunner();
+      try {
+        await new AddCrossAlphabetCatalogSearch1791027000000().down(
+          queryRunner,
+        );
+      } finally {
+        await queryRunner.release();
+      }
       await dataSource.destroy();
     }
 
@@ -239,6 +259,17 @@ describePostgres('TobaccosRepository PostgreSQL search', () => {
       );
     });
 
+    it('keeps exact totals when pagination returns no page rows', async () => {
+      const result = await repository.findAll({
+        search: 'ice cream',
+        page: 99,
+        limit: 1,
+      });
+
+      expect(result.total).toBe(3);
+      expect(result.data).toEqual([]);
+    });
+
     it('supports Russian phonetic spellings and marks conservative typo matches', async () => {
       const cyrillic = await repository.findAll({ search: 'дарксайд кола' });
       const typo = await repository.findAll({ search: 'darkside colla' });
@@ -248,8 +279,7 @@ describePostgres('TobaccosRepository PostgreSQL search', () => {
       expect(new Set(cyrillic.data.map((tobacco) => tobacco.name))).toEqual(
         new Set(['Ice Cream', 'Ice Cream Pistachio']),
       );
-      expect(cyrillic.search).toMatchObject({ matchQuality: 'approximate' });
-      expect(cyrillic.search?.approximateResultIds).toHaveLength(2);
+      expect(cyrillic.search).toBeUndefined();
       expect(typo.total).toBe(2);
       expect(new Set(typo.data.map((tobacco) => tobacco.name))).toEqual(
         new Set(['Ice Cream', 'Ice Cream Pistachio']),
@@ -301,6 +331,148 @@ describePostgres('TobaccosRepository PostgreSQL search', () => {
       expect(first.total).toBe(3);
       expect(second.total).toBe(3);
       expect(first.data[0].id).not.toBe(second.data[0].id);
+    });
+  });
+
+  describe('mixed-alphabet catalog search regressions', () => {
+    beforeAll(async () => insertCrossAlphabetFixtures());
+
+    afterAll(async () => {
+      await dataSource.query(
+        `DELETE FROM ${quotedSchema}.tobaccos WHERE "htreviewsId" LIKE 'htr9200%'`,
+      );
+      await dataSource.query(
+        `DELETE FROM ${quotedSchema}.lines WHERE slug = 'brilliant-collection'`,
+      );
+      await dataSource.query(
+        `DELETE FROM ${quotedSchema}.brands WHERE slug = ANY($1::varchar[])`,
+        [['satyr', 'darkside', 'other', 'mixlab']],
+      );
+    });
+
+    it('recognizes mixed-script names, searchable slugs, Unicode digits, and cross-field terms', async () => {
+      const latin = await repository.findAll({ search: 'more' });
+      const cyrillic = await repository.findAll({ search: 'море' });
+      const joined = await repository.findAll({ search: 'satyr more' });
+      const numeric = await repository.findAll({ search: 'more2' });
+      const separatedNumeric = await repository.findAll({
+        search: 'satyr море 2',
+      });
+
+      expect(latin.data[0].name).toBe('МОRЕ ²');
+      expect(latin.search).toBeUndefined();
+      expect(cyrillic.data.map((tobacco) => tobacco.name)).toContain('МОRЕ ²');
+      expect(joined.data.map((tobacco) => tobacco.name)).toContain('МОRЕ ²');
+      expect(numeric.data.map((tobacco) => tobacco.name)).toContain('МОRЕ ²');
+      expect(separatedNumeric.data.map((tobacco) => tobacco.name)).toContain(
+        'МОRЕ ²',
+      );
+    });
+
+    it('matches visual Cyrillic lookalikes in mixed tokens and preserves other Cyrillic words', async () => {
+      const jagerbomb = await repository.findAll({ search: 'jagerbomb' });
+      const acai = await repository.findAll({ search: 'ice acai' });
+      const mixedAcai = await repository.findAll({ search: 'ice aсai' });
+      const fullAcai = await repository.findAll({
+        search: 'ice acai raspberry',
+      });
+      const juicyPeach = await repository.findAll({ search: 'сочный персик' });
+      const transliteratedPeach = await repository.findAll({
+        search: 'sochnyy persik',
+      });
+
+      expect(jagerbomb.data.map((tobacco) => tobacco.name)).toContain(
+        'Jаgerbomb',
+      );
+      expect(acai.data.map((tobacco) => tobacco.name)).toContain(
+        'ICE AСAI Raspberry',
+      );
+      expect(mixedAcai.data.map((tobacco) => tobacco.name)).toContain(
+        'ICE AСAI Raspberry',
+      );
+      expect(fullAcai.data[0].name).toBe('ICE AСAI Raspberry');
+      expect(fullAcai.search).toBeUndefined();
+      expect(juicyPeach.data.map((tobacco) => tobacco.name)).toContain(
+        'Cочный персик',
+      );
+      expect(juicyPeach.search).toBeUndefined();
+      expect(transliteratedPeach.data.map((tobacco) => tobacco.name)).toContain(
+        'Cочный персик',
+      );
+      expect(transliteratedPeach.search).toBeUndefined();
+      const normalizationResult: unknown = await dataSource.query(
+        `SELECT catalog_search_latin($1) AS latin,
+                catalog_search_visual($2) AS visual,
+                catalog_search_visual($3) AS mixed_ordinary_word,
+                catalog_search_compact($4) AS punctuation,
+                catalog_search_visual($5) AS cyrillic_majority,
+                catalog_search_compact_visual($5) AS cyrillic_majority_key,
+                catalog_search_has_mixed_token($3) AS separate_scripts,
+                catalog_search_has_mixed_token($5) AS mixed_token,
+                catalog_search_has_mixed_token($6) AS yo_mixed`,
+        [
+          'море',
+          'ICE AСAI',
+          'Darkside Черника',
+          'Foo §¤†‡∞∅∇∴∵',
+          'Cочный',
+          'MёD',
+        ],
+      );
+      const [normalization] = normalizationResult as Array<{
+        latin: string;
+        visual: string;
+        mixed_ordinary_word: string;
+        punctuation: string;
+        cyrillic_majority: string;
+        cyrillic_majority_key: string;
+        separate_scripts: boolean;
+        mixed_token: boolean;
+        yo_mixed: boolean;
+      }>;
+      expect(normalization.latin).toBe(compactSearchText('море'));
+      expect(normalization.visual).toBe(visualSearchText('ICE AСAI'));
+      expect(normalization.mixed_ordinary_word).toBe(
+        visualSearchText('Darkside Черника'),
+      );
+      expect(normalization.punctuation).toBe(
+        compactSearchText('Foo §¤†‡∞∅∇∴∵'),
+      );
+      expect(normalization.cyrillic_majority).toBe(visualSearchText('Cочный'));
+      expect(normalization.cyrillic_majority_key).toBe(
+        compactVisualSearchText('Cочный'),
+      );
+      expect(normalization.separate_scripts).toBe(false);
+      expect(normalization.mixed_token).toBe(true);
+      expect(normalization.yo_mixed).toBe(true);
+      expect(compactVisualSearchText('Jаgerbomb')).toBe('jagerbomb');
+      expect(acai.search).toBeUndefined();
+    });
+
+    it('ranks recognized spellings ahead of prefixes and true typo matches', async () => {
+      const more = await repository.findAll({ search: 'more' });
+      const darkside = await repository.findAll({ search: 'дарксайд кола' });
+      const target = darkside.data.findIndex(
+        (tobacco) => tobacco.name === 'DARKSIDE Cola',
+      );
+      const vandal = darkside.data.findIndex(
+        (tobacco) => tobacco.name === 'Vandal Cola',
+      );
+      const kolsky = darkside.data.findIndex(
+        (tobacco) => tobacco.name === 'Кольский краш',
+      );
+      const typo = darkside.data.find(
+        (tobacco) => tobacco.name === 'Darkside Colla',
+      );
+
+      expect(more.data[0].name).toBe('МОRЕ ²');
+      expect(target).toBeGreaterThanOrEqual(0);
+      expect(vandal).toBeGreaterThan(target);
+      expect(kolsky).toBeGreaterThan(target);
+      expect(darkside.search?.approximateResultIds).toContain(typo?.id);
+      expect(darkside.search?.approximateResultIds).not.toContain(
+        darkside.data[target].id,
+      );
     });
   });
 
@@ -589,6 +761,115 @@ describePostgres('TobaccosRepository PostgreSQL search', () => {
           'Medium',
           'Active',
           htreviewsId,
+          '',
+        ],
+      );
+    }
+  }
+
+  async function insertCrossAlphabetFixtures(): Promise<void> {
+    const fixtureBrands = [
+      ['Satyr', 'satyr'],
+      ['Darkside', 'darkside'],
+      ['Other', 'other'],
+      ['MixLab', 'mixlab'],
+    ] as const;
+    const brandIds = new Map<string, string>();
+    for (const [name, slug] of fixtureBrands) {
+      const id = randomUUID();
+      brandIds.set(name, id);
+      await dataSource.query(
+        `INSERT INTO ${quotedSchema}.brands
+          (id, name, slug, country, "logoUrl", status)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [id, name, slug, 'Russia', '', 'Active'],
+      );
+    }
+    const lineId = randomUUID();
+    await dataSource.query(
+      `INSERT INTO ${quotedSchema}.lines
+        (id, name, slug, "brandId", "strengthOfficial", "strengthByRatings", status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        lineId,
+        'Brilliant Collection',
+        'brilliant-collection',
+        brandIds.get('Satyr'),
+        'Medium',
+        'Medium',
+        'Active',
+      ],
+    );
+
+    const fixtures: Array<{
+      name: string;
+      slug: string;
+      brand: string;
+      lineId?: string;
+      rating?: number;
+      ratingsCount?: number;
+    }> = [
+      { name: 'МОRЕ ²', slug: 'more', brand: 'Satyr', lineId },
+      {
+        name: 'Morello',
+        slug: 'morello',
+        brand: 'Other',
+        rating: 9.99,
+        ratingsCount: 10000,
+      },
+      { name: 'DARKSIDE Cola', slug: 'darkside-cola', brand: 'Darkside' },
+      {
+        name: 'Vandal Cola',
+        slug: 'vandal-cola',
+        brand: 'Darkside',
+        rating: 9.99,
+        ratingsCount: 10000,
+      },
+      {
+        name: 'Кольский краш',
+        slug: 'kolskiy-krash',
+        brand: 'Darkside',
+        rating: 9.99,
+        ratingsCount: 10000,
+      },
+      { name: 'Darkside Colla', slug: 'darkside-colla', brand: 'Darkside' },
+      { name: 'Jаgerbomb', slug: 'legacy-jb', brand: 'MixLab' },
+      {
+        name: 'ICE AСAI Raspberry',
+        slug: 'ice-asai-raspberry',
+        brand: 'MixLab',
+      },
+      {
+        name: 'Ice Acai Raspberry Mint',
+        slug: 'prefix-only-acai-mint',
+        brand: 'Other',
+        rating: 9.99,
+        ratingsCount: 10000,
+      },
+      {
+        name: 'Cочный персик',
+        slug: 'legacy-apricot-22',
+        brand: 'MixLab',
+      },
+    ];
+    for (const [index, fixture] of fixtures.entries()) {
+      await dataSource.query(
+        `INSERT INTO ${quotedSchema}.tobaccos
+          (id, name, slug, "brandId", "lineId", rating, "ratingsCount",
+           "strengthOfficial", "strengthByRatings", status, "htreviewsId", "imageUrl")
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+        [
+          randomUUID(),
+          fixture.name,
+          fixture.slug,
+          brandIds.get(fixture.brand),
+          fixture.lineId ?? null,
+          fixture.rating ?? 0,
+          fixture.ratingsCount ?? 0,
+          'Medium',
+          'Medium',
+          'Active',
+          `htr92000${index}`,
           '',
         ],
       );
