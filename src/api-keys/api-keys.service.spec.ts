@@ -29,12 +29,10 @@ describe('ApiKeysService', () => {
     // Create mock repository
     mockApiKeysRepository = {
       findAll: jest.fn(),
-      findOneByKey: jest.fn(),
       findOneById: jest.fn(),
       create: jest.fn(),
       delete: jest.fn(),
-      incrementRequestCount: jest.fn(),
-      updateLastUsed: jest.fn(),
+      trackActiveKeyUsage: jest.fn(),
       getCount: jest.fn(),
     } as unknown as jest.Mocked<ApiKeysRepository>;
 
@@ -275,95 +273,38 @@ describe('ApiKeysService', () => {
 
   describe('validateApiKey', () => {
     it('should return API key and update tracking when valid', async () => {
-      // Arrange
       const key = 'valid-api-key';
-      mockApiKeysRepository.findOneByKey.mockResolvedValue(mockApiKey);
-      mockApiKeysRepository.incrementRequestCount.mockResolvedValue(undefined);
-      mockApiKeysRepository.updateLastUsed.mockResolvedValue(undefined);
-
-      // Act
-      const result = await service.validateApiKey(key);
-
-      // Assert
-      expect(result).toEqual(mockApiKey);
-      expect(mockApiKeysRepository.findOneByKey).toHaveBeenCalledWith(key);
-      expect(mockApiKeysRepository.incrementRequestCount).toHaveBeenCalledWith(
-        mockApiKey.id,
+      const updatedApiKey = { ...mockApiKey, requestCount: 43 };
+      mockApiKeysRepository.trackActiveKeyUsage.mockResolvedValue(
+        updatedApiKey,
       );
-      expect(mockApiKeysRepository.updateLastUsed).toHaveBeenCalledWith(
-        mockApiKey.id,
-      );
-    });
 
-    it('should return null when API key not found', async () => {
-      // Arrange
-      const key = 'non-existent-key';
-      mockApiKeysRepository.findOneByKey.mockResolvedValue(null);
-
-      // Act
       const result = await service.validateApiKey(key);
 
-      // Assert
-      expect(result).toBeNull();
-      expect(mockApiKeysRepository.findOneByKey).toHaveBeenCalledWith(key);
-      expect(
-        mockApiKeysRepository.incrementRequestCount,
-      ).not.toHaveBeenCalled();
-      expect(mockApiKeysRepository.updateLastUsed).not.toHaveBeenCalled();
-    });
-
-    it('should return null when API key is inactive', async () => {
-      // Arrange
-      const key = 'inactive-key';
-      const inactiveApiKey = { ...mockApiKey, isActive: false };
-      mockApiKeysRepository.findOneByKey.mockResolvedValue(inactiveApiKey);
-
-      // Act
-      const result = await service.validateApiKey(key);
-
-      // Assert
-      expect(result).toBeNull();
-      expect(mockApiKeysRepository.findOneByKey).toHaveBeenCalledWith(key);
-      expect(
-        mockApiKeysRepository.incrementRequestCount,
-      ).not.toHaveBeenCalled();
-      expect(mockApiKeysRepository.updateLastUsed).not.toHaveBeenCalled();
-    });
-
-    it('should increment request count on successful validation', async () => {
-      // Arrange
-      const key = 'valid-api-key';
-      mockApiKeysRepository.findOneByKey.mockResolvedValue(mockApiKey);
-      mockApiKeysRepository.incrementRequestCount.mockResolvedValue(undefined);
-      mockApiKeysRepository.updateLastUsed.mockResolvedValue(undefined);
-
-      // Act
-      await service.validateApiKey(key);
-
-      // Assert
-      expect(mockApiKeysRepository.incrementRequestCount).toHaveBeenCalledTimes(
+      expect(result).toEqual(updatedApiKey);
+      expect(mockApiKeysRepository.trackActiveKeyUsage).toHaveBeenCalledTimes(
         1,
       );
-      expect(mockApiKeysRepository.incrementRequestCount).toHaveBeenCalledWith(
-        mockApiKey.id,
+      expect(mockApiKeysRepository.trackActiveKeyUsage).toHaveBeenCalledWith(
+        key,
       );
     });
 
-    it('should update lastUsedAt timestamp on successful validation', async () => {
-      // Arrange
-      const key = 'valid-api-key';
-      mockApiKeysRepository.findOneByKey.mockResolvedValue(mockApiKey);
-      mockApiKeysRepository.incrementRequestCount.mockResolvedValue(undefined);
-      mockApiKeysRepository.updateLastUsed.mockResolvedValue(undefined);
+    it.each(['non-existent-key', 'inactive-key'])(
+      'should return null when key %s is not active',
+      async (key) => {
+        mockApiKeysRepository.trackActiveKeyUsage.mockResolvedValue(null);
 
-      // Act
-      await service.validateApiKey(key);
+        const result = await service.validateApiKey(key);
 
-      // Assert
-      expect(mockApiKeysRepository.updateLastUsed).toHaveBeenCalledTimes(1);
-      expect(mockApiKeysRepository.updateLastUsed).toHaveBeenCalledWith(
-        mockApiKey.id,
-      );
-    });
+        expect(result).toBeNull();
+        expect(mockApiKeysRepository.trackActiveKeyUsage).toHaveBeenCalledTimes(
+          1,
+        );
+        expect(mockApiKeysRepository.trackActiveKeyUsage).toHaveBeenCalledWith(
+          key,
+        );
+      },
+    );
   });
 });

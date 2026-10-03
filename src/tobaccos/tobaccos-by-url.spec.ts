@@ -16,13 +16,20 @@ describe('GET /tobaccos/by-url validation', () => {
   let app: INestApplication<Server>;
   const findByUrl = jest.fn();
   const apiKeysRepository = {
-    findOneByKey: jest.fn((key: string) =>
+    trackActiveKeyUsage: jest.fn((key: string) =>
       Promise.resolve(
-        key === 'active-key' ? { id: 'active-key', key, isActive: true } : null,
+        key === 'active-key'
+          ? {
+              id: 'active-key',
+              key,
+              isActive: true,
+              requestCount: 1,
+              lastUsedAt: new Date(),
+              updatedAt: new Date(),
+            }
+          : null,
       ),
     ),
-    incrementRequestCount: jest.fn().mockResolvedValue(undefined),
-    updateLastUsed: jest.fn().mockResolvedValue(undefined),
   };
 
   beforeAll(async () => {
@@ -91,6 +98,7 @@ describe('GET /tobaccos/by-url validation', () => {
         ]),
       );
       expect(findByUrl).not.toHaveBeenCalled();
+      expect(apiKeysRepository.trackActiveKeyUsage).toHaveBeenCalledTimes(1);
     },
   );
 
@@ -107,6 +115,7 @@ describe('GET /tobaccos/by-url validation', () => {
         .expect(400);
 
       expect(findByUrl).not.toHaveBeenCalled();
+      expect(apiKeysRepository.trackActiveKeyUsage).toHaveBeenCalledTimes(1);
     },
   );
 
@@ -130,6 +139,7 @@ describe('GET /tobaccos/by-url validation', () => {
       'https://htreviews.org/tobaccos/demo-clouds/classic-mix/apple-mint',
     );
     expect(response.body).toEqual({ id: 'apple-mint-id', slug: 'apple-mint' });
+    expect(apiKeysRepository.trackActiveKeyUsage).toHaveBeenCalledTimes(1);
   });
 
   it('requires a valid API key before URL validation', async () => {
@@ -145,5 +155,6 @@ describe('GET /tobaccos/by-url validation', () => {
       .expect(401);
 
     expect(findByUrl).not.toHaveBeenCalled();
+    expect(apiKeysRepository.trackActiveKeyUsage).toHaveBeenCalledTimes(1);
   });
 });

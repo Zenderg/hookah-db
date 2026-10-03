@@ -7,6 +7,7 @@ import {
   IsArray,
   Min,
   Max,
+  MaxLength,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { PaginationDto } from '../../common/dto/pagination.dto';
@@ -52,6 +53,7 @@ export class FindTobaccosDto extends PaginationDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(128)
   search?: string;
 
   @IsOptional()

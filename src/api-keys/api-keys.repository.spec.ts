@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { DeleteResult, Repository, UpdateResult } from 'typeorm';
+import { DeleteResult, Repository } from 'typeorm';
 import { ApiKeysRepository } from './api-keys.repository';
 import { ApiKey } from './api-keys.entity';
 
@@ -27,10 +27,18 @@ describe('ApiKeysRepository', () => {
       findOne: jest.fn(),
       create: jest.fn(),
       save: jest.fn(),
-      update: jest.fn(),
-      increment: jest.fn(),
+      query: jest.fn(),
       delete: jest.fn(),
       count: jest.fn(),
+      metadata: {
+        schema: 'isolated',
+        tableName: 'api_keys',
+        connection: {
+          driver: {
+            escape: jest.fn((identifier: string) => `"${identifier}"`),
+          },
+        },
+      },
     } as unknown as jest.Mocked<Repository<ApiKey>>;
 
     const module: TestingModule = await Test.createTestingModule({
@@ -76,35 +84,37 @@ describe('ApiKeysRepository', () => {
     });
   });
 
-  describe('findOneByKey', () => {
-    it('should return API key when found by key', async () => {
-      // Arrange
+  describe('trackActiveKeyUsage', () => {
+    it('atomically tracks an active key and returns the updated entity', async () => {
       const key = mockApiKey.key;
-      mockApiKeyRepository.findOne.mockResolvedValue(mockApiKey);
+      const updatedApiKey = { ...mockApiKey, requestCount: 43 };
+      mockApiKeyRepository.query.mockResolvedValue([updatedApiKey]);
+      mockApiKeyRepository.create.mockReturnValue(updatedApiKey);
 
-      // Act
-      const result = await repository.findOneByKey(key);
+      const result = await repository.trackActiveKeyUsage(key);
 
-      // Assert
-      expect(result).toEqual(mockApiKey);
-      expect(mockApiKeyRepository.findOne).toHaveBeenCalledWith({
-        where: { key },
-      });
+      expect(result).toEqual(updatedApiKey);
+      expect(mockApiKeyRepository.query).toHaveBeenCalledTimes(1);
+      const [sql, parameters] = mockApiKeyRepository.query.mock.calls[0];
+      expect(sql).toContain('UPDATE "isolated"."api_keys"');
+      expect(sql).toContain('"requestCount" = "requestCount" + 1');
+      expect(sql).toContain('"lastUsedAt" = CURRENT_TIMESTAMP');
+      expect(sql).toContain('"updatedAt" = CURRENT_TIMESTAMP');
+      expect(sql).toContain('WHERE "key" = $1 AND "isActive" = TRUE');
+      expect(sql).toContain('RETURNING *');
+      expect(sql).toContain('SELECT * FROM updated');
+      expect(parameters).toEqual([key]);
+      expect(mockApiKeyRepository.create).toHaveBeenCalledWith(updatedApiKey);
     });
 
-    it('should return null when API key not found by key', async () => {
-      // Arrange
-      const key = 'non-existent-key';
-      mockApiKeyRepository.findOne.mockResolvedValue(null);
+    it('returns null when no active key matches', async () => {
+      mockApiKeyRepository.query.mockResolvedValue([]);
 
-      // Act
-      const result = await repository.findOneByKey(key);
-
-      // Assert
-      expect(result).toBeNull();
-      expect(mockApiKeyRepository.findOne).toHaveBeenCalledWith({
-        where: { key },
-      });
+      await expect(
+        repository.trackActiveKeyUsage('missing-or-inactive'),
+      ).resolves.toBeNull();
+      expect(mockApiKeyRepository.query).toHaveBeenCalledTimes(1);
+      expect(mockApiKeyRepository.create).not.toHaveBeenCalled();
     });
   });
 
@@ -130,50 +140,6 @@ describe('ApiKeysRepository', () => {
       expect(result).toEqual(createdApiKey);
       expect(mockApiKeyRepository.create).toHaveBeenCalledWith(apiKeyData);
       expect(mockApiKeyRepository.save).toHaveBeenCalledWith(createdApiKey);
-    });
-  });
-
-  describe('updateLastUsed', () => {
-    it('should update lastUsedAt timestamp for API key', async () => {
-      // Arrange
-      const apiKeyId = mockApiKey.id;
-      const updateResult: UpdateResult = {
-        affected: 1,
-        generatedMaps: [],
-        raw: [],
-      };
-      mockApiKeyRepository.update.mockResolvedValue(updateResult);
-
-      // Act
-      await repository.updateLastUsed(apiKeyId);
-
-      // Assert
-      expect(mockApiKeyRepository.update).toHaveBeenCalledTimes(1);
-      const [, updatePayload] = mockApiKeyRepository.update.mock.calls[0];
-      expect(updatePayload.lastUsedAt).toBeInstanceOf(Date);
-    });
-  });
-
-  describe('incrementRequestCount', () => {
-    it('should increment requestCount by 1 for API key', async () => {
-      // Arrange
-      const apiKeyId = mockApiKey.id;
-      const updateResult: UpdateResult = {
-        affected: 1,
-        generatedMaps: [],
-        raw: [],
-      };
-      mockApiKeyRepository.increment.mockResolvedValue(updateResult);
-
-      // Act
-      await repository.incrementRequestCount(apiKeyId);
-
-      // Assert
-      expect(mockApiKeyRepository.increment).toHaveBeenCalledWith(
-        { id: apiKeyId },
-        'requestCount',
-        1,
-      );
     });
   });
 

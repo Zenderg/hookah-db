@@ -4,6 +4,7 @@ import {
   ExecutionContext,
   UnauthorizedException,
 } from '@nestjs/common';
+import { performance } from 'node:perf_hooks';
 import { Reflector } from '@nestjs/core';
 import { ApiKeysService } from '../../api-keys/api-keys.service';
 import { ApiKey } from '../../api-keys/api-keys.entity';
@@ -11,6 +12,7 @@ import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 
 interface RequestWithApiKey {
   apiKey?: ApiKey;
+  requestStartedAt?: number;
   headers: {
     'x-api-key'?: string;
     authorization?: string;
@@ -25,6 +27,9 @@ export class ApiKeyGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    const request = context.switchToHttp().getRequest<RequestWithApiKey>();
+    request.requestStartedAt = performance.now();
+
     // Check if route is marked as public
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
@@ -35,7 +40,6 @@ export class ApiKeyGuard implements CanActivate {
       return true;
     }
 
-    const request = context.switchToHttp().getRequest<RequestWithApiKey>();
     const apiKey =
       request.headers['x-api-key'] ||
       request.headers['authorization']?.replace('Bearer ', '');
@@ -44,7 +48,7 @@ export class ApiKeyGuard implements CanActivate {
       throw new UnauthorizedException('API key is required');
     }
 
-    // Validate API key against database and increment request count
+    // Validate and track the key in one database operation.
     const validatedApiKey = await this.apiKeysService.validateApiKey(apiKey);
 
     if (!validatedApiKey) {

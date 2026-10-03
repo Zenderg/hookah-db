@@ -1,14 +1,101 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import {
+  DataSource,
+  EntityTarget,
+  In,
+  ObjectLiteral,
+  Repository,
+} from 'typeorm';
+import { Brand } from '../brands/brands.entity';
+import { Flavor } from '../flavors/flavors.entity';
+import { Line } from '../lines/lines.entity';
 import { Tobacco } from './tobaccos.entity';
 import { FindTobaccosDto } from './dto/find-tobaccos.dto';
+import {
+  compactSearchText,
+  exactSearchSpellings,
+  normalizeSearch,
+  searchSpellings,
+} from './search-normalizer';
 
 const TOBACCO_SORT_FIELDS = {
-  rating: 'tobacco.rating',
-  name: 'tobacco.name',
-  dateAdded: 'tobacco.createdAt',
+  rating: 't.rating',
+  name: 't.name',
+  dateAdded: 't."createdAt"',
 } as const;
+const SEARCH_COMPACT = (column: string) =>
+  `regexp_replace(replace(lower(normalize(${column}, NFKC)), 'ё', 'е'), '[^[:alnum:]]+', '', 'g')`;
+const SEARCH_NORMALIZED = (column: string) =>
+  `regexp_replace(replace(lower(normalize(${column}, NFKC)), 'ё', 'е'), '[^[:alnum:]]+', ' ', 'g')`;
+const ENGLISH_STOPWORDS = new Set([
+  'a',
+  'an',
+  'and',
+  'at',
+  'by',
+  'for',
+  'from',
+  'in',
+  'into',
+  'of',
+  'on',
+  'or',
+  'the',
+  'to',
+  'with',
+]);
+const RUSSIAN_STOPWORDS = new Set([
+  'а',
+  'без',
+  'в',
+  'во',
+  'для',
+  'до',
+  'из',
+  'к',
+  'на',
+  'над',
+  'не',
+  'о',
+  'от',
+  'по',
+  'под',
+  'при',
+  'с',
+  'со',
+  'у',
+  'и',
+]);
+
+function escapeTablePath(
+  connection: DataSource,
+  defaultSchema: string | undefined,
+  entity: EntityTarget<ObjectLiteral> | string,
+): string {
+  const metadata =
+    typeof entity === 'string' ? undefined : connection.getMetadata(entity);
+  const tableName =
+    metadata?.tableName ?? (typeof entity === 'string' ? entity : undefined);
+  if (!tableName) {
+    throw new Error('Cannot resolve catalog table metadata');
+  }
+  const schema: string | undefined = metadata?.schema ?? defaultSchema;
+  const escape = (identifier: string) => connection.driver.escape(identifier);
+  return schema ? `${escape(schema)}.${escape(tableName)}` : escape(tableName);
+}
+
+function queryRows<T>(result: unknown): T[] {
+  if (!Array.isArray(result)) {
+    throw new Error('Expected a row array from PostgreSQL');
+  }
+  return result as T[];
+}
+
+function toBoundarySequencePattern(compactTerm: string): string {
+  const sequence = [...compactTerm].join('[^[:alnum:]]*');
+  return `(^|[^[:alnum:]])${sequence}`;
+}
 
 function getSortField(sortBy: unknown): string {
   if (
@@ -27,19 +114,9 @@ function getSortOrder(order: unknown): 'ASC' | 'DESC' {
   return order.toUpperCase() as 'ASC' | 'DESC';
 }
 
-function splitSearchTerms(search: string): string[] {
-  return search
-    .split(/[\s&|!():<>*]+/u)
-    .filter((term) => /[\p{L}\p{N}]/u.test(term));
-}
-
-function toTsqueryPrefix(term: string): string {
-  const escapedTerm = term.replace(/\\/gu, '\\\\').replace(/'/gu, "''");
-  return `'${escapedTerm}':*`;
-}
-
-function toLikePrefix(term: string): string {
-  return `${term.replace(/[\\%_]/gu, '\\$&')}%`;
+interface SearchResultMetadata {
+  matchQuality: 'approximate';
+  approximateResultIds: string[];
 }
 
 @Injectable()
@@ -49,9 +126,11 @@ export class TobaccosRepository {
     private readonly tobaccoRepository: Repository<Tobacco>,
   ) {}
 
-  async findAll(
-    query: FindTobaccosDto,
-  ): Promise<{ data: Tobacco[]; total: number }> {
+  async findAll(query: FindTobaccosDto): Promise<{
+    data: Tobacco[];
+    total: number;
+    search?: SearchResultMetadata;
+  }> {
     const {
       page = 1,
       limit = 20,
@@ -69,149 +148,346 @@ export class TobaccosRepository {
     const skip = (page - 1) * limit;
     const sortField = getSortField(sortBy);
     const sortOrder = getSortOrder(order);
-
-    const queryBuilder = this.tobaccoRepository.createQueryBuilder('tobacco');
-
-    queryBuilder.leftJoinAndSelect('tobacco.brand', 'brand');
-    queryBuilder.leftJoinAndSelect('tobacco.line', 'line');
-    queryBuilder.leftJoinAndSelect('tobacco.flavors', 'tobaccoFlavor');
-
-    if (brandId) {
-      queryBuilder.andWhere('tobacco.brandId = :brandId', { brandId });
+    const normalizedSearch =
+      search === undefined ? undefined : normalizeSearch(search);
+    const searchTerms = normalizedSearch?.terms ?? [];
+    const invalidNonemptySearch =
+      normalizedSearch?.hasVisibleInput === true && searchTerms.length === 0;
+    if (invalidNonemptySearch) {
+      return { data: [], total: 0 };
     }
+    const tables = {
+      tobacco: escapeTablePath(
+        this.tobaccoRepository.manager.connection,
+        this.tobaccoRepository.metadata.schema,
+        Tobacco,
+      ),
+      brand: escapeTablePath(
+        this.tobaccoRepository.manager.connection,
+        this.tobaccoRepository.metadata.schema,
+        Brand,
+      ),
+      line: escapeTablePath(
+        this.tobaccoRepository.manager.connection,
+        this.tobaccoRepository.metadata.schema,
+        Line,
+      ),
+      flavor: escapeTablePath(
+        this.tobaccoRepository.manager.connection,
+        this.tobaccoRepository.metadata.schema,
+        Flavor,
+      ),
+      tobaccoFlavor: escapeTablePath(
+        this.tobaccoRepository.manager.connection,
+        this.tobaccoRepository.metadata.schema,
+        'tobacco_flavors',
+      ),
+    };
 
-    if (lineId) {
-      queryBuilder.andWhere('tobacco.lineId = :lineId', { lineId });
-    }
-
-    if (minRating !== undefined) {
-      queryBuilder.andWhere('tobacco.rating >= :minRating', { minRating });
-    }
-
-    if (maxRating !== undefined) {
-      queryBuilder.andWhere('tobacco.rating <= :maxRating', { maxRating });
-    }
-
-    if (country) {
-      queryBuilder.andWhere('brand.country = :country', { country });
-    }
-
-    if (status) {
-      queryBuilder.andWhere('tobacco.status = :status', { status });
-    }
-
-    // Filter by flavors (AND logic: tobacco must have ALL selected flavors)
-    if (flavors && flavors.length > 0) {
+    const parameters: unknown[] = [];
+    const bind = (value: unknown): string => {
+      parameters.push(value);
+      return `$${parameters.length}`;
+    };
+    const where: string[] = [];
+    if (brandId) where.push(`t."brandId" = ${bind(brandId)}`);
+    if (lineId) where.push(`t."lineId" = ${bind(lineId)}`);
+    if (minRating !== undefined) where.push(`t.rating >= ${bind(minRating)}`);
+    if (maxRating !== undefined) where.push(`t.rating <= ${bind(maxRating)}`);
+    if (country) where.push(`filter_brand.country = ${bind(country)}`);
+    if (status) where.push(`t.status = ${bind(status)}`);
+    if (flavors?.length) {
       const uniqueFlavors = [...new Set(flavors)];
-      // Use a subquery to find tobaccos that have ALL requested flavors
-      queryBuilder.andWhere(
-        `tobacco.id IN (
-          SELECT tf."tobaccoId"
-          FROM tobacco_flavors tf
-          INNER JOIN flavors f ON f.id = tf."flavorId"
-          WHERE f.name IN (:...flavorNames)
-          GROUP BY tf."tobaccoId"
-          HAVING COUNT(DISTINCT f.id) = :flavorsCount
-        )`,
-        { flavorNames: uniqueFlavors, flavorsCount: uniqueFlavors.length },
-      );
+      const flavorNames = bind(uniqueFlavors);
+      const flavorsCount = bind(uniqueFlavors.length);
+      where.push(`t.id IN (
+        SELECT tf."tobaccoId" FROM ${tables.tobaccoFlavor} tf
+        JOIN ${tables.flavor} f ON f.id = tf."flavorId"
+        WHERE f.name = ANY(${flavorNames}::varchar[])
+        GROUP BY tf."tobaccoId"
+        HAVING COUNT(DISTINCT f.id) = ${flavorsCount}
+      )`);
     }
 
-    const searchWords = search ? splitSearchTerms(search) : [];
+    const termCtes: string[] = [];
+    const isStopword = (term: string) =>
+      ENGLISH_STOPWORDS.has(term.toLocaleLowerCase('en-US')) ||
+      RUSSIAN_STOPWORDS.has(term.toLocaleLowerCase('ru-RU'));
+    const hasNonStopwordTerm = searchTerms.some((term) => !isStopword(term));
+    const compactWhole = searchTerms.length
+      ? compactSearchText(searchTerms.join(''))
+      : '';
+    const wholeQueryMatches =
+      searchTerms.length > 1 && [...compactWhole].length >= 3
+        ? (() => {
+            const whole = bind(compactWhole);
+            const columns = [`t.name`, `b.name`, `l.name`];
+            const exactBranches = columns.map(
+              (column) => `SELECT t.id FROM ${tables.tobacco} t
+          LEFT JOIN ${tables.brand} b ON b.id = t."brandId"
+          LEFT JOIN ${tables.line} l ON l.id = t."lineId"
+          WHERE ${SEARCH_COMPACT(column)} = ${whole}`,
+            );
+            const fuzzyBranches = columns.map((column) => {
+              const compactField = SEARCH_COMPACT(column);
+              const maxEdits = `CASE WHEN length(${whole}) <= 5 THEN 1 ELSE 2 END`;
+              return `SELECT t.id FROM ${tables.tobacco} t
+          LEFT JOIN ${tables.brand} b ON b.id = t."brandId"
+          LEFT JOIN ${tables.line} l ON l.id = t."lineId"
+              WHERE length(${whole}) >= 4 AND ${compactField} % ${whole}
+            AND similarity(${whole}, ${compactField}) >= 0.15
+            AND CASE
+              WHEN char_length(${compactField}) <= 255 AND char_length(${whole}) <= 255
+              THEN levenshtein_less_equal(${compactField}, ${whole}, ${maxEdits})
+              ELSE 256
+            END <= ${maxEdits}`;
+            });
+            return {
+              exact: exactBranches.join('\nUNION\n'),
+              fuzzy: fuzzyBranches.join('\nUNION\n'),
+            };
+          })()
+        : undefined;
 
-    if (searchWords.length > 0) {
-      // Use PostgreSQL Full-Text Search with Russian and English configurations
-      // Search across tobacco.name, brand.name, and line.name
-      // For multi-word searches, each word must match in at least one field (cross-field AND)
+    for (let index = 0; index < searchTerms.length; index += 1) {
+      const term = searchTerms[index];
+      const spellings = searchSpellings(term);
+      const tsQueries = exactSearchSpellings(term).map((spelling) => {
+        const escaped = spelling.replace(/\\/gu, '\\\\').replace(/'/gu, "''");
+        return [bind(`'${escaped}':*`)];
+      });
+      const compactTerm = compactSearchText(term);
+      const useCompactCandidates = [...compactTerm].length >= 3;
+      const fuzzyTerms =
+        [...compactTerm].length >= 4
+          ? spellings.map((spelling) => bind(compactSearchText(spelling)))
+          : [];
+      const compactExact = useCompactCandidates ? bind(compactTerm) : undefined;
+      const sequencePattern = useCompactCandidates
+        ? bind(toBoundarySequencePattern(compactTerm))
+        : undefined;
+      const alias = `term_${index}`;
+      const branches = [
+        { table: `${tables.tobacco} t`, field: 't.name' },
+        {
+          table: `${tables.brand} b JOIN ${tables.tobacco} t ON t."brandId" = b.id`,
+          field: 'b.name',
+        },
+        {
+          table: `${tables.line} l JOIN ${tables.tobacco} t ON t."lineId" = l.id`,
+          field: 'l.name',
+        },
+      ];
+      const fieldBranches = branches.map(({ table, field }) => {
+        const compactField = SEARCH_COMPACT(field);
+        const normalizedField = SEARCH_NORMALIZED(field);
+        const compactSequenceMatch = useCompactCandidates
+          ? `(
+              ${compactField} LIKE '%' || ${compactExact} || '%'
+              AND ${normalizedField} ~* ${sequencePattern}
+            )`
+          : 'FALSE';
+        const fts = tsQueries
+          .map((lexemeParams) => {
+            const configMatches = ['simple', 'russian', 'english'].map(
+              (config) =>
+                lexemeParams
+                  .map(
+                    (param) =>
+                      `to_tsvector('${config}', ${field}) @@ to_tsquery('${config}', ${param})`,
+                  )
+                  .join(' AND '),
+            );
+            const compactPrefix = useCompactCandidates
+              ? `${compactField} LIKE ${compactExact} || '%'`
+              : 'FALSE';
+            return `(${[...configMatches, compactPrefix, compactSequenceMatch].join(' OR ')})`;
+          })
+          .join(' OR ');
+        const relevance = tsQueries
+          .flatMap((lexemeParams) =>
+            ['simple', 'russian', 'english'].flatMap((config) =>
+              lexemeParams.map(
+                (param) =>
+                  `ts_rank(to_tsvector('${config}', ${field}), to_tsquery('${config}', ${param}))`,
+              ),
+            ),
+          )
+          .join(' + ');
+        const sequenceRelevance = `CASE WHEN ${compactSequenceMatch} THEN 1.0 ELSE 0.0 END`;
+        const fuzzy = fuzzyTerms.length
+          ? fuzzyTerms
+              .map((param) => {
+                const maxEdits = `CASE WHEN length(${param}) <= 5 THEN 1 ELSE 2 END`;
+                const closeWord = `EXISTS (
+              SELECT 1 FROM regexp_split_to_table(replace(lower(normalize(${field}, NFKC)), 'ё', 'е'), '[^[:alnum:]]+') AS candidate_word(word)
+              WHERE CASE
+                WHEN char_length(candidate_word.word) <= 255 AND char_length(${param}) <= 255
+                THEN levenshtein_less_equal(lower(candidate_word.word), ${param}, ${maxEdits})
+                ELSE 256
+              END <= ${maxEdits}
+            )`;
+                const closeCompactName = `CASE
+              WHEN char_length(${compactField}) <= 255 AND char_length(${param}) <= 255
+              THEN levenshtein_less_equal(${compactField}, ${param}, ${maxEdits})
+              ELSE 256
+            END <= ${maxEdits}`;
+                const fuzzyWord = `(${normalizedField} %> ${param}
+              AND word_similarity(${param}, ${normalizedField}) >= 0.42
+              AND ${closeWord})`;
+                const fuzzyCompactName = `(length(${param}) >= 8
+              AND ${compactField} % ${param}
+              AND similarity(${compactField}, ${param}) >= 0.15
+              AND ${closeCompactName})`;
+                return `(length(${param}) >= 4 AND (${fuzzyWord} OR ${fuzzyCompactName}))`;
+              })
+              .join(' OR ')
+          : 'FALSE';
+        return `SELECT t.id, BOOL_OR(${fts}) AS exact, COALESCE(MAX(${relevance} + ${sequenceRelevance}), 0) AS relevance
+          FROM ${table}
+          WHERE (${fts}) OR (${fuzzy})
+          GROUP BY t.id`;
+      });
+      const ignoredTermBranch =
+        hasNonStopwordTerm && isStopword(term)
+          ? `UNION ALL SELECT id, FALSE AS exact FROM ${tables.tobacco}`
+          : '';
+      termCtes.push(`${alias} AS (
+        SELECT id, BOOL_OR(exact) AS exact, MAX(relevance) AS relevance FROM (
+          ${fieldBranches.join('\nUNION ALL\n')}
+          ${ignoredTermBranch ? `UNION ALL SELECT id, FALSE AS exact, 0::real AS relevance FROM ${tables.tobacco}` : ''}
+        ) matched_fields GROUP BY id
+      )`);
+    }
 
-      // Build parameters object for all search words
-      const searchParams: Record<string, string> = {};
+    const countParameters = [...parameters];
+    const wholePhraseParameter = searchTerms.length ? bind(compactWhole) : '';
+    let candidateCte = '';
+    if (searchTerms.length) {
+      const termsIntersected = searchTerms.map(
+        (_, index) => `term_${index} t${index}`,
+      );
+      const exactCount = searchTerms
+        .map((_, index) => `CASE WHEN t${index}.exact THEN 1 ELSE 0 END`)
+        .join(' + ');
+      const relevanceTotal = searchTerms
+        .map((_, index) => `COALESCE(t${index}.relevance, 0)`)
+        .join(' + ');
+      const from = termsIntersected.join('\nJOIN ');
+      const joinedExact = wholeQueryMatches
+        ? `UNION ALL SELECT id, ${searchTerms.length} AS exact_count, ${searchTerms.length}::real AS relevance FROM (${wholeQueryMatches.exact}) joined_exact`
+        : '';
+      const joinedFuzzy = wholeQueryMatches
+        ? `UNION ALL SELECT id, GREATEST(${searchTerms.length} - 1, 0) AS exact_count, 0::real AS relevance FROM (${wholeQueryMatches.fuzzy}) joined_fuzzy`
+        : '';
+      candidateCte = `WITH ${termCtes.join(',\n')}, strict_or_fuzzy AS (
+        SELECT t0.id, (${exactCount}) AS exact_count, (${relevanceTotal}) AS relevance FROM ${from.replace(/\nJOIN term_(\d+) t(\d+)/gu, '\nJOIN term_$1 t$2 ON t$2.id = t0.id')}
+        ${joinedExact}
+        ${joinedFuzzy}
+      ), matched AS (
+        SELECT id, MAX(exact_count) AS exact_count, MAX(relevance) AS relevance
+        FROM strict_or_fuzzy GROUP BY id
+      )`;
+    }
 
-      // For each search word, create conditions for:
-      // 1. Full-Text Search with prefix operator (:*) for stemming support
-      // 2. ILIKE for exact prefix matching (case-insensitive)
-      searchWords.forEach((word, index) => {
-        const paramNamePrefix = `searchWordPrefix${index}`;
-        const paramNameILike = `searchWordILike${index}`;
+    const filterClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+    const wholeQueryPrefix = `${wholePhraseParameter} || '%'`;
+    const phraseMatch = `CASE WHEN
+      ${SEARCH_COMPACT('t.name')} = ${wholePhraseParameter}
+      OR ${SEARCH_COMPACT('b.name')} = ${wholePhraseParameter}
+      OR ${SEARCH_COMPACT('l.name')} = ${wholePhraseParameter}
+      OR ${SEARCH_COMPACT("concat_ws(' ', b.name, t.name)")} = ${wholePhraseParameter}
+      OR ${SEARCH_COMPACT("concat_ws(' ', b.name, l.name, t.name)")} = ${wholePhraseParameter}
+      OR ${SEARCH_COMPACT("concat_ws(' ', l.name, t.name)")} = ${wholePhraseParameter}
+      THEN 1 ELSE 0 END`;
+    const phrasePrefix = `CASE WHEN
+      ${SEARCH_COMPACT('t.name')} LIKE ${wholeQueryPrefix}
+      OR ${SEARCH_COMPACT('b.name')} LIKE ${wholeQueryPrefix}
+      OR ${SEARCH_COMPACT('l.name')} LIKE ${wholeQueryPrefix}
+      THEN 1 ELSE 0 END`;
+    const ordering = searchTerms.length
+      ? `matched.exact_count DESC,
+         ${phraseMatch} DESC,
+         ${phrasePrefix} DESC,
+         matched.relevance DESC,
+         ${sortField} ${sortOrder}, t."ratingsCount" DESC, t.id ASC`
+      : `${sortField} ${sortOrder}, t."ratingsCount" DESC, t.id ASC`;
+    const countSql = `${candidateCte}
+      SELECT COUNT(*)::int AS total
+      FROM ${tables.tobacco} t ${country ? `JOIN ${tables.brand} filter_brand ON filter_brand.id = t."brandId"` : ''}
+      ${searchTerms.length ? 'JOIN matched ON matched.id = t.id' : ''}
+      ${filterClause}`;
+    const pageSql = `${candidateCte}
+      SELECT t.id${searchTerms.length ? ', matched.exact_count' : ''}
+      FROM ${tables.tobacco} t ${country ? `JOIN ${tables.brand} filter_brand ON filter_brand.id = t."brandId"` : ''}
+      ${searchTerms.length ? `LEFT JOIN ${tables.brand} b ON b.id = t."brandId" LEFT JOIN ${tables.line} l ON l.id = t."lineId"` : ''}
+      ${searchTerms.length ? 'JOIN matched ON matched.id = t.id' : ''}
+      ${filterClause}
+      ORDER BY ${ordering}
+      OFFSET ${bind(skip)} LIMIT ${bind(limit)}`;
 
-        searchParams[paramNamePrefix] = toTsqueryPrefix(word);
-        searchParams[paramNameILike] = toLikePrefix(word);
-
-        queryBuilder.andWhere(
-          `(
-            to_tsvector('russian', tobacco.name) @@ to_tsquery('russian', :${paramNamePrefix}) OR
-             to_tsvector('english', tobacco.name) @@ to_tsquery('english', :${paramNamePrefix}) OR
-            to_tsvector('russian', brand.name) @@ to_tsquery('russian', :${paramNamePrefix}) OR
-             to_tsvector('english', brand.name) @@ to_tsquery('english', :${paramNamePrefix}) OR
-            to_tsvector('russian', line.name) @@ to_tsquery('russian', :${paramNamePrefix}) OR
-             to_tsvector('english', line.name) @@ to_tsquery('english', :${paramNamePrefix}) OR
-            LOWER(tobacco.name) LIKE LOWER(:${paramNameILike}) ESCAPE E'\\\\' OR
-            LOWER(brand.name) LIKE LOWER(:${paramNameILike}) ESCAPE E'\\\\' OR
-            LOWER(line.name) LIKE LOWER(:${paramNameILike}) ESCAPE E'\\\\'
-          )`,
+    const result = await this.tobaccoRepository.manager.transaction(
+      'REPEATABLE READ',
+      async (manager) => {
+        await manager.query('SET TRANSACTION READ ONLY');
+        if (searchTerms.length) {
+          await manager.query(
+            "SET LOCAL pg_trgm.word_similarity_threshold = '0.42'",
+          );
+          await manager.query(
+            "SET LOCAL pg_trgm.similarity_threshold = '0.15'",
+          );
+        }
+        const countRowsResult: unknown = await manager.query(
+          countSql,
+          countParameters,
         );
-      });
+        const pageRowsResult: unknown = await manager.query(
+          pageSql,
+          parameters,
+        );
+        const countRows = queryRows<{ total: number }>(countRowsResult);
+        const pageRows = queryRows<{ id: string; exact_count?: number }>(
+          pageRowsResult,
+        );
+        const rows = pageRows;
+        const ids = rows.map((row) => row.id);
+        const records = ids.length
+          ? await manager.getRepository(Tobacco).find({
+              where: { id: In(ids) },
+              relations: { brand: true, line: true, flavors: true },
+            })
+          : [];
+        const byId = new Map(records.map((record) => [record.id, record]));
+        return {
+          total: Number(countRows[0]?.total ?? 0),
+          rows,
+          data: ids.flatMap((id) => {
+            const record = byId.get(id);
+            return record ? [record] : [];
+          }),
+        };
+      },
+    );
+    const approximateResultIds = result.rows
+      .filter(
+        (row) =>
+          row.exact_count !== undefined && row.exact_count < searchTerms.length,
+      )
+      .map((row) => row.id);
 
-      // Calculate base relevance ranking from Full-Text Search
-      // Combines rankings from both language configurations across all fields
-      // The optional line relation contributes zero when absent, preserving other field ranks.
-      const relevanceExpressions = searchWords.map((_, index) => {
-        const paramNamePrefix = `searchWordPrefix${index}`;
-        return `(
-          ts_rank(to_tsvector('russian', tobacco.name), to_tsquery('russian', :${paramNamePrefix})) +
-          ts_rank(to_tsvector('english', tobacco.name), to_tsquery('english', :${paramNamePrefix})) +
-          ts_rank(to_tsvector('russian', brand.name), to_tsquery('russian', :${paramNamePrefix})) +
-          ts_rank(to_tsvector('english', brand.name), to_tsquery('english', :${paramNamePrefix})) +
-          COALESCE(ts_rank(to_tsvector('russian', line.name), to_tsquery('russian', :${paramNamePrefix})), 0) +
-          COALESCE(ts_rank(to_tsvector('english', line.name), to_tsquery('english', :${paramNamePrefix})), 0)
-        )`;
-      });
-
-      // Calculate bonuses for exact matches and prefix matches
-      // Bonus weights:
-      // - Exact match of tobacco.name: +100
-      // - Prefix match at start of tobacco.name: +50
-      // - Prefix match at start of brand.name: +30
-      // - Prefix match at start of line.name: +30
-      const exactMatchBonus = searchWords.map((word, index) => {
-        const paramName = `searchWordExact${index}`;
-        searchParams[paramName] = word;
-        return `CASE WHEN LOWER(tobacco.name) = LOWER(:${paramName}) THEN 100 ELSE 0 END`;
-      });
-
-      const prefixMatchBonus = searchWords.map((_, index) => {
-        const paramName = `searchWordILike${index}`;
-        return `(
-          CASE WHEN LOWER(tobacco.name) LIKE LOWER(:${paramName}) ESCAPE E'\\\\' THEN 50 ELSE 0 END +
-          CASE WHEN LOWER(brand.name) LIKE LOWER(:${paramName}) ESCAPE E'\\\\' THEN 30 ELSE 0 END +
-          CASE WHEN LOWER(line.name) LIKE LOWER(:${paramName}) ESCAPE E'\\\\' THEN 30 ELSE 0 END
-        )`;
-      });
-
-      // Combine all expressions into final ranking score
-      // Final score = base relevance + exact match bonuses + prefix match bonuses
-      queryBuilder.addSelect(
-        `COALESCE(${relevanceExpressions.join(' + ')}, 0) + ${exactMatchBonus.join(' + ')} + ${prefixMatchBonus.join(' + ')}`,
-        'relevance',
-      );
-
-      // Set all parameters
-      Object.entries(searchParams).forEach(([key, value]) => {
-        queryBuilder.setParameter(key, value);
-      });
-
-      // Sort by relevance when search is provided (override sortBy parameter)
-      queryBuilder.orderBy('relevance', 'DESC');
-    } else {
-      // Use normal sorting when no search is provided
-      queryBuilder.orderBy(sortField, sortOrder);
-    }
-
-    queryBuilder.skip(skip).take(limit);
-
-    const [data, total] = await queryBuilder.getManyAndCount();
-
-    return { data, total };
+    return {
+      data: result.data,
+      total: result.total,
+      ...(approximateResultIds.length
+        ? {
+            search: {
+              matchQuality: 'approximate',
+              approximateResultIds,
+            } as SearchResultMetadata,
+          }
+        : {}),
+    };
   }
 
   async findOne(id: string): Promise<Tobacco | null> {

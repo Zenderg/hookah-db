@@ -31,12 +31,14 @@ describePostgres('TobaccosRepository PostgreSQL search', () => {
       synchronize: false,
     });
     await adminDataSource.initialize();
+    await adminDataSource.query('CREATE EXTENSION IF NOT EXISTS pg_trgm');
+    await adminDataSource.query('CREATE EXTENSION IF NOT EXISTS fuzzystrmatch');
     await adminDataSource.query(`CREATE SCHEMA ${quotedSchema}`);
 
     dataSource = new DataSource({
       ...connectionOptions,
       schema,
-      extra: { options: `-c search_path=${schema}` },
+      extra: { options: `-c search_path=${schema},public` },
       entities: [Brand, Line, Tobacco, Flavor],
       synchronize: false,
     });
@@ -74,6 +76,16 @@ describePostgres('TobaccosRepository PostgreSQL search', () => {
       expect(result.data.map((tobacco) => tobacco.name)).toEqual([name]);
     },
   );
+
+  it.each([
+    ['Tea 1.5', '1'],
+    ['Mix 2.0', '2'],
+  ])('finds numeric prefix %s for search %s', async (name, search) => {
+    const result = await repository.findAll({ search });
+
+    expect(result.total).toBe(1);
+    expect(result.data.map((tobacco) => tobacco.name)).toEqual([name]);
+  });
 
   it('returns both fixture rows for a whitespace-only search', async () => {
     const result = await repository.findAll({ search: '  \t\n ' });
@@ -171,6 +183,125 @@ describePostgres('TobaccosRepository PostgreSQL search', () => {
         ]);
       },
     );
+  });
+
+  describe('indexed catalog search behavior', () => {
+    beforeAll(async () => insertCatalogSearchFixtures());
+
+    it('prioritizes the complete tobacco name and searches brand plus tobacco name', async () => {
+      const exactName = await repository.findAll({ search: 'Ice Cream' });
+      const brandAndName = await repository.findAll({
+        search: 'Darkside Cola Ice Cream',
+      });
+
+      expect(exactName.data.map((tobacco) => tobacco.name)).toEqual([
+        'Ice Cream',
+        'Ice Cream Pistachio',
+        'Vanilla Ice Cream',
+      ]);
+      expect(brandAndName.total).toBe(2);
+      expect(brandAndName.data.map((tobacco) => tobacco.name).sort()).toEqual([
+        'Ice Cream',
+        'Ice Cream Pistachio',
+      ]);
+    });
+
+    it('matches joined and separated brand spellings without matching an interior prefix', async () => {
+      const separated = await repository.findAll({ search: 'black burn' });
+      const joined = await repository.findAll({ search: 'blackburn' });
+      const interior = await repository.findAll({ search: 'col' });
+
+      expect(separated.data.map((tobacco) => tobacco.name)).toEqual(['Berry']);
+      expect(joined.data.map((tobacco) => tobacco.name)).toEqual(['Berry']);
+      expect(interior.total).toBe(2);
+      expect(
+        interior.data.every(
+          (tobacco) => tobacco.brand?.name === 'Darkside Cola',
+        ),
+      ).toBe(true);
+    });
+
+    it('matches joined terms inside names only at a word boundary', async () => {
+      const separated = await repository.findAll({ search: 'ice cream' });
+      const joined = await repository.findAll({ search: 'icecream' });
+      const interior = await repository.findAll({ search: 'col' });
+
+      expect(separated.total).toBe(3);
+      expect(joined.total).toBe(3);
+      expect(new Set(joined.data.map((tobacco) => tobacco.id))).toEqual(
+        new Set(separated.data.map((tobacco) => tobacco.id)),
+      );
+      expect(joined.data.map((tobacco) => tobacco.name)).toContain(
+        'Vanilla Ice Cream',
+      );
+      expect(interior.data.map((tobacco) => tobacco.name)).not.toContain(
+        'Chocolate',
+      );
+    });
+
+    it('supports Russian phonetic spellings and marks conservative typo matches', async () => {
+      const cyrillic = await repository.findAll({ search: 'дарксайд кола' });
+      const typo = await repository.findAll({ search: 'darkside colla' });
+      const joinedTypo = await repository.findAll({ search: 'darksidecolla' });
+
+      expect(cyrillic.total).toBe(2);
+      expect(new Set(cyrillic.data.map((tobacco) => tobacco.name))).toEqual(
+        new Set(['Ice Cream', 'Ice Cream Pistachio']),
+      );
+      expect(cyrillic.search).toMatchObject({ matchQuality: 'approximate' });
+      expect(cyrillic.search?.approximateResultIds).toHaveLength(2);
+      expect(typo.total).toBe(2);
+      expect(new Set(typo.data.map((tobacco) => tobacco.name))).toEqual(
+        new Set(['Ice Cream', 'Ice Cream Pistachio']),
+      );
+      expect(typo.search).toMatchObject({ matchQuality: 'approximate' });
+      expect(typo.search?.approximateResultIds).toHaveLength(2);
+      expect(joinedTypo.total).toBe(2);
+      expect(new Set(joinedTypo.data.map((tobacco) => tobacco.name))).toEqual(
+        new Set(['Ice Cream', 'Ice Cream Pistachio']),
+      );
+      expect(joinedTypo.search?.approximateResultIds).toHaveLength(2);
+    });
+
+    it('keeps literal stopwords searchable and permits an explicit approximate fallback', async () => {
+      const literal = await repository.findAll({ search: 'with lemon' });
+      const stopwordsOnly = await repository.findAll({ search: 'with the' });
+
+      expect(literal.total).toBe(1);
+      expect(literal.data[0].name).toBe('With Lemon');
+      expect(stopwordsOnly.total).toBe(0);
+    });
+
+    it('uses current brand and line names after catalog updates', async () => {
+      const beforeRename = await repository.findAll({ search: 'Old Signal' });
+      await dataSource.query(
+        `UPDATE ${quotedSchema}.brands SET name = 'New Signal' WHERE name = 'Old Signal'`,
+      );
+      const afterRename = await repository.findAll({ search: 'New Signal' });
+      const beforeLineRename = await repository.findAll({ search: 'Old Line' });
+      await dataSource.query(
+        `UPDATE ${quotedSchema}.lines SET name = 'New Line' WHERE name = 'Old Line'`,
+      );
+      const afterLineRename = await repository.findAll({ search: 'New Line' });
+
+      expect(beforeRename.total).toBe(3);
+      expect(afterRename.total).toBe(3);
+      expect(beforeLineRename.total).toBe(5);
+      expect(afterLineRename.total).toBe(5);
+    });
+
+    it('keeps repeated terms and page boundaries deterministic', async () => {
+      const first = await repository.findAll({ search: 'ice ice', limit: 1 });
+      const second = await repository.findAll({
+        search: 'ice ice',
+        limit: 1,
+        page: 2,
+      });
+
+      expect(first.total).toBe(3);
+      expect(second.total).toBe(3);
+      expect(first.data[0].id).not.toBe(second.data[0].id);
+    });
   });
 
   it.each(["Tea'1.5", 'Tea\\1.5'])(
@@ -368,6 +499,90 @@ describePostgres('TobaccosRepository PostgreSQL search', () => {
           randomUUID(),
           name,
           slug,
+          brandId,
+          fixtureLineId,
+          'Medium',
+          'Medium',
+          'Active',
+          htreviewsId,
+          '',
+        ],
+      );
+    }
+  }
+
+  async function insertCatalogSearchFixtures(): Promise<void> {
+    const darksideId = randomUUID();
+    const blackburnId = randomUUID();
+    const oldSignalId = randomUUID();
+    const creameryId = randomUUID();
+    await dataSource.query(
+      `INSERT INTO ${quotedSchema}.brands (id, name, slug, country, "logoUrl", status)
+       VALUES ($1, $2, $3, $4, $5, $6), ($7, $8, $9, $10, $11, $12), ($13, $14, $15, $16, $17, $18), ($19, $20, $21, $22, $23, $24)`,
+      [
+        darksideId,
+        'Darkside Cola',
+        'darkside-cola',
+        'Russia',
+        '',
+        'Active',
+        creameryId,
+        'Creamery',
+        'creamery',
+        'Russia',
+        '',
+        'Active',
+        blackburnId,
+        'Blackburn',
+        'blackburn',
+        'Russia',
+        '',
+        'Active',
+        oldSignalId,
+        'Old Signal',
+        'old-signal',
+        'Russia',
+        '',
+        'Active',
+      ],
+    );
+
+    const lineId = randomUUID();
+    await dataSource.query(
+      `INSERT INTO ${quotedSchema}.lines
+        (id, name, slug, "brandId", "strengthOfficial", "strengthByRatings", status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        lineId,
+        'Old Line',
+        'old-line',
+        oldSignalId,
+        'Medium',
+        'Medium',
+        'Active',
+      ],
+    );
+
+    const fixtures: Array<[string, string, string, string | null]> = [
+      ['Ice Cream', darksideId, lineId, 'htr910001'],
+      ['Ice Cream Pistachio', darksideId, lineId, 'htr910002'],
+      ['Berry', blackburnId, null, 'htr910003'],
+      ['Fresh', oldSignalId, lineId, 'htr910004'],
+      ['Mint', oldSignalId, lineId, 'htr910005'],
+      ['With Lemon', oldSignalId, lineId, 'htr910006'],
+      ['Vanilla Ice Cream', creameryId, null, 'htr910007'],
+      ['Chocolate', creameryId, null, 'htr910008'],
+    ];
+    for (const [name, brandId, fixtureLineId, htreviewsId] of fixtures) {
+      await dataSource.query(
+        `INSERT INTO ${quotedSchema}.tobaccos
+          (id, name, slug, "brandId", "lineId", "strengthOfficial",
+           "strengthByRatings", status, "htreviewsId", "imageUrl")
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        [
+          randomUUID(),
+          name,
+          `${name.toLowerCase().replaceAll(' ', '-')}-${htreviewsId}`,
           brandId,
           fixtureLineId,
           'Medium',

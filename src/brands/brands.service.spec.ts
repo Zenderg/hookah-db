@@ -217,6 +217,27 @@ describe('BrandsService', () => {
       });
     });
 
+    it('preserves approximate search metadata on nested tobacco pages', async () => {
+      mockBrandsRepository.findOne.mockResolvedValue(mockBrand);
+      mockTobaccosRepository.findAll.mockResolvedValue({
+        data: [mockTobacco],
+        total: 1,
+        search: {
+          matchQuality: 'approximate',
+          approximateResultIds: [mockTobacco.id],
+        },
+      });
+
+      const result = await service.findTobaccosByBrand(mockBrand.id, {
+        search: 'darkside colla',
+      });
+
+      expect(result.meta.search).toEqual({
+        matchQuality: 'approximate',
+        approximateResultIds: [mockTobacco.id],
+      });
+    });
+
     it('should throw NotFoundException when brand not found', async () => {
       // Arrange
       const brandId = 'non-existent-id';

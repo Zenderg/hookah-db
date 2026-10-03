@@ -75,6 +75,7 @@ npm run migration:show
 - Repository tests use mock QueryBuilder objects. Include all chain methods when creating these mocks: `leftJoin`, `leftJoinAndSelect`, `select`, `addSelect`, `where`, `andWhere`, `orderBy`, `skip`, `take`, `setParameter`, `getManyAndCount`, `getRawMany`, `getOne`.
 - When changing select or ranking strategy, update assertions that distinguish `select` from `addSelect`.
 - `src/tobaccos/tobaccos.repository.postgres.spec.ts` checks search behavior against a real PostgreSQL server. It is skipped unless `POSTGRES_SEARCH_TESTS=true`; when enabled, it creates a uniquely named schema, loads its fixtures there, and drops that schema afterward. The database user needs permission to create and drop schemas.
+- Tobacco search migration installs the PostgreSQL `pg_trgm` and `fuzzystrmatch` extensions. The migration runner needs permission to create trusted extensions in the target database; search-index changes are applied through migrations because TypeORM synchronization is disabled.
 
 Run the PostgreSQL repository regression against a local Compose database with:
 

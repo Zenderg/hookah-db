@@ -88,10 +88,26 @@ DTOs, and utilities.
   accept `order=asc|desc`; unsupported sort fields and directions return HTTP
   400 before repository access. Line and flavor lists do not accept sort
   parameters.
-- Tobacco search uses PostgreSQL FTS with Russian and English configurations across `tobacco.name`, `brand.name`, and `line.name`.
-- Search splits on whitespace and PostgreSQL tsquery operators. Other punctuation stays within a term and is quoted for PostgreSQL normalization, preserving decimals and compounds such as `1.5` and `apple-mint`. Every term must match at least one searched field, so multi-term searches use cross-field AND logic.
-- Each term retains PostgreSQL prefix matching and Russian/English stemming, plus case-insensitive field-prefix matching with LIKE wildcards escaped. Whitespace-only or operator-only input uses the normal requested sort without a search filter.
-- Search ranking includes exact match bonus +100, tobacco prefix bonus +50, and brand/line prefix bonus +30.
-- A tobacco without a line contributes zero line relevance while retaining its tobacco and brand relevance.
-- Flavor filtering uses AND logic: a tobacco must have every requested flavor. Repeated flavor names count once, so duplicates do not change the matching results.
+- Catalog list methods return an exact `total`. Tobacco pagination first selects
+  distinct matching IDs and counts the filtered catalog before loading brand,
+  optional line, and flavors for only the requested page.
+- Tobacco search covers tobacco, brand, and line names; flavors remain an
+  explicit filter. Search terms use cross-field AND logic, so each term may
+  match any of the three name fields while every term must match.
+- Search supports Russian and English stemming, literal stopwords,
+  punctuation-insensitive decimal and compound names, and joined or separated
+  spellings. Deterministic transliteration and conservative fuzzy matching
+  support common spelling variants and typos. Ranking is strict term matches,
+  complete names or name combinations, whole-query prefixes, FTS relevance, the
+  requested sort, rating count, then UUID. Approximate results are identified
+  by `meta.search.matchQuality` and `meta.search.approximateResultIds`.
+- Empty whitespace means an unfiltered browse request. Nonempty input with no
+  searchable terms returns no results. Search length and term count are bounded
+  at both the HTTP DTO and repository boundaries.
+- Flavor filtering uses AND logic: a tobacco must have every requested flavor.
+  Repeated flavor names count once, and the filter is applied before counting
+  and pagination with one grouped tobacco-ID subquery, without multiplying
+  candidate rows.
+- The complete normalization, matching, ranking, approximate-result, and
+  database-index contract lives in [`search-contract.md`](search-contract.md).
 - Global exception responses use `{ statusCode, timestamp, path, message }`.

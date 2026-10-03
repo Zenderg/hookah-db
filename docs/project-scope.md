@@ -15,11 +15,11 @@ through authorized endpoints.
 Import from `htreviews.org` is optional. New self-host setups should be able to
 start with sample data and without automatically calling external websites.
 
-Approximate production-scale data:
+Approximate production-scale data observed on 2026-10-03:
 
-- 272 brands
-- 471 lines
-- 11,861 tobaccos
+- 298 brands
+- 510 lines
+- 12,773 tobaccos
 
 ## Explicit Non-Goals
 

@@ -15,7 +15,8 @@ export class TobaccosService {
   async findAll(
     query: FindTobaccosDto,
   ): Promise<PaginatedResponseDto<Tobacco>> {
-    const { data, total } = await this.tobaccosRepository.findAll(query);
+    const { data, total, search } =
+      await this.tobaccosRepository.findAll(query);
     const { page = 1, limit = 20 } = query;
     const totalPages = Math.ceil(total / limit);
 
@@ -26,6 +27,7 @@ export class TobaccosService {
         page,
         limit,
         totalPages,
+        ...(search ? { search } : {}),
       },
     };
   }

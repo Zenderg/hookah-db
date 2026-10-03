@@ -47,7 +47,7 @@ export class BrandsService {
       throw new NotFoundException('Brand not found');
     }
 
-    const { data, total } = await this.tobaccosRepository.findAll({
+    const { data, total, search } = await this.tobaccosRepository.findAll({
       ...query,
       brandId,
     });
@@ -61,6 +61,7 @@ export class BrandsService {
         page,
         limit,
         totalPages,
+        ...(search ? { search } : {}),
       },
     };
   }

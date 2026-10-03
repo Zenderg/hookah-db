@@ -15,21 +15,30 @@ export class ApiKeysRepository {
     return this.apiKeyRepository.find();
   }
 
-  async findOneByKey(key: string): Promise<ApiKey | null> {
-    return this.apiKeyRepository.findOne({ where: { key } });
+  async trackActiveKeyUsage(key: string): Promise<ApiKey | null> {
+    const { schema, tableName, connection } = this.apiKeyRepository.metadata;
+    const tablePath = schema
+      ? `${connection.driver.escape(schema)}.${connection.driver.escape(tableName)}`
+      : connection.driver.escape(tableName);
+    const rows = await this.apiKeyRepository.query<ApiKey[]>(
+      `WITH updated AS (
+         UPDATE ${tablePath}
+         SET "requestCount" = "requestCount" + 1,
+             "lastUsedAt" = CURRENT_TIMESTAMP,
+             "updatedAt" = CURRENT_TIMESTAMP
+         WHERE "key" = $1 AND "isActive" = TRUE
+         RETURNING *
+       )
+       SELECT * FROM updated`,
+      [key],
+    );
+
+    return rows[0] ? this.apiKeyRepository.create(rows[0]) : null;
   }
 
   async create(apiKey: Partial<ApiKey>): Promise<ApiKey> {
     const entity = this.apiKeyRepository.create(apiKey);
     return this.apiKeyRepository.save(entity);
-  }
-
-  async updateLastUsed(id: string): Promise<void> {
-    await this.apiKeyRepository.update(id, { lastUsedAt: new Date() });
-  }
-
-  async incrementRequestCount(id: string): Promise<void> {
-    await this.apiKeyRepository.increment({ id }, 'requestCount', 1);
   }
 
   async delete(id: string): Promise<boolean> {

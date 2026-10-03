@@ -46,7 +46,7 @@ export class LinesService {
       throw new NotFoundException('Line not found');
     }
 
-    const { data, total } = await this.tobaccosRepository.findAll({
+    const { data, total, search } = await this.tobaccosRepository.findAll({
       ...query,
       lineId,
     });
@@ -60,6 +60,7 @@ export class LinesService {
         page,
         limit,
         totalPages,
+        ...(search ? { search } : {}),
       },
     };
   }

@@ -215,6 +215,27 @@ describe('LinesService', () => {
       });
     });
 
+    it('preserves approximate search metadata on nested tobacco pages', async () => {
+      mockLinesRepository.findOne.mockResolvedValue(mockLine);
+      mockTobaccosRepository.findAll.mockResolvedValue({
+        data: [mockTobacco],
+        total: 1,
+        search: {
+          matchQuality: 'approximate',
+          approximateResultIds: [mockTobacco.id],
+        },
+      });
+
+      const result = await service.findTobaccosByLine(mockLine.id, {
+        search: 'darkside colla',
+      });
+
+      expect(result.meta.search).toEqual({
+        matchQuality: 'approximate',
+        approximateResultIds: [mockTobacco.id],
+      });
+    });
+
     it('should throw NotFoundException when line not found', async () => {
       // Arrange
       const lineId = 'non-existent-id';

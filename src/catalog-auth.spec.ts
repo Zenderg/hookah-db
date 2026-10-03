@@ -42,17 +42,20 @@ const catalogRoutes = [
 ];
 
 const apiKeysRepositoryMock = {
-  findOneByKey: jest.fn((key: string) =>
+  trackActiveKeyUsage: jest.fn((key: string) =>
     Promise.resolve(
       key === 'active-key'
-        ? { id: 'active-key', key, isActive: true }
-        : key === 'inactive-key'
-          ? { id: 'inactive-key', key, isActive: false }
-          : null,
+        ? {
+            id: 'active-key',
+            key,
+            isActive: true,
+            requestCount: 1,
+            lastUsedAt: new Date(),
+            updatedAt: new Date(),
+          }
+        : null,
     ),
   ),
-  incrementRequestCount: jest.fn().mockResolvedValue(undefined),
-  updateLastUsed: jest.fn().mockResolvedValue(undefined),
 };
 
 describe('catalog API key access', () => {
@@ -140,8 +143,7 @@ describe('catalog API key access', () => {
 
   it.each(catalogRoutes)('%s rejects requests without a key', async (route) => {
     await request(app.getHttpServer()).get(route).expect(401);
-    expect(apiKeysRepositoryMock.incrementRequestCount).not.toHaveBeenCalled();
-    expect(apiKeysRepositoryMock.updateLastUsed).not.toHaveBeenCalled();
+    expect(apiKeysRepositoryMock.trackActiveKeyUsage).not.toHaveBeenCalled();
   });
 
   it.each(catalogRoutes)('%s rejects an invalid key', async (route) => {
@@ -149,8 +151,7 @@ describe('catalog API key access', () => {
       .get(route)
       .set('X-API-Key', 'invalid-key')
       .expect(401);
-    expect(apiKeysRepositoryMock.incrementRequestCount).not.toHaveBeenCalled();
-    expect(apiKeysRepositoryMock.updateLastUsed).not.toHaveBeenCalled();
+    expect(apiKeysRepositoryMock.trackActiveKeyUsage).toHaveBeenCalledTimes(1);
   });
 
   it.each(catalogRoutes)('%s rejects an inactive key', async (route) => {
@@ -158,8 +159,7 @@ describe('catalog API key access', () => {
       .get(route)
       .set('X-API-Key', 'inactive-key')
       .expect(401);
-    expect(apiKeysRepositoryMock.incrementRequestCount).not.toHaveBeenCalled();
-    expect(apiKeysRepositoryMock.updateLastUsed).not.toHaveBeenCalled();
+    expect(apiKeysRepositoryMock.trackActiveKeyUsage).toHaveBeenCalledTimes(1);
   });
 
   it.each(catalogRoutes)('%s accepts an active X-API-Key', async (route) => {
@@ -167,11 +167,7 @@ describe('catalog API key access', () => {
       .get(route)
       .set('X-API-Key', 'active-key')
       .expect(200);
-    expect(apiKeysRepositoryMock.findOneByKey).toHaveBeenCalledTimes(1);
-    expect(apiKeysRepositoryMock.incrementRequestCount).toHaveBeenCalledTimes(
-      1,
-    );
-    expect(apiKeysRepositoryMock.updateLastUsed).toHaveBeenCalledTimes(1);
+    expect(apiKeysRepositoryMock.trackActiveKeyUsage).toHaveBeenCalledTimes(1);
   });
 
   it.each(catalogRoutes)('%s accepts an active Bearer key', async (route) => {
@@ -179,11 +175,7 @@ describe('catalog API key access', () => {
       .get(route)
       .set('Authorization', 'Bearer active-key')
       .expect(200);
-    expect(apiKeysRepositoryMock.findOneByKey).toHaveBeenCalledTimes(1);
-    expect(apiKeysRepositoryMock.incrementRequestCount).toHaveBeenCalledTimes(
-      1,
-    );
-    expect(apiKeysRepositoryMock.updateLastUsed).toHaveBeenCalledTimes(1);
+    expect(apiKeysRepositoryMock.trackActiveKeyUsage).toHaveBeenCalledTimes(1);
   });
 
   it.each([undefined, 'invalid-key', 'inactive-key', 'active-key'])(
@@ -194,11 +186,7 @@ describe('catalog API key access', () => {
         health.set('X-API-Key', key);
       }
       await health.expect(200);
-      expect(apiKeysRepositoryMock.findOneByKey).not.toHaveBeenCalled();
-      expect(
-        apiKeysRepositoryMock.incrementRequestCount,
-      ).not.toHaveBeenCalled();
-      expect(apiKeysRepositoryMock.updateLastUsed).not.toHaveBeenCalled();
+      expect(apiKeysRepositoryMock.trackActiveKeyUsage).not.toHaveBeenCalled();
     },
   );
 });

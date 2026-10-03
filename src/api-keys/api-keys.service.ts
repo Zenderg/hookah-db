@@ -56,12 +56,6 @@ export class ApiKeysService {
   }
 
   async validateApiKey(key: string): Promise<ApiKey | null> {
-    const apiKey = await this.apiKeysRepository.findOneByKey(key);
-    if (!apiKey || !apiKey.isActive) {
-      return null;
-    }
-    await this.apiKeysRepository.incrementRequestCount(apiKey.id);
-    await this.apiKeysRepository.updateLastUsed(apiKey.id);
-    return apiKey;
+    return this.apiKeysRepository.trackActiveKeyUsage(key);
   }
 }

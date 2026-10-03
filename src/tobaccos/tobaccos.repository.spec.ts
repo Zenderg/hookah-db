@@ -1,41 +1,81 @@
+import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { BadRequestException } from '@nestjs/common';
-import { Repository, SelectQueryBuilder } from 'typeorm';
-import { TobaccosRepository } from './tobaccos.repository';
-import { Tobacco } from './tobaccos.entity';
+import {
+  EntityManager,
+  FindManyOptions,
+  Repository,
+  SelectQueryBuilder,
+} from 'typeorm';
 import { FindTobaccosDto } from './dto/find-tobaccos.dto';
+import { Tobacco } from './tobaccos.entity';
+import { TobaccosRepository } from './tobaccos.repository';
 
 /* eslint-disable @typescript-eslint/unbound-method */
 describe('TobaccosRepository', () => {
   let repository: TobaccosRepository;
-  let mockTobaccoRepository: jest.Mocked<Repository<Tobacco>>;
-  let mockQueryBuilder: jest.Mocked<SelectQueryBuilder<Tobacco>>;
-
-  const mockTobacco: Tobacco = {
+  let tobaccoRepository: jest.Mocked<Repository<Tobacco>>;
+  let queryBuilder: jest.Mocked<SelectQueryBuilder<Tobacco>>;
+  let manager: Repository<Tobacco>['manager'];
+  let sqlQuery: jest.MockedFunction<
+    (sql: string, parameters?: unknown[]) => Promise<unknown[]>
+  >;
+  let transactionMock: jest.Mock;
+  let findPageMock: jest.MockedFunction<
+    (options: FindManyOptions<Tobacco>) => Promise<Tobacco[]>
+  >;
+  const tobacco = {
     id: '123e4567-e89b-12d3-a456-426614174000',
-    name: 'Test Tobacco',
-    slug: 'test-tobacco',
-    brandId: 'brand-123',
-    brand: null as any, // eslint-disable-line @typescript-eslint/no-unsafe-assignment
+    name: 'Ice Cream',
+    slug: 'ice-cream',
+    brandId: 'brand-id',
+    brand: null,
     lineId: null,
     line: null,
     rating: 4.5,
     ratingsCount: 50,
-    strengthOfficial: 'Средняя',
-    strengthByRatings: 'Средняя',
-    status: 'Выпускается',
-    htreviewsId: 'ht-123',
-    imageUrl: 'https://example.com/tobacco.png',
-    description: 'Test tobacco description',
+    strengthOfficial: 'Medium',
+    strengthByRatings: 'Medium',
+    status: 'Active',
+    htreviewsId: 'htr123',
+    imageUrl: '',
+    description: null,
     flavors: [],
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
-  };
+  } as Tobacco;
 
   beforeEach(async () => {
-    // Create mock query builder
-    mockQueryBuilder = {
+    sqlQuery = jest.fn((sql: string) =>
+      Promise.resolve(
+        sql.includes('COUNT(*)')
+          ? [{ total: 7 }]
+          : [{ id: tobacco.id, exact_count: 2 }],
+      ),
+    );
+    transactionMock = jest.fn(
+      (
+        _isolation: string,
+        callback: (manager: EntityManager) => Promise<unknown>,
+      ) => callback(manager),
+    );
+    findPageMock = jest.fn(() => Promise.resolve([tobacco]));
+    const connection = {
+      getMetadata: (entity: { name: string } | string) => ({
+        tableName:
+          typeof entity === 'string' ? entity : `${entity.name.toLowerCase()}s`,
+        schema: 'search_test',
+      }),
+      driver: { escape: (identifier: string) => `"${identifier}"` },
+      options: { schema: 'search_test' },
+    };
+    manager = {
+      query: sqlQuery,
+      transaction: transactionMock,
+      connection,
+      getRepository: jest.fn().mockReturnValue({ find: findPageMock }),
+    } as unknown as Repository<Tobacco>['manager'];
+    queryBuilder = {
       leftJoin: jest.fn().mockReturnThis(),
       leftJoinAndSelect: jest.fn().mockReturnThis(),
       select: jest.fn().mockReturnThis(),
@@ -50,800 +90,191 @@ describe('TobaccosRepository', () => {
       getRawMany: jest.fn(),
       getOne: jest.fn(),
     } as unknown as jest.Mocked<SelectQueryBuilder<Tobacco>>;
-
-    // Create mock repository
-    mockTobaccoRepository = {
-      createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
+    tobaccoRepository = {
+      manager,
+      metadata: { schema: 'search_test' },
       findOne: jest.fn(),
+      createQueryBuilder: jest.fn().mockReturnValue(queryBuilder),
     } as unknown as jest.Mocked<Repository<Tobacco>>;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TobaccosRepository,
-        {
-          provide: getRepositoryToken(Tobacco),
-          useValue: mockTobaccoRepository,
-        },
+        { provide: getRepositoryToken(Tobacco), useValue: tobaccoRepository },
       ],
     }).compile();
-
     repository = module.get<TobaccosRepository>(TobaccosRepository);
   });
 
-  afterEach(() => {
-    jest.clearAllMocks();
-  });
+  afterEach(() => jest.clearAllMocks());
 
   describe('findAll', () => {
-    it('should return paginated tobaccos with default pagination', async () => {
-      // Arrange
-      const query: FindTobaccosDto = { page: 1, limit: 20 };
-      const mockTobaccos = [mockTobacco];
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([mockTobaccos, 1]);
+    it('counts and pages catalog IDs before hydrating only the page relations', async () => {
+      const result = await repository.findAll({ page: 2, limit: 3 });
+      const queries = sqlQuery.mock.calls;
 
-      // Act
-      const result = await repository.findAll(query);
-
-      // Assert
-      expect(result).toEqual({
-        data: mockTobaccos,
-        total: 1,
-      });
-      expect(mockTobaccoRepository.createQueryBuilder).toHaveBeenCalledWith(
-        'tobacco',
-      );
-      expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
-        'tobacco.brand',
-        'brand',
-      );
-      expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
-        'tobacco.line',
-        'line',
-      );
-      expect(mockQueryBuilder.skip).toHaveBeenCalledWith(0);
-      expect(mockQueryBuilder.take).toHaveBeenCalledWith(20);
-      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
-        'tobacco.rating',
-        'DESC',
-      );
-      expect(mockQueryBuilder.getManyAndCount).toHaveBeenCalled();
-    });
-
-    it('should apply brandId filter', async () => {
-      // Arrange
-      const query: FindTobaccosDto = { brandId: 'brand-123' };
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
-
-      // Act
-      await repository.findAll(query);
-
-      // Assert
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        'tobacco.brandId = :brandId',
-        { brandId: 'brand-123' },
-      );
-    });
-
-    it('should apply lineId filter', async () => {
-      // Arrange
-      const query: FindTobaccosDto = { lineId: 'line-456' };
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
-
-      // Act
-      await repository.findAll(query);
-
-      // Assert
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        'tobacco.lineId = :lineId',
-        { lineId: 'line-456' },
-      );
-    });
-
-    it('should apply minRating filter', async () => {
-      // Arrange
-      const query: FindTobaccosDto = { minRating: 3 };
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
-
-      // Act
-      await repository.findAll(query);
-
-      // Assert
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        'tobacco.rating >= :minRating',
-        { minRating: 3 },
-      );
-    });
-
-    it('should apply maxRating filter', async () => {
-      // Arrange
-      const query: FindTobaccosDto = { maxRating: 5 };
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
-
-      // Act
-      await repository.findAll(query);
-
-      // Assert
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        'tobacco.rating <= :maxRating',
-        { maxRating: 5 },
-      );
-    });
-
-    it('should apply both minRating and maxRating filters', async () => {
-      // Arrange
-      const query: FindTobaccosDto = { minRating: 3, maxRating: 5 };
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
-
-      // Act
-      await repository.findAll(query);
-
-      // Assert
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        'tobacco.rating >= :minRating',
-        { minRating: 3 },
-      );
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        'tobacco.rating <= :maxRating',
-        { maxRating: 5 },
-      );
-    });
-
-    it('should apply country filter using brand join', async () => {
-      // Arrange
-      const query: FindTobaccosDto = { country: 'Россия' };
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
-
-      // Act
-      await repository.findAll(query);
-
-      // Assert
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        'brand.country = :country',
-        { country: 'Россия' },
-      );
-    });
-
-    it('should apply status filter', async () => {
-      // Arrange
-      const query: FindTobaccosDto = { status: 'Выпускается' };
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
-
-      // Act
-      await repository.findAll(query);
-
-      // Assert
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        'tobacco.status = :status',
-        { status: 'Выпускается' },
-      );
-    });
-
-    it('should use unique requested flavors for the AND match count', async () => {
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
-
-      await repository.findAll({ flavors: ['яблоко', 'яблоко', 'мята'] });
-
-      const flavorFilterCall = mockQueryBuilder.andWhere.mock.calls.find(
-        ([clause]) =>
-          (clause as string).includes('HAVING COUNT(DISTINCT f.id)'),
-      );
-      expect(flavorFilterCall).toBeDefined();
-      expect(flavorFilterCall?.[1]).toEqual({
-        flavorNames: ['яблоко', 'мята'],
-        flavorsCount: 2,
+      expect(result).toEqual({ data: [tobacco], total: 7 });
+      expect(queries).toHaveLength(3);
+      expect(queries[1][0]).toContain('COUNT(*)');
+      expect(queries[2][0]).toContain('OFFSET $1 LIMIT $2');
+      expect(queries[2][1]).toEqual([3, 3]);
+      expect(findPageMock).toHaveBeenCalledTimes(1);
+      const findOptions = findPageMock.mock.calls[0]?.[0];
+      expect(Object.keys(findOptions?.where ?? {})).toEqual(['id']);
+      expect(findOptions?.relations).toEqual({
+        brand: true,
+        line: true,
+        flavors: true,
       });
     });
 
-    it('should apply search filter with full-text search', async () => {
-      // Arrange
-      const query: FindTobaccosDto = { search: 'test' };
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
-
-      // Act
-      await repository.findAll(query);
-
-      // Assert - check that andWhere was called with the search query
-      const searchCall = mockQueryBuilder.andWhere.mock.calls.find((call) => {
-        const whereClause = call[0] as string;
-        return (
-          whereClause?.includes('to_tsvector') &&
-          whereClause?.includes('to_tsquery')
-        );
-      });
-      expect(searchCall).toBeDefined();
-      expect(mockQueryBuilder.addSelect).toHaveBeenCalled();
-      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
-        'relevance',
-        'DESC',
-      );
-    });
-
-    it('should keep decimal compounds and split tsquery operators safely', async () => {
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
-
-      await repository.findAll({ search: 'apple & Tea1.5 2.0 ! мят' });
-
-      const parameters = mockQueryBuilder.setParameter.mock.calls.map(
-        (call) => call[1] as string,
-      );
-      expect(parameters).toContain("'apple':*");
-      expect(parameters).toContain("'Tea1.5':*");
-      expect(parameters).toContain("'2.0':*");
-      expect(parameters).toContain("'мят':*");
-      expect(parameters).toContain('Tea1.5%');
-      expect(parameters).toContain('2.0%');
-      expect(parameters).not.toContain("'&':*");
-      expect(parameters).not.toContain("'!':*");
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledTimes(4);
-    });
-
-    it('should quote tsquery terms and escape LIKE wildcards', async () => {
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
-
-      await repository.findAll({ search: "o'reilly\\_100%" });
-
-      const parameters = mockQueryBuilder.setParameter.mock.calls.map(
-        (call) => call[1] as string,
-      );
-      expect(parameters).toContain("'o''reilly\\\\_100%':*");
-      expect(parameters).toContain("o'reilly\\\\\\_100\\%%");
-
-      const searchClause = mockQueryBuilder.andWhere.mock.calls.find((call) =>
-        (call[0] as string).includes('to_tsquery'),
+    it('builds indexed per-field candidate sets and intersects terms for cross-field AND', async () => {
+      await repository.findAll({ search: 'cola darks' });
+      const queries = sqlQuery.mock.calls;
+      const countSql = queries.find(([sql]) =>
+        String(sql).includes('COUNT(*)'),
       )?.[0] as string;
-      expect(searchClause).toContain("ESCAPE E'\\\\'");
-      const relevanceClause = mockQueryBuilder.addSelect.mock.calls.find(
-        (call) => (call[0] as string).includes('ts_rank'),
-      )?.[0] as string;
-      expect(relevanceClause).toContain("ESCAPE E'\\\\'");
+
+      expect(countSql).toContain("to_tsvector('simple'");
+      expect(countSql).toContain("to_tsvector('russian'");
+      expect(countSql).toContain("to_tsvector('english'");
+      expect(countSql).toContain('UNION ALL');
+      expect(countSql).toContain('JOIN term_1 t1 ON t1.id = t0.id');
+      expect(countSql).toContain('%>');
+      expect(countSql).not.toContain('JOIN tobacco_flavors');
     });
 
-    it.each(['  \t\n ', '& | : !'])(
-      'should use normal sorting when search has no searchable terms: %s',
+    it.each(['c', 'co', 'м', 'a', '1', '1.5'])(
+      'keeps short prefixes and decimals on lexical full-text candidates: %s',
       async (search) => {
-        mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
+        await repository.findAll({ search });
+        const countSql = sqlQuery.mock.calls.find(([sql]) =>
+          String(sql).includes('COUNT(*)'),
+        )?.[0] as string;
 
-        await repository.findAll({ search, sortBy: 'rating', order: 'desc' });
-
-        expect(mockQueryBuilder.setParameter).not.toHaveBeenCalled();
-        expect(mockQueryBuilder.addSelect).not.toHaveBeenCalled();
-        expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
-          'tobacco.rating',
-          'DESC',
-        );
+        expect(countSql).toContain("to_tsvector('simple'");
+        expect(countSql).not.toContain("LIKE '%' ||");
+        expect(countSql).not.toContain('%>');
+        expect(countSql).not.toContain('similarity(');
       },
     );
 
-    it('should apply custom sortBy and order', async () => {
-      // Arrange
-      const query: FindTobaccosDto = { sortBy: 'name', order: 'asc' };
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
-
-      // Act
-      await repository.findAll(query);
-
-      // Assert
-      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
-        'tobacco.name',
-        'ASC',
-      );
-    });
-
-    it('should calculate skip correctly for pagination', async () => {
-      // Arrange
-      const query: FindTobaccosDto = { page: 3, limit: 10 };
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
-
-      // Act
-      await repository.findAll(query);
-
-      // Assert
-      expect(mockQueryBuilder.skip).toHaveBeenCalledWith(20); // (3 - 1) * 10
-      expect(mockQueryBuilder.take).toHaveBeenCalledWith(10);
-    });
-
-    it('should handle empty results', async () => {
-      // Arrange
-      const query: FindTobaccosDto = { page: 1, limit: 20 };
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
-
-      // Act
-      const result = await repository.findAll(query);
-
-      // Assert
-      expect(result).toEqual({
-        data: [],
-        total: 0,
-      });
-    });
-
-    it('should apply all filters together', async () => {
-      // Arrange
-      const query: FindTobaccosDto = {
-        page: 1,
-        limit: 20,
-        sortBy: 'rating',
-        order: 'desc',
-        brandId: 'brand-123',
-        lineId: 'line-456',
+    it('keeps filters and all-flavor matching inside the exact count and page queries', async () => {
+      await repository.findAll({
+        brandId: 'brand-id',
+        lineId: 'line-id',
         minRating: 3,
         maxRating: 5,
-        country: 'Россия',
-        status: 'Выпускается',
-        search: 'test',
-      };
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
-
-      // Act
-      await repository.findAll(query);
-
-      // Assert
-      expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
-        'tobacco.brand',
-        'brand',
-      );
-      expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
-        'tobacco.line',
-        'line',
-      );
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        'tobacco.brandId = :brandId',
-        { brandId: 'brand-123' },
-      );
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        'tobacco.lineId = :lineId',
-        { lineId: 'line-456' },
-      );
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        'tobacco.rating >= :minRating',
-        { minRating: 3 },
-      );
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        'tobacco.rating <= :maxRating',
-        { maxRating: 5 },
-      );
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        'brand.country = :country',
-        { country: 'Россия' },
-      );
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        'tobacco.status = :status',
-        { status: 'Выпускается' },
-      );
-      // Assert - check that search WHERE clause was called
-      const searchCall = mockQueryBuilder.andWhere.mock.calls.find((call) => {
-        const whereClause = call[0] as string;
-        return (
-          whereClause?.includes('to_tsvector') &&
-          whereClause?.includes('to_tsquery')
-        );
+        country: 'Russia',
+        status: 'Active',
+        flavors: ['mint', 'mint', 'lemon'],
+        search: 'ice cream',
       });
-      expect(searchCall).toBeDefined();
-      expect(mockQueryBuilder.addSelect).toHaveBeenCalled();
-      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
-        'relevance',
-        'DESC',
+      const queries = sqlQuery.mock.calls;
+      const countCall = queries.find(([sql]) =>
+        String(sql).includes('COUNT(*)'),
       );
+      const countSql = countCall?.[0] as string;
+      const parameters = countCall?.[1] as unknown[];
+      const pageSql = queries.find(([sql]) =>
+        String(sql).includes('OFFSET'),
+      )?.[0] as string;
+
+      expect(countSql).toContain('t."brandId" = $1');
+      expect(countSql).toContain('t."lineId" = $2');
+      expect(countSql).toContain('t.rating >= $3');
+      expect(countSql).toContain('t.rating <= $4');
+      expect(countSql).toContain('filter_brand.country = $5');
+      expect(countSql).toContain('t.status = $6');
+      expect(countSql).toContain('HAVING COUNT(DISTINCT f.id) = $8');
+      expect(countSql).toContain('t.id IN (\n        SELECT tf."tobaccoId"');
+      expect(countSql).not.toContain('tf."tobaccoId" = t.id');
+      expect(pageSql).toContain('HAVING COUNT(DISTINCT f.id) = $8');
+      expect(parameters.slice(0, 8)).toEqual([
+        'brand-id',
+        'line-id',
+        3,
+        5,
+        'Russia',
+        'Active',
+        ['mint', 'lemon'],
+        2,
+      ]);
     });
 
-    it('should not apply optional filters when not provided', async () => {
-      // Arrange
-      const query: FindTobaccosDto = { page: 1, limit: 20 };
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
-
-      // Act
-      await repository.findAll(query);
-
-      // Assert
-      expect(mockQueryBuilder.andWhere).not.toHaveBeenCalled();
-      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
-        'tobacco.rating',
-        'DESC',
+    it('keeps strict matches above fuzzy matches and labels approximate pages', async () => {
+      sqlQuery.mockImplementation((sql: string) =>
+        Promise.resolve(
+          sql.startsWith('SET ')
+            ? []
+            : sql.includes('COUNT(*)')
+              ? [{ total: 1 }]
+              : [{ id: tobacco.id, exact_count: 0 }],
+        ),
       );
+
+      const result = await repository.findAll({ search: 'darksaid' });
+
+      expect(result.search).toEqual({
+        matchQuality: 'approximate',
+        approximateResultIds: [tobacco.id],
+      });
+      const calls = sqlQuery.mock.calls;
+      const pageSql = calls.find(([sql]) =>
+        String(sql).includes('OFFSET'),
+      )?.[0] as string;
+      expect(pageSql).toContain('matched.exact_count DESC');
+      expect(pageSql).toContain('t."ratingsCount" DESC, t.id ASC');
     });
 
-    it('should use default sortBy and order when not provided', async () => {
-      // Arrange
-      const query: FindTobaccosDto = {};
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
+    it('treats whitespace as browse and nonempty punctuation as zero matches', async () => {
+      const browse = await repository.findAll({ search: ' \t\n ' });
+      const queryCountBefore = sqlQuery.mock.calls.length;
+      const punctuation = await repository.findAll({ search: '!!!' });
 
-      // Act
-      await repository.findAll(query);
-
-      // Assert
-      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
-        'tobacco.rating',
-        'DESC',
-      );
+      expect(browse.total).toBe(7);
+      expect(punctuation).toEqual({ data: [], total: 0 });
+      expect(sqlQuery.mock.calls).toHaveLength(queryCountBefore);
     });
 
-    it.each([
-      ['rating', 'tobacco.rating', 'DESC'],
-      ['name', 'tobacco.name', 'ASC'],
-      ['dateAdded', 'tobacco.createdAt', 'DESC'],
-    ] as const)(
-      'maps %s to its fixed entity field',
-      async (sortBy, field, direction) => {
-        mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
-        await repository.findAll({
-          sortBy,
-          order: direction.toLowerCase() as 'asc' | 'desc',
-        });
-        expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(field, direction);
-      },
-    );
-
-    it('keeps relevance sorting when search overrides a valid catalog sort', async () => {
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
-      await repository.findAll({ sortBy: 'dateAdded', search: 'mint' });
-      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
-        'relevance',
-        'DESC',
-      );
+    it('bounds query length and term count at the repository boundary', async () => {
+      await expect(
+        repository.findAll({ search: 'x'.repeat(129) }),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        repository.findAll({
+          search: 'one two three four five six seven eight nine',
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(transactionMock).not.toHaveBeenCalled();
     });
 
     it.each(['views', 'unsupported', 'toString', '__proto__'])(
-      'rejects unsupported direct sort field %s before query creation',
+      'rejects unsupported direct sort field %s',
       async (sortBy) => {
         await expect(
-          repository.findAll({ sortBy, search: 'mint' } as FindTobaccosDto),
+          repository.findAll({ sortBy } as FindTobaccosDto),
         ).rejects.toBeInstanceOf(BadRequestException);
-        expect(mockTobaccoRepository.createQueryBuilder).not.toHaveBeenCalled();
+        expect(transactionMock).not.toHaveBeenCalled();
       },
     );
 
-    it('rejects unsupported direct sort order before query creation', async () => {
+    it('rejects unsupported direct sort order', async () => {
       await expect(
         repository.findAll({ order: 'desc,unsupported' } as FindTobaccosDto),
       ).rejects.toBeInstanceOf(BadRequestException);
-      expect(mockTobaccoRepository.createQueryBuilder).not.toHaveBeenCalled();
-    });
-
-    // Tests for improved search with prefix matching and ranking
-    it('should apply prefix search with ILIKE for partial word matches', async () => {
-      // Arrange
-      const query: FindTobaccosDto = { search: 'col' };
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
-
-      // Act
-      await repository.findAll(query);
-
-      // Assert - check that ILIKE conditions are present
-      const searchCall = mockQueryBuilder.andWhere.mock.calls.find((call) => {
-        const whereClause = call[0] as string;
-        return (
-          whereClause?.includes('LOWER(tobacco.name) LIKE LOWER') ||
-          whereClause?.includes('LOWER(brand.name) LIKE LOWER') ||
-          whereClause?.includes('LOWER(line.name) LIKE LOWER')
-        );
-      });
-      expect(searchCall).toBeDefined();
-    });
-
-    it('should use FTS prefix operator (:*) for stemming support', async () => {
-      // Arrange
-      const query: FindTobaccosDto = { search: 'cola' };
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
-
-      // Act
-      await repository.findAll(query);
-
-      // Assert - check that setParameter was called with values containing :*
-      const hasPrefixParam = mockQueryBuilder.setParameter.mock.calls.some(
-        (call) => {
-          const value = call[1] as string;
-          return value?.includes(':*');
-        },
-      );
-      expect(hasPrefixParam).toBe(true);
-    });
-
-    it('should calculate exact match bonus for tobacco name', async () => {
-      // Arrange
-      const query: FindTobaccosDto = { search: 'Test Tobacco' };
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
-
-      // Act
-      await repository.findAll(query);
-
-      // Assert - check that addSelect was called with relevance score
-      // calls[0] is addSelect('tobacco'), calls[1] is the relevance expression
-      const relevanceCall = mockQueryBuilder.addSelect.mock.calls.find((call) =>
-        (call[0] as string).includes('CASE WHEN'),
-      );
-      expect(relevanceCall).toBeDefined();
-      expect(relevanceCall![0]).toContain(
-        'CASE WHEN LOWER(tobacco.name) = LOWER',
-      );
-      expect(relevanceCall![0]).toContain('THEN 100 ELSE 0 END');
-    });
-
-    it('should calculate prefix match bonus for tobacco name', async () => {
-      // Arrange
-      const query: FindTobaccosDto = { search: 'Test' };
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
-
-      // Act
-      await repository.findAll(query);
-
-      // Assert - check that prefix match bonus is calculated
-      const relevanceCall = mockQueryBuilder.addSelect.mock.calls.find((call) =>
-        (call[0] as string).includes('CASE WHEN'),
-      );
-      expect(relevanceCall).toBeDefined();
-      expect(relevanceCall![0]).toContain(
-        'CASE WHEN LOWER(tobacco.name) LIKE LOWER',
-      );
-      expect(relevanceCall![0]).toContain('THEN 50 ELSE 0 END');
-    });
-
-    it('should calculate prefix match bonus for brand name', async () => {
-      // Arrange
-      const query: FindTobaccosDto = { search: 'Test' };
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
-
-      // Act
-      await repository.findAll(query);
-
-      // Assert - check that brand prefix match bonus is calculated
-      const relevanceCall = mockQueryBuilder.addSelect.mock.calls.find((call) =>
-        (call[0] as string).includes('CASE WHEN'),
-      );
-      expect(relevanceCall).toBeDefined();
-      expect(relevanceCall![0]).toContain(
-        'CASE WHEN LOWER(brand.name) LIKE LOWER',
-      );
-      expect(relevanceCall![0]).toContain('THEN 30 ELSE 0 END');
-    });
-
-    it('should calculate prefix match bonus for line name', async () => {
-      // Arrange
-      const query: FindTobaccosDto = { search: 'Test' };
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
-
-      // Act
-      await repository.findAll(query);
-
-      // Assert - check that line prefix match bonus is calculated
-      const relevanceCall = mockQueryBuilder.addSelect.mock.calls.find((call) =>
-        (call[0] as string).includes('CASE WHEN'),
-      );
-      expect(relevanceCall).toBeDefined();
-      expect(relevanceCall![0]).toContain(
-        'CASE WHEN LOWER(line.name) LIKE LOWER',
-      );
-      expect(relevanceCall![0]).toContain('THEN 30 ELSE 0 END');
-    });
-
-    it('should handle multi-word search with cross-field AND logic', async () => {
-      // Arrange
-      const query: FindTobaccosDto = { search: 'cola darks' };
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
-
-      // Act
-      await repository.findAll(query);
-
-      // Assert - check that multiple andWhere calls are made (one per word)
-      const searchCalls = mockQueryBuilder.andWhere.mock.calls.filter(
-        (call) => {
-          const whereClause = call[0] as string;
-          return (
-            whereClause?.includes('to_tsvector') ||
-            whereClause?.includes('LOWER') ||
-            whereClause?.includes('LIKE')
-          );
-        },
-      );
-      // Should have at least 2 search calls (one for each word)
-      expect(searchCalls.length).toBeGreaterThanOrEqual(2);
-    });
-
-    it('should combine base relevance with bonuses for final ranking', async () => {
-      // Arrange
-      const query: FindTobaccosDto = { search: 'test' };
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
-
-      // Act
-      await repository.findAll(query);
-
-      // Assert - check that final score combines all components
-      const relevanceCall = mockQueryBuilder.addSelect.mock.calls.find((call) =>
-        (call[0] as string).includes('ts_rank'),
-      );
-      expect(relevanceCall).toBeDefined();
-      // Should contain base relevance (ts_rank)
-      expect(relevanceCall![0]).toContain('ts_rank');
-      // Should contain exact match bonus (100)
-      expect(relevanceCall![0]).toContain('100');
-      // Should contain prefix match bonuses (50, 30)
-      expect(relevanceCall![0]).toContain('50');
-      expect(relevanceCall![0]).toContain('30');
-    });
-
-    it('should set parameters for prefix and exact match calculations', async () => {
-      // Arrange
-      const query: FindTobaccosDto = { search: 'test' };
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
-
-      // Act
-      await repository.findAll(query);
-
-      // Assert - check that setParameter is called with correct values
-      expect(mockQueryBuilder.setParameter).toHaveBeenCalled();
-      const setParamCalls = mockQueryBuilder.setParameter.mock.calls;
-      // Should have parameters for prefix search (test%)
-      const hasPrefixParam = setParamCalls.some((call) => {
-        return call[1] === 'test%';
-      });
-      expect(hasPrefixParam).toBe(true);
-    });
-
-    it('should handle case-insensitive search', async () => {
-      // Arrange
-      const query: FindTobaccosDto = { search: 'TEST' }; // uppercase
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTobacco], 1]);
-
-      // Act
-      await repository.findAll(query);
-
-      // Assert - check that LOWER() is used for case-insensitive matching
-      const searchCall = mockQueryBuilder.andWhere.mock.calls.find((call) => {
-        const whereClause = call[0] as string;
-        return whereClause?.includes('LOWER');
-      });
-      expect(searchCall).toBeDefined();
+      expect(transactionMock).not.toHaveBeenCalled();
     });
   });
 
   describe('findOne', () => {
-    it('should return tobacco when found', async () => {
-      // Arrange
-      const tobaccoId = mockTobacco.id;
-      mockTobaccoRepository.findOne.mockResolvedValue(mockTobacco);
-
-      // Act
-      const result = await repository.findOne(tobaccoId);
-
-      // Assert
-      expect(result).toEqual(mockTobacco);
-      expect(mockTobaccoRepository.findOne).toHaveBeenCalledWith({
-        where: { id: tobaccoId },
+    it('loads the tobacco relations', async () => {
+      tobaccoRepository.findOne.mockResolvedValue(tobacco);
+      await expect(repository.findOne(tobacco.id)).resolves.toBe(tobacco);
+      expect(tobaccoRepository.findOne).toHaveBeenCalledWith({
+        where: { id: tobacco.id },
         relations: ['brand', 'line', 'flavors'],
       });
-    });
-
-    it('should return null when tobacco not found', async () => {
-      // Arrange
-      const tobaccoId = 'non-existent-id';
-      mockTobaccoRepository.findOne.mockResolvedValue(null);
-
-      // Act
-      const result = await repository.findOne(tobaccoId);
-
-      // Assert
-      expect(result).toBeNull();
-      expect(mockTobaccoRepository.findOne).toHaveBeenCalledWith({
-        where: { id: tobaccoId },
-        relations: ['brand', 'line', 'flavors'],
-      });
-    });
-  });
-
-  describe('findBySlug', () => {
-    it('should return tobacco when found by slug', async () => {
-      // Arrange
-      const slug = mockTobacco.slug;
-      mockTobaccoRepository.findOne.mockResolvedValue(mockTobacco);
-
-      // Act
-      const result = await repository.findBySlug(slug);
-
-      // Assert
-      expect(result).toEqual(mockTobacco);
-      expect(mockTobaccoRepository.findOne).toHaveBeenCalledWith({
-        where: { slug },
-        relations: ['brand', 'line', 'flavors'],
-      });
-    });
-
-    it('should return null when tobacco not found by slug', async () => {
-      // Arrange
-      const slug = 'non-existent-slug';
-      mockTobaccoRepository.findOne.mockResolvedValue(null);
-
-      // Act
-      const result = await repository.findBySlug(slug);
-
-      // Assert
-      expect(result).toBeNull();
-      expect(mockTobaccoRepository.findOne).toHaveBeenCalledWith({
-        where: { slug },
-        relations: ['brand', 'line', 'flavors'],
-      });
-    });
-  });
-
-  describe('getStatuses', () => {
-    it('should return list of unique statuses', async () => {
-      // Arrange
-      const mockRawResult = [
-        { status: 'Выпускается' },
-        { status: 'Лимитированная' },
-        { status: 'Снята с производства' },
-      ];
-      mockQueryBuilder.getRawMany.mockResolvedValue(mockRawResult);
-
-      // Act
-      const result = await repository.getStatuses();
-
-      // Assert
-      expect(result).toEqual([
-        'Выпускается',
-        'Лимитированная',
-        'Снята с производства',
-      ]);
-      expect(mockTobaccoRepository.createQueryBuilder).toHaveBeenCalledWith(
-        'tobacco',
-      );
-      expect(mockQueryBuilder.select).toHaveBeenCalledWith(
-        'DISTINCT tobacco.status',
-      );
-      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
-        'tobacco.status IS NOT NULL',
-      );
-      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
-        'tobacco.status',
-        'ASC',
-      );
-      expect(mockQueryBuilder.getRawMany).toHaveBeenCalled();
-    });
-
-    it('should return empty array when no statuses exist', async () => {
-      // Arrange
-      mockQueryBuilder.getRawMany.mockResolvedValue([]);
-
-      // Act
-      const result = await repository.getStatuses();
-
-      // Assert
-      expect(result).toEqual([]);
-    });
-
-    it('should filter out NULL status values', async () => {
-      // Arrange
-      const mockRawResult = [
-        { status: 'Выпускается' },
-        { status: 'Лимитированная' },
-      ];
-      mockQueryBuilder.getRawMany.mockResolvedValue(mockRawResult);
-
-      // Act
-      const result = await repository.getStatuses();
-
-      // Assert
-      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
-        'tobacco.status IS NOT NULL',
-      );
-      expect(result).toEqual(['Выпускается', 'Лимитированная']);
-    });
-
-    it('should order statuses alphabetically', async () => {
-      // Arrange
-      const mockRawResult = [
-        { status: 'Снята с производства' },
-        { status: 'Выпускается' },
-        { status: 'Лимитированная' },
-      ];
-      mockQueryBuilder.getRawMany.mockResolvedValue(mockRawResult);
-
-      // Act
-      await repository.getStatuses();
-
-      // Assert
-      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
-        'tobacco.status',
-        'ASC',
-      );
     });
   });
 });

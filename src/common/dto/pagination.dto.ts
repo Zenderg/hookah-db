@@ -21,6 +21,10 @@ export class PaginationMetaDto {
   page: number;
   limit: number;
   totalPages: number;
+  search?: {
+    matchQuality: 'approximate';
+    approximateResultIds: string[];
+  };
 }
 
 export class PaginatedResponseDto<T> {
